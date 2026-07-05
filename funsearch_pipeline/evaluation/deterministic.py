@@ -1,18 +1,22 @@
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 import json
 import math
 
 from funsearch_pipeline.evaluation.interfaces import EvaluatedCandidate
 from funsearch_pipeline.evaluation.interfaces import PairScore
+from funsearch_pipeline.priority_tools.contracts import PriorityAncestryCoordinate
+from funsearch_pipeline.priority_tools.contracts import PriorityTargetVariant
+from funsearch_pipeline.priority_tools.contracts import PriorityTrainingData
 from funsearch_pipeline.program_database.database import CandidateProgram
 
 
 class DeterministicPriorityEvaluator:
     """Synthetic evaluator used to validate orchestration before oracle wiring."""
 
-    def __init__(self, *, function_name: str) -> None:
+    def __init__(self, *, function_name: str, logger: logging.Logger | None = None) -> None:
         """Create a synthetic evaluator for smoke tests.
 
         Input:
@@ -23,6 +27,7 @@ class DeterministicPriorityEvaluator:
         """
 
         self._function_name = function_name
+        self._logger = logger
 
     def prepare(self, experiment_dir: Path) -> None:
         """Write a deterministic evaluator manifest.
@@ -35,6 +40,7 @@ class DeterministicPriorityEvaluator:
         """
 
         manifest_path = experiment_dir / "preprocessed" / "deterministic_manifest.json"
+        created = not manifest_path.exists()
         manifest_path.parent.mkdir(parents=True, exist_ok=True)
         manifest_path.write_text(
             json.dumps(
@@ -46,6 +52,11 @@ class DeterministicPriorityEvaluator:
                 sort_keys=True,
             )
         )
+        if created and self._logger is not None:
+            self._logger.info(
+                "Prepared deterministic evaluator manifest at %s",
+                manifest_path,
+            )
 
     def evaluate_candidate(self, candidate: CandidateProgram) -> EvaluatedCandidate | None:
         """Score one candidate by executing it on synthetic inputs.
@@ -63,12 +74,33 @@ class DeterministicPriorityEvaluator:
             exec(candidate.program_source, namespace)
             priority_function = namespace[self._function_name]
             raw_value = priority_function(
-                training_data={"records": []},
-                ancestry_coordinate=[0.25, -0.5, 0.75],
-                target_variant="dosage__rsSynthetic",
+                training_data=PriorityTrainingData(
+                    records=(),
+                    variant_names=("rsSynthetic",),
+                    variant_dosage_fields=("dosage__rsSynthetic",),
+                    covariate_names=(),
+                    sample_count=0,
+                    ancestry_dimension=3,
+                    has_additional_covariates=False,
+                ),
+                ancestry_coordinate=PriorityAncestryCoordinate(
+                    values=(0.25, -0.5, 0.75),
+                    dimension=3,
+                ),
+                target_variant=PriorityTargetVariant(
+                    name="rsSynthetic",
+                    dosage_field="dosage__rsSynthetic",
+                    column_index=0,
+                ),
             )
             score = float(raw_value)
         except Exception:
+            if self._logger is not None:
+                self._logger.exception(
+                    "Deterministic evaluation failed for candidate island=%s sample=%s",
+                    candidate.island_id,
+                    candidate.sample_index,
+                )
             return None
 
         if not math.isfinite(score):

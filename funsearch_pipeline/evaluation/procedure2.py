@@ -9,6 +9,7 @@ import ast
 import hashlib
 import inspect
 import json
+import logging
 import math
 import pickle
 
@@ -81,7 +82,13 @@ class PairEvaluationResult:
 class Procedure2PriorityEvaluator:
     """Oracle Procedure 2 evaluator for FunSearch priority functions."""
 
-    def __init__(self, *, settings: EvaluatorSettings, function_name: str) -> None:
+    def __init__(
+        self,
+        *,
+        settings: EvaluatorSettings,
+        function_name: str,
+        logger: logging.Logger | None = None,
+    ) -> None:
         """Create the Procedure 2 evaluator.
 
         Input:
@@ -94,6 +101,7 @@ class Procedure2PriorityEvaluator:
 
         self._settings = settings
         self._function_name = function_name
+        self._logger = logger
         self._prepared_pairs: tuple[PreparedDatasetPair, ...] = ()
 
     @property
@@ -220,6 +228,21 @@ class Procedure2PriorityEvaluator:
         _write_pickle(prepared_pair.oracle_train_pickle, oracle_train)
         _write_pickle(prepared_pair.calibration_pickle, calibration)
         _write_pickle(prepared_pair.scoring_pickle, scoring)
+        if self._logger is not None:
+            self._logger.info(
+                "Prepared Procedure 2 dataset pair %s from training_sources=%s testing_sources=%s "
+                "oracle_train_pickle=%s oracle_train_samples=%d calibration_pickle=%s calibration_samples=%d "
+                "scoring_pickle=%s scoring_samples=%d",
+                dataset_pair.name,
+                [str(path) for path in dataset_pair.training_pickles],
+                [str(path) for path in dataset_pair.testing_pickles],
+                prepared_pair.oracle_train_pickle,
+                _dataset_length(oracle_train),
+                prepared_pair.calibration_pickle,
+                _dataset_length(calibration),
+                prepared_pair.scoring_pickle,
+                _dataset_length(scoring),
+            )
         return prepared_pair
 
     def evaluate_candidate(self, candidate: CandidateProgram) -> EvaluatedCandidate | None:
@@ -244,6 +267,12 @@ class Procedure2PriorityEvaluator:
                 for pair in self._prepared_pairs
             }
         except Exception:
+            if self._logger is not None:
+                self._logger.exception(
+                    "Procedure2 evaluation failed for candidate island=%s sample=%s",
+                    candidate.island_id,
+                    candidate.sample_index,
+                )
             return None
 
         pair_scores = tuple(

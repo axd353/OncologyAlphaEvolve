@@ -7,6 +7,7 @@ from funsearch.implementation import code_manipulation
 from funsearch_pipeline.config import EvaluatorSettings
 from funsearch_pipeline.config import SamplerSettings
 from funsearch_pipeline.evaluation import build_evaluator
+from funsearch_pipeline.logging_utils import configure_file_logger
 from funsearch_pipeline.program_database import IslandPrompt
 from funsearch_pipeline.program_database import IslandShard
 from funsearch_pipeline.sampling.backends import run_sampling_request
@@ -31,6 +32,7 @@ class IslandSamplerRequest:
         function_to_evolve: Unversioned priority function name.
         sampler_settings: LLM backend and sampling hyperparameters.
         evaluator_settings: Evaluator backend and scoring hyperparameters.
+        logging_level: Logging level used for the worker-local evaluator logger.
         experiment_dir: Shared experiment directory containing prepared data.
         system_prompt: Text prompt supplied as LLM instructions.
         output_dir: Per-island directory for raw sampler artifacts.
@@ -47,6 +49,7 @@ class IslandSamplerRequest:
     function_to_evolve: str
     sampler_settings: SamplerSettings
     evaluator_settings: EvaluatorSettings
+    logging_level: str
     experiment_dir: Path
     system_prompt: str
     output_dir: Path
@@ -199,9 +202,19 @@ def run_island_sampler(request: IslandSamplerRequest) -> IslandSamplerResult:
         ),
     )
 
+    evaluator_logger = configure_file_logger(
+        request.log_path,
+        request.logging_level,
+        logger_name=(
+            f"funsearch_pipeline.sampler.cycle_{request.cycle_index:04d}."
+            f"island_{request.island_shard.island_id:03d}"
+        ),
+    )
+
     evaluator = build_evaluator(
         request.evaluator_settings,
         function_name=request.function_to_evolve,
+        logger=evaluator_logger,
     )
     evaluator.prepare(request.experiment_dir)
     generated_candidates = 0

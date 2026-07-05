@@ -10,6 +10,7 @@ from funsearch_pipeline.config import EvaluatorSettings
 from funsearch_pipeline.config import ProgramDatabaseSettings
 from funsearch_pipeline.evaluation import build_evaluator
 from funsearch_pipeline.evaluation.procedure2 import Procedure2PriorityEvaluator
+from funsearch_pipeline.logging_utils import configure_file_logger
 from funsearch_pipeline.program_database.database import CycleProgramsDatabase
 
 
@@ -111,3 +112,59 @@ def test_procedure2_evaluator_scores_seed_priority_function(tmp_path: Path) -> N
     assert scores["mean"] == scores["no_covariates"]
     assert scores["simplicity"] < 0.0
     assert result.metadata["procedure2_pairs"]["no_covariates"]["num_variants"] == 2
+
+
+def test_procedure2_prepare_logs_first_materialization(tmp_path: Path) -> None:
+    train_a = _write_pickle(tmp_path / "train_a.pkl", _make_synthetic_oracle_frame(40))
+    train_b = _write_pickle(
+        tmp_path / "train_b.pkl",
+        _make_synthetic_oracle_frame(40, offset=40),
+    )
+    test_path = _write_pickle(
+        tmp_path / "test.pkl",
+        _make_synthetic_oracle_frame(30, offset=80),
+    )
+    log_path = tmp_path / "prepare.log"
+    logger = configure_file_logger(
+        log_path,
+        "INFO",
+        logger_name=f"test.procedure2.prepare.{tmp_path.name}",
+    )
+    settings = EvaluatorSettings(
+        backend="procedure2",
+        metric="roc_auc",
+        oracle_train_fraction=0.8,
+        preprocessed_dirname="preprocessed",
+        calibration_penalties=(0.1, 1.0),
+        scoring_partitions=1,
+        bootstrap_iterations=10,
+        dataset_pairs=(
+            DatasetPairConfig(
+                name="no_covariates",
+                has_additional_covariates=False,
+                training_pickles=(train_a, train_b),
+                testing_pickles=(test_path,),
+            ),
+        ),
+    )
+
+    evaluator = build_evaluator(
+        settings,
+        function_name="priority",
+        logger=logger,
+    )
+
+    assert isinstance(evaluator, Procedure2PriorityEvaluator)
+
+    experiment_dir = tmp_path / "experiment"
+    evaluator.prepare(experiment_dir)
+    evaluator.prepare(experiment_dir)
+
+    log_text = log_path.read_text()
+    assert log_text.count("Prepared Procedure 2 dataset pair no_covariates") == 1
+    assert str(train_a) in log_text
+    assert str(train_b) in log_text
+    assert str(test_path) in log_text
+    assert "oracle_train_samples=64" in log_text
+    assert "calibration_samples=16" in log_text
+    assert "scoring_samples=30" in log_text

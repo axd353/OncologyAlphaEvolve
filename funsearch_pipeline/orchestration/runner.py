@@ -100,6 +100,7 @@ def _build_island_sampler_requests(
                 function_to_evolve=database.function_to_evolve,
                 sampler_settings=config.sampler,
                 evaluator_settings=config.evaluator,
+                logging_level=config.logging.level,
                 experiment_dir=experiment_dir,
                 system_prompt=system_prompt,
                 output_dir=cycle_dir / "sampler_outputs" / f"island_{island_shard.island_id:03d}",
@@ -180,6 +181,7 @@ def run_experiment(config_path: str | Path) -> Path:
     evaluator = build_evaluator(
         config.evaluator,
         function_name=config.experiment.function_to_evolve,
+        logger=logger,
     )
     evaluator.prepare(experiment_dir)
 
