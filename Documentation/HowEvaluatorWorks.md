@@ -97,6 +97,15 @@ The first time a pair is actually materialized, the evaluator logs:
 - the output artifact paths
 - the sample counts written to each artifact
 
+### Missing-value imputation during preparation
+
+Before the prepared pickles are written, the evaluator imputes missing feature values in the raw pandas DataFrames.
+
+- dosage columns are mean-imputed
+- additional covariate columns are mode-imputed
+
+This happens in `prepare(...)`, not during candidate scoring, so the persisted `oracle_train.pkl`, `calibration.pkl`, and `scoring.pkl` artifacts already contain the cleaned values used by later evaluation steps. The covariate columns are also cast to float at this stage so pandas nullable `NA` values do not leak into downstream feature extraction.
+
 ## How `evaluate_candidate(...)` works
 
 `evaluate_candidate(...)` is where the candidate priority function is actually used.

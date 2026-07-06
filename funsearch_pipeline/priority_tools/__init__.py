@@ -1,5 +1,6 @@
 """Public tools and contracts available to evolved priority functions."""
 
+from .direct_tools_ancestry_distance import equal_count_interval_densities
 from .direct_tools_ancestry_distance import equal_count_intervals
 from .direct_tools_ancestry_distance import radius_for_percentage
 from .contracts import AncestryCoordinate
@@ -20,6 +21,7 @@ __all__ = [
 	"PriorityTrainingRecord",
 	"TargetVariant",
 	"TrainingData",
+	"equal_count_interval_densities",
 	"equal_count_intervals",
 	"radius_for_percentage",
 ]

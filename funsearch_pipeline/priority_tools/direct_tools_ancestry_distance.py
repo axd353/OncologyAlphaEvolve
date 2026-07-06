@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from .helper_tools_ancestry_distance import _equal_count_shell_upper_bounds
 from .helper_tools_ancestry_distance import _exact_count_from_percentage
+from .helper_tools_ancestry_distance import _radial_shell_volume
 from .helper_tools_ancestry_distance import _radius_for_exact_prefix_count
 from .helper_tools_ancestry_distance import _sorted_ancestry_distances
 from .contracts import PriorityAncestryCoordinate
@@ -91,4 +92,72 @@ def equal_count_intervals(
     return intervals
 
 
-__all__ = ["equal_count_intervals", "radius_for_percentage"]
+def equal_count_interval_densities(
+    training_data: PriorityTrainingData,
+    ancestry_coordinate: PriorityAncestryCoordinate,
+    n: int,
+) -> list[float]:
+    """Return sample densities for the intervals produced by `equal_count_intervals`.
+
+    Input:
+        training_data: The exact same `PriorityTrainingData` object that the
+            priority function receives as its `training_data` argument.
+        ancestry_coordinate: The exact same `PriorityAncestryCoordinate` object
+            that the priority function receives as its `ancestry_coordinate`
+            argument.
+        n: Number of intervals to produce. Must be an integer in `[1, 20]`.
+
+    Output:
+        List of `n` densities, ordered from the closest ancestry region to the
+        farthest. Density `i` corresponds to the radial region
+        `[r_{i-1}, r_i)` with `r_0 = 0`, where the radii are chosen to split
+        the training samples as evenly as possible around
+        `ancestry_coordinate`. Each density equals
+        `number_of_training_samples_in_region / region_volume`, where
+        `region_volume` is the Euclidean shell volume between the two radii in
+        `training_data.ancestry_dimension` dimensions.
+
+    Raises:
+        TypeError: if `n` is not an integer.
+        ValueError: if the dataset is empty, the contract shapes are inconsistent,
+            `n` falls outside `[1, 20]`, or a returned interval has zero
+            Euclidean region volume while still containing samples.
+    """
+
+    intervals = equal_count_intervals(training_data, ancestry_coordinate, n)
+    sorted_distances = _sorted_ancestry_distances(training_data, ancestry_coordinate)
+    densities: list[float] = []
+    distance_index = 0
+    for lower_bound, upper_bound in intervals:
+        interval_count = 0
+        while distance_index < len(sorted_distances):
+            distance = sorted_distances[distance_index]
+            if distance < lower_bound:
+                distance_index += 1
+                continue
+            if distance >= upper_bound:
+                break
+            interval_count += 1
+            distance_index += 1
+
+        interval_volume = _radial_shell_volume(
+            lower_bound,
+            upper_bound,
+            training_data.ancestry_dimension,
+        )
+        if interval_volume <= 0.0:
+            if interval_count == 0:
+                densities.append(0.0)
+                continue
+            raise ValueError(
+                "Density is undefined because an interval returned by equal_count_intervals has zero Euclidean region volume but still contains samples."
+            )
+        densities.append(interval_count / interval_volume)
+    return densities
+
+
+__all__ = [
+    "equal_count_interval_densities",
+    "equal_count_intervals",
+    "radius_for_percentage",
+]

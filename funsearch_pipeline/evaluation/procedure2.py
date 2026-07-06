@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from concurrent.futures import ProcessPoolExecutor
+from concurrent.futures import as_completed
 from dataclasses import asdict
 from dataclasses import dataclass
 from pathlib import Path
@@ -43,6 +44,16 @@ PriorityFunction = Callable[
     [PriorityTrainingData, PriorityAncestryCoordinate, PriorityTargetVariant],
     float,
 ]
+
+_PRIORITY_TOOLS_IMPORTS = (
+    "from __future__ import annotations\n"
+    "from funsearch_pipeline.priority_tools import PriorityAncestryCoordinate\n"
+    "from funsearch_pipeline.priority_tools import PriorityTargetVariant\n"
+    "from funsearch_pipeline.priority_tools import PriorityTrainingData\n"
+    "from funsearch_pipeline.priority_tools import equal_count_interval_densities\n"
+    "from funsearch_pipeline.priority_tools import equal_count_intervals\n"
+    "from funsearch_pipeline.priority_tools import radius_for_percentage\n\n"
+)
 
 _EXPECTED_PRIORITY_PARAMETERS = (
     "training_data",
@@ -218,17 +229,27 @@ class Procedure2PriorityEvaluator:
         ):
             return prepared_pair
 
-        combined_training = _load_and_combine_pickles(dataset_pair.training_pickles)
+        combined_training, training_imputed_counts = _impute_missing_feature_columns(
+            _load_and_combine_pickles(dataset_pair.training_pickles)
+        )
         oracle_train, calibration = _split_training_data(
             combined_training,
             oracle_train_fraction=self._settings.oracle_train_fraction,
         )
-        scoring = _load_and_combine_pickles(dataset_pair.testing_pickles)
+        scoring, scoring_imputed_counts = _impute_missing_feature_columns(
+            _load_and_combine_pickles(dataset_pair.testing_pickles)
+        )
 
         _write_pickle(prepared_pair.oracle_train_pickle, oracle_train)
         _write_pickle(prepared_pair.calibration_pickle, calibration)
         _write_pickle(prepared_pair.scoring_pickle, scoring)
         if self._logger is not None:
+            self._logger.info(
+                "Imputed missing values for dataset pair %s: training=%s scoring=%s",
+                dataset_pair.name,
+                training_imputed_counts or "none",
+                scoring_imputed_counts or "none",
+            )
             self._logger.info(
                 "Prepared Procedure 2 dataset pair %s from training_sources=%s testing_sources=%s "
                 "oracle_train_pickle=%s oracle_train_samples=%d calibration_pickle=%s calibration_samples=%d "
@@ -262,10 +283,7 @@ class Procedure2PriorityEvaluator:
         try:
             priority_function = _load_priority_function(candidate.program_source, self._function_name)
             _validate_priority_signature(priority_function)
-            pair_results = {
-                pair.name: self._evaluate_pair(pair, candidate, priority_function)
-                for pair in self._prepared_pairs
-            }
+            pair_results = self._evaluate_pairs(candidate)
         except Exception:
             if self._logger is not None:
                 self._logger.exception(
@@ -297,87 +315,137 @@ class Procedure2PriorityEvaluator:
             },
         )
 
-    def _evaluate_pair(
+    def _evaluate_pairs(
         self,
-        prepared_pair: PreparedDatasetPair,
         candidate: CandidateProgram,
-        priority_function: PriorityFunction,
-    ) -> PairEvaluationResult:
-        """Score one prepared training/testing pair for one priority function."""
+    ) -> dict[str, "PairEvaluationResult"]:
+        """Score all prepared pairs, one worker process per pair when >1.
 
-        oracle_train = _read_pickle(prepared_pair.oracle_train_pickle)
-        calibration = _read_pickle(prepared_pair.calibration_pickle)
-        scoring = _read_pickle(prepared_pair.scoring_pickle)
-        variant_names = _list_variant_names(oracle_train)
-        if not variant_names:
-            raise ValueError(f"No dosage columns found for pair {prepared_pair.name!r}.")
+        A single pair runs inline to avoid process overhead. Multiple pairs are
+        each scored in their own worker process so they run concurrently; the OS
+        schedules the processes onto available cores, so no CPU pinning is
+        needed.
+        """
 
-        calibration_labels = _extract_labels(calibration)
-        calibration_oracle_features = _build_oracle_feature_matrix(
-            training_data=oracle_train,
-            subject_data=calibration,
-            variant_names=variant_names,
-            priority_function=priority_function,
-        )
-        calibration_covariates = _extract_covariates(
-            calibration,
-            include_covariates=prepared_pair.has_additional_covariates,
-        )
-        calibration_model = _fit_best_calibration_model(
-            oracle_features=calibration_oracle_features,
-            covariates=calibration_covariates,
-            labels=calibration_labels,
-            penalties=self._settings.calibration_penalties,
-        )
+        if len(self._prepared_pairs) <= 1:
+            return {
+                pair.name: _evaluate_prepared_pair(
+                    self._settings,
+                    self._function_name,
+                    pair,
+                    candidate.program_source,
+                )
+                for pair in self._prepared_pairs
+            }
 
-        oracle_training_for_scoring = _combine_data_objects([oracle_train, calibration])
-        scoring_labels = _extract_labels(scoring)
-        scoring_oracle_features = _build_scoring_oracle_feature_matrix(
-            training_data=oracle_training_for_scoring,
-            scoring_data=scoring,
-            variant_names=variant_names,
-            candidate_source=candidate.program_source,
-            function_name=self._function_name,
-            scoring_partitions=int(
-                getattr(self._settings, "scoring_partitions", _DEFAULT_SCORING_PARTITIONS)
+        pair_results: dict[str, PairEvaluationResult] = {}
+        with ProcessPoolExecutor(max_workers=len(self._prepared_pairs)) as executor:
+            future_to_name = {
+                executor.submit(
+                    _evaluate_prepared_pair,
+                    self._settings,
+                    self._function_name,
+                    pair,
+                    candidate.program_source,
+                ): pair.name
+                for pair in self._prepared_pairs
+            }
+            for future in as_completed(future_to_name):
+                pair_results[future_to_name[future]] = future.result()
+        # Preserve the configured pair order regardless of completion order so
+        # the program-database score signature stays deterministic.
+        return {pair.name: pair_results[pair.name] for pair in self._prepared_pairs}
+
+
+def _evaluate_prepared_pair(
+    settings: EvaluatorSettings,
+    function_name: str,
+    prepared_pair: PreparedDatasetPair,
+    candidate_source: str,
+) -> "PairEvaluationResult":
+    """Score one prepared training/testing pair for one priority function.
+
+    This is a module-level function so it can run inside a worker process. It
+    reloads the priority function from ``candidate_source`` because compiled
+    functions are not picklable across processes.
+    """
+
+    priority_function = _load_priority_function(candidate_source, function_name)
+    _validate_priority_signature(priority_function)
+
+    oracle_train = _read_pickle(prepared_pair.oracle_train_pickle)
+    calibration = _read_pickle(prepared_pair.calibration_pickle)
+    scoring = _read_pickle(prepared_pair.scoring_pickle)
+    variant_names = _list_variant_names(oracle_train)
+    if not variant_names:
+        raise ValueError(f"No dosage columns found for pair {prepared_pair.name!r}.")
+
+    calibration_labels = _extract_labels(calibration)
+    calibration_oracle_features = _build_oracle_feature_matrix(
+        training_data=oracle_train,
+        subject_data=calibration,
+        variant_names=variant_names,
+        priority_function=priority_function,
+    )
+    calibration_covariates = _extract_covariates(
+        calibration,
+        include_covariates=prepared_pair.has_additional_covariates,
+    )
+    calibration_model = _fit_best_calibration_model(
+        oracle_features=calibration_oracle_features,
+        covariates=calibration_covariates,
+        labels=calibration_labels,
+        penalties=settings.calibration_penalties,
+    )
+
+    oracle_training_for_scoring = _combine_data_objects([oracle_train, calibration])
+    scoring_labels = _extract_labels(scoring)
+    scoring_oracle_features = _build_scoring_oracle_feature_matrix(
+        training_data=oracle_training_for_scoring,
+        scoring_data=scoring,
+        variant_names=variant_names,
+        candidate_source=candidate_source,
+        function_name=function_name,
+        scoring_partitions=int(
+            getattr(settings, "scoring_partitions", _DEFAULT_SCORING_PARTITIONS)
+        ),
+    )
+    scoring_covariates = _extract_covariates(
+        scoring,
+        include_covariates=prepared_pair.has_additional_covariates,
+    )
+    risk_scores = _predict_linear_score(
+        calibration_model,
+        oracle_features=scoring_oracle_features,
+        covariates=scoring_covariates,
+    )
+    direct_auc = _safe_roc_auc(scoring_labels, risk_scores)
+    bootstrap_auc_median = _bootstrap_auc_median(
+        labels=scoring_labels,
+        risk_scores=risk_scores,
+        bootstrap_iterations=int(
+            getattr(settings, "bootstrap_iterations", _DEFAULT_BOOTSTRAP_ITERATIONS)
+        ),
+        random_seed=_stable_bootstrap_seed(candidate_source, prepared_pair.name),
+    )
+
+    return PairEvaluationResult(
+        score=bootstrap_auc_median,
+        metadata={
+            "direct_auc": direct_auc,
+            "bootstrap_auc_median": bootstrap_auc_median,
+            "bootstrap_iterations": int(
+                getattr(settings, "bootstrap_iterations", _DEFAULT_BOOTSTRAP_ITERATIONS)
             ),
-        )
-        scoring_covariates = _extract_covariates(
-            scoring,
-            include_covariates=prepared_pair.has_additional_covariates,
-        )
-        risk_scores = _predict_linear_score(
-            calibration_model,
-            oracle_features=scoring_oracle_features,
-            covariates=scoring_covariates,
-        )
-        direct_auc = _safe_roc_auc(scoring_labels, risk_scores)
-        bootstrap_auc_median = _bootstrap_auc_median(
-            labels=scoring_labels,
-            risk_scores=risk_scores,
-            bootstrap_iterations=int(
-                getattr(self._settings, "bootstrap_iterations", _DEFAULT_BOOTSTRAP_ITERATIONS)
-            ),
-            random_seed=_stable_bootstrap_seed(candidate.program_source, prepared_pair.name),
-        )
-
-        return PairEvaluationResult(
-            score=bootstrap_auc_median,
-            metadata={
-                "direct_auc": direct_auc,
-                "bootstrap_auc_median": bootstrap_auc_median,
-                "bootstrap_iterations": int(
-                    getattr(self._settings, "bootstrap_iterations", _DEFAULT_BOOTSTRAP_ITERATIONS)
-                ),
-                "selected_calibration_penalty": calibration_model.penalty,
-                "calibration_log_loss": calibration_model.calibration_log_loss,
-                "num_variants": len(variant_names),
-                "num_oracle_train_samples": _dataset_length(oracle_train),
-                "num_calibration_samples": _dataset_length(calibration),
-                "num_scoring_samples": _dataset_length(scoring),
-                "used_additional_covariates": prepared_pair.has_additional_covariates,
-            },
-        )
+            "selected_calibration_penalty": calibration_model.penalty,
+            "calibration_log_loss": calibration_model.calibration_log_loss,
+            "num_variants": len(variant_names),
+            "num_oracle_train_samples": _dataset_length(oracle_train),
+            "num_calibration_samples": _dataset_length(calibration),
+            "num_scoring_samples": _dataset_length(scoring),
+            "used_additional_covariates": prepared_pair.has_additional_covariates,
+        },
+    )
 
 
 def _load_prepared_pairs_manifest(manifest_path: Path) -> tuple[PreparedDatasetPair, ...]:
@@ -412,6 +480,50 @@ def _load_and_combine_pickles(paths: Sequence[str | Path]) -> Any:
     if not paths:
         raise ValueError("At least one pickle path is required.")
     return _combine_data_objects([_read_pickle(path) for path in paths])
+
+
+def _impute_missing_feature_columns(data: Any) -> tuple[Any, dict[str, int]]:
+    """Impute missing dosage and covariate values before persisting artifacts.
+
+    Dosage columns are mean-imputed (continuous expected allele dosages) and the
+    categorical covariate columns are mode-imputed. Covariate columns are cast to
+    float so pandas nullable ``NA`` never reaches the downstream feature builders.
+    Returns the imputed data plus a per-column count of imputed values.
+    """
+
+    if not isinstance(data, pd.DataFrame):
+        return data, {}
+
+    imputed = data.copy()
+    imputed_counts: dict[str, int] = {}
+
+    dosage_columns = [
+        column
+        for column in imputed.columns
+        if str(column).startswith(DOSAGE_COLUMN_PREFIX)
+    ]
+    for column in dosage_columns:
+        numeric_column = imputed[column].astype("float64")
+        missing_count = int(numeric_column.isna().sum())
+        if missing_count:
+            numeric_column = numeric_column.fillna(numeric_column.mean())
+            imputed_counts[column] = missing_count
+        imputed[column] = numeric_column
+
+    covariate_columns = [
+        column for column in DEFAULT_COVARIATE_FIELDS if column in imputed.columns
+    ]
+    for column in covariate_columns:
+        numeric_column = imputed[column].astype("float64")
+        missing_count = int(numeric_column.isna().sum())
+        if missing_count:
+            mode_values = numeric_column.mode(dropna=True)
+            fill_value = float(mode_values.iloc[0]) if not mode_values.empty else 0.0
+            numeric_column = numeric_column.fillna(fill_value)
+            imputed_counts[column] = missing_count
+        imputed[column] = numeric_column
+
+    return imputed, imputed_counts
 
 
 def _combine_data_objects(data_objects: Sequence[Any]) -> Any:
@@ -475,11 +587,27 @@ def _select_rows(data: Any, indices: np.ndarray) -> Any:
 
 def _load_priority_function(program_source: str, function_name: str) -> PriorityFunction:
     namespace: dict[str, Any] = {}
-    exec(program_source, namespace)
+    exec(_compose_candidate_module(program_source), namespace)
     priority_function = namespace[function_name]
     if not callable(priority_function):
         raise TypeError(f"{function_name!r} is not callable.")
     return priority_function
+
+
+def _compose_candidate_module(program_source: str) -> str:
+    """Prepend priority-tool imports while keeping ``from __future__`` first.
+
+    Any ``from __future__`` line in the candidate is dropped so the single
+    canonical future import in ``_PRIORITY_TOOLS_IMPORTS`` stays at the top of
+    the executed module and never triggers a SyntaxError.
+    """
+
+    body_lines = [
+        line
+        for line in program_source.splitlines()
+        if not line.lstrip().startswith("from __future__ import")
+    ]
+    return _PRIORITY_TOOLS_IMPORTS + "\n".join(body_lines) + "\n"
 
 
 def _validate_priority_signature(priority_function: PriorityFunction) -> None:

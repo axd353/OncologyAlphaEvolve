@@ -10,6 +10,7 @@ from funsearch_pipeline.config import EvaluatorSettings
 from funsearch_pipeline.config import ProgramDatabaseSettings
 from funsearch_pipeline.evaluation import build_evaluator
 from funsearch_pipeline.evaluation.procedure2 import Procedure2PriorityEvaluator
+from funsearch_pipeline.evaluation.procedure2 import _impute_missing_feature_columns
 from funsearch_pipeline.logging_utils import configure_file_logger
 from funsearch_pipeline.program_database.database import CycleProgramsDatabase
 
@@ -114,6 +115,60 @@ def test_procedure2_evaluator_scores_seed_priority_function(tmp_path: Path) -> N
     assert result.metadata["procedure2_pairs"]["no_covariates"]["num_variants"] == 2
 
 
+def test_procedure2_scores_two_pairs_in_parallel(tmp_path: Path) -> None:
+    train = _write_pickle(tmp_path / "train.pkl", _make_synthetic_oracle_frame(60))
+    test = _write_pickle(tmp_path / "test.pkl", _make_synthetic_oracle_frame(40, offset=60))
+    seed_source = (
+        "def priority(training_data, ancestry_coordinate, target_variant):\n"
+        "    return 10.0\n"
+    )
+    database = CycleProgramsDatabase.from_seed_program_text(
+        settings=ProgramDatabaseSettings(
+            functions_per_prompt=2,
+            num_islands=2,
+            cluster_sampling_temperature_init=0.1,
+            cluster_sampling_temperature_period=100,
+        ),
+        seed_program_text=seed_source,
+        function_to_evolve="priority",
+    )
+    candidate = database.build_seed_candidate()
+    evaluator = Procedure2PriorityEvaluator(
+        settings=EvaluatorSettings(
+            backend="procedure2",
+            metric="roc_auc",
+            oracle_train_fraction=0.8,
+            preprocessed_dirname="preprocessed",
+            calibration_penalties=(1.0,),
+            scoring_partitions=1,
+            bootstrap_iterations=10,
+            dataset_pairs=(
+                DatasetPairConfig(
+                    name="pair_one",
+                    has_additional_covariates=False,
+                    training_pickles=(train,),
+                    testing_pickles=(test,),
+                ),
+                DatasetPairConfig(
+                    name="pair_two",
+                    has_additional_covariates=False,
+                    training_pickles=(train,),
+                    testing_pickles=(test,),
+                ),
+            ),
+        ),
+        function_name="priority",
+    )
+
+    evaluator.prepare(tmp_path)
+    result = evaluator.evaluate_candidate(candidate)
+
+    assert result is not None
+    scores = result.scores_per_test()
+    assert list(scores) == ["pair_one", "pair_two", "simplicity", "mean"]
+    assert set(result.metadata["procedure2_pairs"]) == {"pair_one", "pair_two"}
+
+
 def test_procedure2_prepare_logs_first_materialization(tmp_path: Path) -> None:
     train_a = _write_pickle(tmp_path / "train_a.pkl", _make_synthetic_oracle_frame(40))
     train_b = _write_pickle(
@@ -168,3 +223,87 @@ def test_procedure2_prepare_logs_first_materialization(tmp_path: Path) -> None:
     assert "oracle_train_samples=64" in log_text
     assert "calibration_samples=16" in log_text
     assert "scoring_samples=30" in log_text
+
+
+def test_procedure2_imputes_missing_dosages_before_scoring(tmp_path: Path) -> None:
+    train_frame = _make_synthetic_oracle_frame(40)
+    train_frame.loc[0, "dosage__risk"] = np.nan
+    test_frame = _make_synthetic_oracle_frame(30, offset=80)
+    test_frame.loc[0, "dosage__risk"] = np.nan
+    train_path = _write_pickle(tmp_path / "train.pkl", train_frame)
+    test_path = _write_pickle(tmp_path / "test.pkl", test_frame)
+
+    seed_source = (
+        "from __future__ import annotations\n"
+        "from funsearch_pipeline.priority_tools.contracts import PriorityAncestryCoordinate\n"
+        "from funsearch_pipeline.priority_tools.contracts import PriorityTargetVariant\n"
+        "from funsearch_pipeline.priority_tools.contracts import PriorityTrainingData\n\n"
+        "def priority(\n"
+        "    training_data: PriorityTrainingData,\n"
+        "    ancestry_coordinate: PriorityAncestryCoordinate,\n"
+        "    target_variant: PriorityTargetVariant,\n"
+        ") -> float:\n"
+        "    return 10.0\n"
+    )
+    database = CycleProgramsDatabase.from_seed_program_text(
+        settings=ProgramDatabaseSettings(
+            functions_per_prompt=2,
+            num_islands=2,
+            cluster_sampling_temperature_init=0.1,
+            cluster_sampling_temperature_period=100,
+        ),
+        seed_program_text=seed_source,
+        function_to_evolve="priority",
+    )
+    candidate = database.build_seed_candidate()
+    evaluator = Procedure2PriorityEvaluator(
+        settings=EvaluatorSettings(
+            backend="procedure2",
+            metric="roc_auc",
+            oracle_train_fraction=0.8,
+            preprocessed_dirname="preprocessed",
+            calibration_penalties=(0.1, 1.0),
+            scoring_partitions=1,
+            bootstrap_iterations=10,
+            dataset_pairs=(
+                DatasetPairConfig(
+                    name="no_covariates",
+                    has_additional_covariates=False,
+                    training_pickles=(train_path,),
+                    testing_pickles=(test_path,),
+                ),
+            ),
+        ),
+        function_name="priority",
+    )
+
+    evaluator.prepare(tmp_path)
+
+    prepared_scoring = pd.read_pickle(
+        tmp_path / "preprocessed" / "no_covariates" / "scoring.pkl"
+    )
+    assert not prepared_scoring["dosage__risk"].isna().any()
+
+    result = evaluator.evaluate_candidate(candidate)
+    assert result is not None
+
+
+def test_impute_missing_feature_columns_handles_nullable_covariates() -> None:
+    frame = pd.DataFrame(
+        {
+            "phenotype": [0, 1, 0, 1],
+            "dosage__risk": [0.0, np.nan, 2.0, 2.0],
+            "bmi_cat": pd.array([1, 1, pd.NA, 2], dtype="Int64"),
+            "current_smoking": pd.array([pd.NA, 0, 0, 1], dtype="Int64"),
+        }
+    )
+
+    imputed, counts = _impute_missing_feature_columns(frame)
+
+    assert counts == {"dosage__risk": 1, "bmi_cat": 1, "current_smoking": 1}
+    assert not imputed[["dosage__risk", "bmi_cat", "current_smoking"]].isna().any().any()
+    # dosage uses the column mean of the observed values (0, 2, 2).
+    assert np.isclose(imputed.loc[1, "dosage__risk"], 4.0 / 3.0)
+    # categorical covariates use the mode of the observed codes.
+    assert imputed.loc[2, "bmi_cat"] == 1.0
+    assert imputed.loc[0, "current_smoking"] == 0.0

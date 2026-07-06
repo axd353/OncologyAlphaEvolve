@@ -107,7 +107,11 @@ def prepare_local_variant_data(
     target_variant: Any,
     radius: float,
 ) -> LocalVariantData:
-    """Extract labels, genotype dosage, and covariates inside the closed ball."""
+    """Extract labels, genotype dosage, and covariates inside the closed ball.
+
+    Missing target dosages are mean-imputed within the local neighborhood so the
+    downstream logistic fit never sees NaNs from sparse genotype gaps.
+    """
 
     center = np.asarray(ancestry_coordinate, dtype=float)
     labels: list[float] = []
@@ -128,9 +132,12 @@ def prepare_local_variant_data(
     if any(row is not None for row in covariates):
         covariate_matrix = align_covariate_rows(covariates, sample_count=len(labels))
 
+    genotype_array = np.asarray(genotype, dtype=float)
+    genotype_array = impute_missing_genotype_values(genotype_array)
+
     return LocalVariantData(
         labels=np.asarray(labels, dtype=float),
-        genotype=np.asarray(genotype, dtype=float),
+        genotype=genotype_array,
         covariates=covariate_matrix,
         sample_count=len(labels),
     )
@@ -178,6 +185,9 @@ def get_nonidentifiable_local_effect_reason(
     unique_labels = np.unique(local_data.labels)
     if unique_labels.size < 2:
         return f"local labels contain only one class: {unique_labels.tolist()}"
+
+    if not np.isfinite(local_data.genotype).any():
+        return "local genotype is entirely missing"
 
     if np.allclose(local_data.genotype, local_data.genotype[0]):
         return (
@@ -261,6 +271,21 @@ def sigmoid(values: np.ndarray) -> np.ndarray:
 
     clipped = np.clip(values, -30.0, 30.0)
     return 1.0 / (1.0 + np.exp(-clipped))
+
+
+def impute_missing_genotype_values(genotype: np.ndarray) -> np.ndarray:
+    """Fill sparse missing dosage values with the local mean dosage."""
+
+    if genotype.size == 0:
+        return genotype
+
+    finite_mask = np.isfinite(genotype)
+    if finite_mask.all() or not finite_mask.any():
+        return genotype
+
+    imputed = genotype.copy()
+    imputed[~finite_mask] = float(np.mean(imputed[finite_mask]))
+    return imputed
 
 
 def align_covariate_rows(

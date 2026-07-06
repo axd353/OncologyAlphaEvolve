@@ -4,6 +4,7 @@ import math
 
 import pytest
 
+from funsearch_pipeline.priority_tools import equal_count_interval_densities
 from funsearch_pipeline.priority_tools import equal_count_intervals
 from funsearch_pipeline.priority_tools import radius_for_percentage
 from funsearch_pipeline.priority_tools.contracts import PriorityAncestryCoordinate
@@ -120,3 +121,26 @@ def test_equal_count_intervals_assigns_tied_boundary_distance_to_earlier_interva
         for lower, upper in intervals
     ]
     assert counts == [3, 1]
+
+
+def test_equal_count_interval_densities_match_interval_counts_over_1d_shell_length() -> None:
+    training_data = _make_training_data(-1.0, 2.0, -3.0, 4.0, -5.0, 6.0)
+    ancestry_coordinate = PriorityAncestryCoordinate(values=(0.0,), dimension=1)
+
+    densities = equal_count_interval_densities(training_data, ancestry_coordinate, 3)
+
+    assert len(densities) == 3
+    assert math.isclose(densities[0], 0.5)
+    assert math.isclose(densities[1], 0.5)
+    assert math.isclose(densities[2], 0.5)
+
+
+def test_equal_count_interval_densities_return_zero_for_empty_zero_volume_intervals() -> None:
+    training_data = _make_training_data(-1.0, 3.0)
+    ancestry_coordinate = PriorityAncestryCoordinate(values=(0.0,), dimension=1)
+
+    densities = equal_count_interval_densities(training_data, ancestry_coordinate, 4)
+
+    assert math.isclose(densities[0], 0.5)
+    assert math.isclose(densities[1], 0.25)
+    assert densities[2:] == [0.0, 0.0]

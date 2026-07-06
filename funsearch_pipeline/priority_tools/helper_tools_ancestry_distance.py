@@ -222,3 +222,46 @@ def _equal_count_shell_upper_bounds(
             _radius_for_exact_prefix_count(sorted_distances, prefix_count)
         )
     return tuple(upper_bounds)
+
+
+def _radial_shell_volume(
+    lower_radius: float,
+    upper_radius: float,
+    dimension: int,
+) -> float:
+    """Return the Euclidean volume of a radial shell.
+
+    Input:
+        lower_radius: Inner shell radius. Must be finite and non-negative.
+        upper_radius: Outer shell radius. Must be finite and at least as large
+            as `lower_radius`.
+        dimension: Ambient ancestry-space dimension. Must be a positive integer.
+
+    Output:
+        Volume of the region `{x : lower_radius <= ||x|| < upper_radius}` in the
+        given Euclidean dimension.
+
+    Raises:
+        TypeError: if `dimension` is not an integer.
+        ValueError: if either radius is non-finite, negative, ordered
+            incorrectly, or if `dimension` is not positive.
+    """
+
+    if isinstance(dimension, bool) or not isinstance(dimension, Integral):
+        raise TypeError("dimension must be an integer.")
+    numeric_dimension = int(dimension)
+    if numeric_dimension < 1:
+        raise ValueError("dimension must be positive.")
+    if not math.isfinite(lower_radius) or not math.isfinite(upper_radius):
+        raise ValueError("Shell radii must be finite.")
+    if lower_radius < 0.0 or upper_radius < 0.0:
+        raise ValueError("Shell radii must be non-negative.")
+    if upper_radius < lower_radius:
+        raise ValueError("upper_radius must be at least lower_radius.")
+
+    unit_ball_volume = math.pi ** (numeric_dimension / 2.0) / math.gamma(
+        numeric_dimension / 2.0 + 1.0
+    )
+    return unit_ball_volume * (
+        upper_radius ** numeric_dimension - lower_radius ** numeric_dimension
+    )
