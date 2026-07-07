@@ -16,6 +16,9 @@ from funsearch_pipeline.evaluation import build_evaluator
 from funsearch_pipeline.logging_utils import configure_file_logger
 from funsearch_pipeline.program_database.database import CycleProgramsDatabase
 
+"""
+ PYTHONDONTWRITEBYTECODE=1 pytest -s -q -p no:cacheprovider test_evaluator.py
+"""
 
 NO_COVARIATES_TRAINING = (
     "/lustre/isaac24/scratch/adas23/dbGapData/MECProstateCancer/"
@@ -89,8 +92,8 @@ def test_manual_procedure2_evaluation() -> None:
             oracle_train_fraction=0.8,
             preprocessed_dirname="preprocessed",
             calibration_penalties=(0.1, 1.0, 10.0),
-            calibration_partitions=4,
-            scoring_partitions=4,
+            calibration_partitions=10,
+            scoring_partitions=10,
             bootstrap_iterations=50,
             dataset_pairs=(
                 DatasetPairConfig(

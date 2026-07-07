@@ -1,14 +1,7 @@
-from __future__ import annotations
-
-from funsearch_pipeline.priority_tools.contracts import PriorityAncestryCoordinate
-from funsearch_pipeline.priority_tools.contracts import PriorityTargetVariant
-from funsearch_pipeline.priority_tools.contracts import PriorityTrainingData
-
-
 def priority(
-    training_data: PriorityTrainingData,
-    ancestry_coordinate: PriorityAncestryCoordinate,
-    target_variant: PriorityTargetVariant,
+    training_data,
+    ancestry_coordinate,
+    target_variant,
 ) -> float:
     """Simple seed priority function used to bootstrap the program database."""
 

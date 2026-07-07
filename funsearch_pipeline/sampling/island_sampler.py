@@ -12,14 +12,10 @@ from funsearch_pipeline.logging_utils import configure_file_logger
 from funsearch_pipeline.program_database import IslandPrompt
 from funsearch_pipeline.program_database import IslandShard
 from funsearch_pipeline.sampling.backends import run_sampling_request
+from funsearch_pipeline.sampling.priority_candidate_validation import build_candidate_program
+from funsearch_pipeline.sampling.priority_candidate_validation import validate_candidate_priority_function
 from funsearch_pipeline.sampling.interfaces import SamplerRequest
 from funsearch_pipeline.sampling.interfaces import append_sampler_log
-
-"""
-Upstream FunSearch still reduces those scores (trtuend by evaluator) to a single scalar for island ranking and “best program” tracking. 
-In programs_database.py, _reduce_score uses the last entry in the score mapping, so whatever you place last is what determines island 
-bestness and prompt sampling. The full score mapping is still stored as the cluster signature, though, via _get_signature.
-"""
 
 
 @dataclass(frozen=True)
@@ -134,24 +130,11 @@ def _log_prompt(log_path: Path, prompt: IslandPrompt, sample_index: int) -> None
     append_sampler_log(log_path, f"sample_index=0 full_prompt_end island={prompt.island_id}")
 
 
-def _is_completion_shape_valid(raw_completion: str) -> bool:
-    """Placeholder for future priority-function response validation.
-
-    Input:
-        raw_completion: Text returned by the LLM backend.
-
-    Output:
-        `True` for now. Later this can enforce that the completion represents a
-        syntactically valid priority-function body before evaluation.
-    """
-
-    return bool(raw_completion.strip())
-
-
 def _build_single_completion_request(
     request: IslandSamplerRequest,
     prompt: IslandPrompt,
     sample_index: int,
+    attempt_index: int,
 ) -> SamplerRequest:
     """Create one backend request from the shard's current prompt.
 
@@ -173,7 +156,7 @@ def _build_single_completion_request(
         system_prompt=request.system_prompt,
         model=request.sampler_settings.model,
         candidates_per_island_per_cycle=1,
-        output_dir=request.output_dir / f"sample_{sample_index:03d}",
+        output_dir=request.output_dir / f"sample_{sample_index:03d}" / f"attempt_{attempt_index:02d}",
         log_path=request.log_path,
         temperature=request.sampler_settings.temperature,
         max_output_tokens=request.sampler_settings.max_output_tokens,
@@ -247,6 +230,8 @@ def run_island_sampler(request: IslandSamplerRequest) -> IslandSamplerResult:
     evaluator.prepare(request.experiment_dir)
     generated_candidates = 0
     accepted_candidates = 0
+    logged_first_success = False
+    max_attempts_per_prompt = 5
 
     for sample_index in range(request.sampler_settings.candidates_per_island_per_cycle):
         prompt = request.island_shard.get_prompt()
@@ -260,31 +245,55 @@ def run_island_sampler(request: IslandSamplerRequest) -> IslandSamplerResult:
             ),
         )
 
-        completions = run_sampling_request(
-            _build_single_completion_request(request, prompt, sample_index)
-        )
-        generated_candidates += len(completions)
+        registered = False
+        for attempt_index in range(1, max_attempts_per_prompt + 1):
+            completions = run_sampling_request(
+                _build_single_completion_request(request, prompt, sample_index, attempt_index)
+            )
+            generated_candidates += 1
 
-        for completion in completions:
-            if not _is_completion_shape_valid(completion.raw_completion):
+            if not completions:
                 append_sampler_log(
                     request.log_path,
-                    f"sample_index={sample_index} rejected=empty_completion",
+                    (
+                        f"sample_index={sample_index} attempt={attempt_index} "
+                        "rejected=empty_completion"
+                    ),
                 )
                 continue
 
-            candidate_program = request.island_shard.materialize_candidate(
-                prompt,
-                completion.raw_completion,
-                sample_index,
-                template=request.template,
-                function_to_evolve=request.function_to_evolve,
-            )
+            completion = completions[0]
+            try:
+                candidate_program = build_candidate_program(
+                    template=request.template,
+                    function_to_evolve=request.function_to_evolve,
+                    island_id=request.island_shard.island_id,
+                    version_generated=prompt.version_generated,
+                    raw_completion=completion.raw_completion,
+                    sample_index=sample_index,
+                )
+                validate_candidate_priority_function(
+                    candidate_program,
+                    request.function_to_evolve,
+                )
+            except Exception as exc:
+                append_sampler_log(
+                    request.log_path,
+                    (
+                        f"sample_index={sample_index} attempt={attempt_index} "
+                        f"rejected=invalid_priority_function error={type(exc).__name__}: {exc}"
+                    ),
+                )
+                continue
+
             evaluated_candidate = evaluator.evaluate_candidate(candidate_program)
             if evaluated_candidate is None:
                 append_sampler_log(
                     request.log_path,
-                    f"sample_index={sample_index} rejected=evaluation_failed",
+                    (
+                        f"sample_index={sample_index} attempt={attempt_index} "
+                        "rejected=evaluation_failed"
+                    ),
                 )
                 continue
 
@@ -293,12 +302,45 @@ def run_island_sampler(request: IslandSamplerRequest) -> IslandSamplerResult:
                 dict(evaluated_candidate.scores_per_test()),
             )
             accepted_candidates += 1
+            if not logged_first_success:
+                append_sampler_log(
+                    request.log_path,
+                    (
+                        f"sample_index={sample_index} attempt={attempt_index} "
+                        "registered=true first_success=true full_priority_function_begin"
+                    ),
+                )
+                append_sampler_log(
+                    request.log_path,
+                    candidate_program.raw_completion.rstrip("\n"),
+                )
+                append_sampler_log(
+                    request.log_path,
+                    (
+                        f"sample_index={sample_index} attempt={attempt_index} "
+                        f"registered=true after_attempts={attempt_index} "
+                        f"better_than_present_best={improved} full_priority_function_end"
+                    ),
+                )
+                logged_first_success = True
+            else:
+                append_sampler_log(
+                    request.log_path,
+                    (
+                        f"sample_index={sample_index} attempt={attempt_index} "
+                        f"registered=true after_attempts={attempt_index} "
+                        f"better_than_present_best={improved}"
+                    ),
+                )
+            registered = True
+            break
+
+        if not registered:
             append_sampler_log(
                 request.log_path,
                 (
-                    f"sample_index={sample_index} accepted=true "
-                    f"reduced_score={evaluated_candidate.reduced_score:.6f} "
-                    f"better_than_present_best={improved}"
+                    f"sample_index={sample_index} no_priority_function_generated "
+                    f"after_attempts={max_attempts_per_prompt}"
                 ),
             )
 
