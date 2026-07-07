@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import os
 from pathlib import Path
 
 from funsearch.implementation import code_manipulation
@@ -179,6 +180,24 @@ def _build_single_completion_request(
     )
 
 
+def _format_sampler_cpu_binding() -> tuple[str, str]:
+    current_cpu = "unknown"
+    if hasattr(os, "sched_getcpu"):
+        try:
+            current_cpu = str(int(os.sched_getcpu()))
+        except OSError:
+            current_cpu = "unknown"
+
+    allowed_cpus = "unknown"
+    if hasattr(os, "sched_getaffinity"):
+        try:
+            allowed_cpus = str(sorted(int(cpu) for cpu in os.sched_getaffinity(0)))
+        except OSError:
+            allowed_cpus = "unknown"
+
+    return current_cpu, allowed_cpus
+
+
 def run_island_sampler(request: IslandSamplerRequest) -> IslandSamplerResult:
     """Sample, evaluate, and register candidates on one island shard.
 
@@ -199,6 +218,15 @@ def run_island_sampler(request: IslandSamplerRequest) -> IslandSamplerResult:
         (
             f"cycle={request.cycle_index} island={request.island_shard.island_id} "
             f"experiment_dir={request.experiment_dir} sampler_start"
+        ),
+    )
+    current_cpu, allowed_cpus = _format_sampler_cpu_binding()
+    append_sampler_log(
+        request.log_path,
+        (
+            f"cycle={request.cycle_index} island={request.island_shard.island_id} "
+            f"sampler_cpu pid={os.getpid()} current_cpu={current_cpu} "
+            f"allowed_cpus={allowed_cpus}"
         ),
     )
 

@@ -89,7 +89,8 @@ def test_manual_procedure2_evaluation() -> None:
             oracle_train_fraction=0.8,
             preprocessed_dirname="preprocessed",
             calibration_penalties=(0.1, 1.0, 10.0),
-            scoring_partitions=1,
+            calibration_partitions=4,
+            scoring_partitions=4,
             bootstrap_iterations=50,
             dataset_pairs=(
                 DatasetPairConfig(

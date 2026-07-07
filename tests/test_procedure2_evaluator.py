@@ -81,6 +81,7 @@ def test_procedure2_evaluator_scores_seed_priority_function(tmp_path: Path) -> N
             oracle_train_fraction=0.8,
             preprocessed_dirname="preprocessed",
             calibration_penalties=(0.1, 1.0),
+            calibration_partitions=2,
             scoring_partitions=2,
             bootstrap_iterations=10,
             dataset_pairs=(
@@ -118,6 +119,12 @@ def test_procedure2_evaluator_scores_seed_priority_function(tmp_path: Path) -> N
 def test_procedure2_scores_two_pairs_in_parallel(tmp_path: Path) -> None:
     train = _write_pickle(tmp_path / "train.pkl", _make_synthetic_oracle_frame(60))
     test = _write_pickle(tmp_path / "test.pkl", _make_synthetic_oracle_frame(40, offset=60))
+    log_path = tmp_path / "parallel_pairs.log"
+    logger = configure_file_logger(
+        log_path,
+        "INFO",
+        logger_name=f"test.procedure2.parallel_pairs.{tmp_path.name}",
+    )
     seed_source = (
         "def priority(training_data, ancestry_coordinate, target_variant):\n"
         "    return 10.0\n"
@@ -140,6 +147,7 @@ def test_procedure2_scores_two_pairs_in_parallel(tmp_path: Path) -> None:
             oracle_train_fraction=0.8,
             preprocessed_dirname="preprocessed",
             calibration_penalties=(1.0,),
+            calibration_partitions=1,
             scoring_partitions=1,
             bootstrap_iterations=10,
             dataset_pairs=(
@@ -158,6 +166,7 @@ def test_procedure2_scores_two_pairs_in_parallel(tmp_path: Path) -> None:
             ),
         ),
         function_name="priority",
+        logger=logger,
     )
 
     evaluator.prepare(tmp_path)
@@ -167,6 +176,9 @@ def test_procedure2_scores_two_pairs_in_parallel(tmp_path: Path) -> None:
     scores = result.scores_per_test()
     assert list(scores) == ["pair_one", "pair_two", "simplicity", "mean"]
     assert set(result.metadata["procedure2_pairs"]) == {"pair_one", "pair_two"}
+    log_text = log_path.read_text()
+    assert "procedure2_pair_worker initialized" in log_text
+    assert "pair=pair_one" in log_text or "pair=pair_two" in log_text
 
 
 def test_procedure2_prepare_logs_first_materialization(tmp_path: Path) -> None:
@@ -191,6 +203,7 @@ def test_procedure2_prepare_logs_first_materialization(tmp_path: Path) -> None:
         oracle_train_fraction=0.8,
         preprocessed_dirname="preprocessed",
         calibration_penalties=(0.1, 1.0),
+        calibration_partitions=1,
         scoring_partitions=1,
         bootstrap_iterations=10,
         dataset_pairs=(
@@ -263,6 +276,7 @@ def test_procedure2_imputes_missing_dosages_before_scoring(tmp_path: Path) -> No
             oracle_train_fraction=0.8,
             preprocessed_dirname="preprocessed",
             calibration_penalties=(0.1, 1.0),
+            calibration_partitions=1,
             scoring_partitions=1,
             bootstrap_iterations=10,
             dataset_pairs=(

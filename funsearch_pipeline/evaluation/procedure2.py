@@ -12,6 +12,7 @@ import inspect
 import json
 import logging
 import math
+import os
 import pickle
 
 import numpy as np
@@ -61,6 +62,7 @@ _EXPECTED_PRIORITY_PARAMETERS = (
     "target_variant",
 )
 _DEFAULT_BOOTSTRAP_ITERATIONS = 200
+_DEFAULT_CALIBRATION_PARTITIONS = 1
 _DEFAULT_SCORING_PARTITIONS = 1
 
 
@@ -232,6 +234,7 @@ class Procedure2PriorityEvaluator:
         combined_training, training_imputed_counts = _impute_missing_feature_columns(
             _load_and_combine_pickles(dataset_pair.training_pickles)
         )
+        combined_training_sample_count = _dataset_length(combined_training)
         oracle_train, calibration = _split_training_data(
             combined_training,
             oracle_train_fraction=self._settings.oracle_train_fraction,
@@ -239,16 +242,25 @@ class Procedure2PriorityEvaluator:
         scoring, scoring_imputed_counts = _impute_missing_feature_columns(
             _load_and_combine_pickles(dataset_pair.testing_pickles)
         )
+        scoring_sample_count = _dataset_length(scoring)
 
         _write_pickle(prepared_pair.oracle_train_pickle, oracle_train)
         _write_pickle(prepared_pair.calibration_pickle, calibration)
         _write_pickle(prepared_pair.scoring_pickle, scoring)
         if self._logger is not None:
             self._logger.info(
-                "Imputed missing values for dataset pair %s: training=%s scoring=%s",
+                "Imputed missing values for dataset pair %s: training=%s (rows=%d) scoring=%s (rows=%d)",
                 dataset_pair.name,
-                training_imputed_counts or "none",
-                scoring_imputed_counts or "none",
+                _format_imputation_summary(
+                    training_imputed_counts,
+                    combined_training_sample_count,
+                ),
+                combined_training_sample_count,
+                _format_imputation_summary(
+                    scoring_imputed_counts,
+                    scoring_sample_count,
+                ),
+                scoring_sample_count,
             )
             self._logger.info(
                 "Prepared Procedure 2 dataset pair %s from training_sources=%s testing_sources=%s "
@@ -334,6 +346,7 @@ class Procedure2PriorityEvaluator:
                     self._function_name,
                     pair,
                     candidate.program_source,
+                    self._logger.name if self._logger is not None else None,
                 )
                 for pair in self._prepared_pairs
             }
@@ -347,6 +360,7 @@ class Procedure2PriorityEvaluator:
                     self._function_name,
                     pair,
                     candidate.program_source,
+                    self._logger.name if self._logger is not None else None,
                 ): pair.name
                 for pair in self._prepared_pairs
             }
@@ -362,6 +376,7 @@ def _evaluate_prepared_pair(
     function_name: str,
     prepared_pair: PreparedDatasetPair,
     candidate_source: str,
+    logger_name: str | None = None,
 ) -> "PairEvaluationResult":
     """Score one prepared training/testing pair for one priority function.
 
@@ -369,6 +384,12 @@ def _evaluate_prepared_pair(
     reloads the priority function from ``candidate_source`` because compiled
     functions are not picklable across processes.
     """
+
+    _log_worker_cpu_binding(
+        logger_name,
+        role="procedure2_pair_worker",
+        pair_name=prepared_pair.name,
+    )
 
     priority_function = _load_priority_function(candidate_source, function_name)
     _validate_priority_signature(priority_function)
@@ -381,11 +402,15 @@ def _evaluate_prepared_pair(
         raise ValueError(f"No dosage columns found for pair {prepared_pair.name!r}.")
 
     calibration_labels = _extract_labels(calibration)
-    calibration_oracle_features = _build_oracle_feature_matrix(
+    calibration_oracle_features = _build_calibration_oracle_feature_matrix(
         training_data=oracle_train,
-        subject_data=calibration,
+        calibration_data=calibration,
         variant_names=variant_names,
-        priority_function=priority_function,
+        candidate_source=candidate_source,
+        function_name=function_name,
+        calibration_partitions=int(
+            getattr(settings, "calibration_partitions", _DEFAULT_CALIBRATION_PARTITIONS)
+        ),
     )
     calibration_covariates = _extract_covariates(
         calibration,
@@ -524,6 +549,17 @@ def _impute_missing_feature_columns(data: Any) -> tuple[Any, dict[str, int]]:
         imputed[column] = numeric_column
 
     return imputed, imputed_counts
+
+
+def _format_imputation_summary(imputed_counts: dict[str, int], sample_count: int) -> dict[str, str] | str:
+    if not imputed_counts:
+        return "none"
+    if sample_count <= 0:
+        return {column: "n/a" for column in imputed_counts}
+    return {
+        column: f"{(count / sample_count) * 100:.3g}%"
+        for column, count in imputed_counts.items()
+    }
 
 
 def _combine_data_objects(data_objects: Sequence[Any]) -> Any:
@@ -721,6 +757,25 @@ def _build_oracle_feature_matrix(
     return feature_matrix
 
 
+def _build_calibration_oracle_feature_matrix(
+    *,
+    training_data: Any,
+    calibration_data: Any,
+    variant_names: Sequence[str],
+    candidate_source: str,
+    function_name: str,
+    calibration_partitions: int,
+) -> np.ndarray:
+    return _build_partitioned_oracle_feature_matrix(
+        training_data=training_data,
+        subject_data=calibration_data,
+        variant_names=variant_names,
+        candidate_source=candidate_source,
+        function_name=function_name,
+        partitions=calibration_partitions,
+    )
+
+
 def _call_priority_function(
     priority_function: PriorityFunction,
     training_data: PriorityTrainingData,
@@ -808,31 +863,31 @@ def _logical_variant_name(variant_name: str) -> str:
     return variant_name
 
 
-def _build_scoring_oracle_feature_matrix(
+def _build_partitioned_oracle_feature_matrix(
     *,
     training_data: Any,
-    scoring_data: Any,
+    subject_data: Any,
     variant_names: Sequence[str],
     candidate_source: str,
     function_name: str,
-    scoring_partitions: int,
+    partitions: int,
 ) -> np.ndarray:
-    scoring_partitions = max(1, scoring_partitions)
-    if scoring_partitions == 1 or _dataset_length(scoring_data) <= 1:
+    partitions = max(1, partitions)
+    if partitions == 1 or _dataset_length(subject_data) <= 1:
         priority_function = _load_priority_function(candidate_source, function_name)
         _validate_priority_signature(priority_function)
         return _build_oracle_feature_matrix(
             training_data=training_data,
-            subject_data=scoring_data,
+            subject_data=subject_data,
             variant_names=variant_names,
             priority_function=priority_function,
         )
 
-    chunks = _split_data_into_chunks(scoring_data, scoring_partitions)
+    chunks = _split_data_into_chunks(subject_data, partitions)
     with ProcessPoolExecutor(max_workers=len(chunks)) as executor:
         futures = [
             executor.submit(
-                _build_scoring_oracle_feature_matrix_worker,
+                _build_partitioned_oracle_feature_matrix_worker,
                 candidate_source,
                 function_name,
                 training_data,
@@ -844,18 +899,37 @@ def _build_scoring_oracle_feature_matrix(
         return np.vstack([future.result() for future in futures])
 
 
-def _build_scoring_oracle_feature_matrix_worker(
+def _build_scoring_oracle_feature_matrix(
+    *,
+    training_data: Any,
+    scoring_data: Any,
+    variant_names: Sequence[str],
+    candidate_source: str,
+    function_name: str,
+    scoring_partitions: int,
+) -> np.ndarray:
+    return _build_partitioned_oracle_feature_matrix(
+        training_data=training_data,
+        subject_data=scoring_data,
+        variant_names=variant_names,
+        candidate_source=candidate_source,
+        function_name=function_name,
+        partitions=scoring_partitions,
+    )
+
+
+def _build_partitioned_oracle_feature_matrix_worker(
     candidate_source: str,
     function_name: str,
     training_data: Any,
-    scoring_chunk: Any,
+    subject_chunk: Any,
     variant_names: tuple[str, ...],
 ) -> np.ndarray:
     priority_function = _load_priority_function(candidate_source, function_name)
     _validate_priority_signature(priority_function)
     return _build_oracle_feature_matrix(
         training_data=training_data,
-        subject_data=scoring_chunk,
+        subject_data=subject_chunk,
         variant_names=variant_names,
         priority_function=priority_function,
     )
@@ -866,6 +940,49 @@ def _split_data_into_chunks(data: Any, requested_chunks: int) -> list[Any]:
     chunk_count = min(max(1, requested_chunks), sample_count)
     index_chunks = [chunk for chunk in np.array_split(np.arange(sample_count), chunk_count) if chunk.size]
     return [_select_rows(data, chunk) for chunk in index_chunks]
+
+
+def _current_cpu_index() -> int | None:
+    if not hasattr(os, "sched_getcpu"):
+        return None
+    try:
+        return int(os.sched_getcpu())
+    except OSError:
+        return None
+
+
+def _allowed_cpu_indices() -> tuple[int, ...] | None:
+    if not hasattr(os, "sched_getaffinity"):
+        return None
+    try:
+        return tuple(sorted(int(cpu) for cpu in os.sched_getaffinity(0)))
+    except OSError:
+        return None
+
+
+def _log_worker_cpu_binding(
+    logger_name: str | None,
+    *,
+    role: str,
+    pair_name: str,
+) -> None:
+    if logger_name is None:
+        return
+
+    logger = logging.getLogger(logger_name)
+    if not logger.handlers:
+        return
+
+    current_cpu = _current_cpu_index()
+    allowed_cpus = _allowed_cpu_indices()
+    logger.info(
+        "%s initialized pid=%d pair=%s current_cpu=%s allowed_cpus=%s",
+        role,
+        os.getpid(),
+        pair_name,
+        current_cpu if current_cpu is not None else "unknown",
+        list(allowed_cpus) if allowed_cpus is not None else "unknown",
+    )
 
 
 def _fit_best_calibration_model(

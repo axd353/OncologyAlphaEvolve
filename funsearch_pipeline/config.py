@@ -90,6 +90,7 @@ class EvaluatorSettings:
     oracle_train_fraction: float
     preprocessed_dirname: str
     calibration_penalties: tuple[float, ...]
+    calibration_partitions: int
     scoring_partitions: int
     bootstrap_iterations: int
     dataset_pairs: tuple[DatasetPairConfig, ...]
@@ -205,6 +206,8 @@ def _validate_config(config: PipelineConfig) -> None:
         raise ValueError(
             "At least one evaluator.dataset_pairs entry is required for the procedure2 evaluator."
         )
+    if config.evaluator.calibration_partitions < 1:
+        raise ValueError("evaluator.calibration_partitions must be at least 1.")
     if config.evaluator.scoring_partitions < 1:
         raise ValueError("evaluator.scoring_partitions must be at least 1.")
     if config.evaluator.bootstrap_iterations < 1:
@@ -307,6 +310,7 @@ def load_pipeline_config(config_path: str | Path) -> PipelineConfig:
                 float(value)
                 for value in evaluator_section.get("calibration_penalties", [1.0])
             ),
+            calibration_partitions=int(evaluator_section.get("calibration_partitions", 1)),
             scoring_partitions=int(evaluator_section.get("scoring_partitions", 1)),
             bootstrap_iterations=int(evaluator_section.get("bootstrap_iterations", 200)),
             dataset_pairs=_parse_dataset_pairs(base_dir, evaluator_section),

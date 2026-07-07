@@ -115,7 +115,10 @@ def equal_count_interval_densities(
         `ancestry_coordinate`. Each density equals
         `number_of_training_samples_in_region / region_volume`, where
         `region_volume` is the Euclidean shell volume between the two radii in
-        `training_data.ancestry_dimension` dimensions.
+        `training_data.ancestry_dimension` dimensions. To get the actual
+        interval boundaries in the same order, call
+        `equal_count_intervals(training_data, ancestry_coordinate, n)` with the
+        same arguments.
 
     Raises:
         TypeError: if `n` is not an integer.

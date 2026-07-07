@@ -96,6 +96,11 @@ def test_funsearch_runner_creates_cycle_snapshots_and_resets_islands(tmp_path: P
     cycle_0002_start = json.loads(
         (experiment_dir / "cycle_0002" / "program_db_start_summary.json").read_text()
     )
+    sampler_log = (
+        experiment_dir / "cycle_0001" / "sampler_logs" / "island_000.log"
+    ).read_text()
 
     assert all(island["num_programs"] == 3 for island in cycle_0001_end["islands"])
     assert any(island["num_programs"] == 1 for island in cycle_0002_start["islands"])
+    assert "sampler_cpu pid=" in sampler_log
+    assert "allowed_cpus=" in sampler_log
