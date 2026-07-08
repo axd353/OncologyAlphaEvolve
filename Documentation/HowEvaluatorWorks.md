@@ -106,6 +106,8 @@ Before the prepared pickles are written, the evaluator imputes missing feature v
 
 This happens in `prepare(...)`, not during candidate scoring, so the persisted `oracle_train.pkl`, `calibration.pkl`, and `scoring.pkl` artifacts already contain the cleaned values used by later evaluation steps. The covariate columns are also cast to float at this stage so pandas nullable `NA` values do not leak into downstream feature extraction.
 
+Because the priority-function contract objects are built from those prepared artifacts, direct and helper tools under `funsearch_pipeline/priority_tools/` should not normally encounter missing dosage values during evaluator-driven runs.
+
 ## How `evaluate_candidate(...)` works
 
 `evaluate_candidate(...)` is where the candidate priority function is actually used.

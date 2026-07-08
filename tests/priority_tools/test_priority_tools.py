@@ -2,35 +2,63 @@ from __future__ import annotations
 
 import math
 
+import funsearch_pipeline.priority_tools.helper_tools_variant_statistics as variant_helpers
 import pytest
 
+from GenomicsHelpers.effect_size_calculator import estimate_marginal_logistic_effect as real_estimate_marginal_logistic_effect
+from funsearch_pipeline.priority_tools import dosage_entropy_by_cumulative_radius
+from funsearch_pipeline.priority_tools import dosage_entropy_by_interval
 from funsearch_pipeline.priority_tools import equal_count_interval_densities
 from funsearch_pipeline.priority_tools import equal_count_intervals
+from funsearch_pipeline.priority_tools import effect_size_by_cumulative_radius
+from funsearch_pipeline.priority_tools import effect_size_by_interval
+from funsearch_pipeline.priority_tools import effect_size_standard_error_by_cumulative_radius
+from funsearch_pipeline.priority_tools import effect_size_standard_error_by_interval
+from funsearch_pipeline.priority_tools import minimum_radius_for_sample_count
 from funsearch_pipeline.priority_tools import radius_for_percentage
 from funsearch_pipeline.priority_tools.contracts import PriorityAncestryCoordinate
+from funsearch_pipeline.priority_tools.contracts import PriorityTargetVariant
 from funsearch_pipeline.priority_tools.contracts import PriorityTrainingData
 from funsearch_pipeline.priority_tools.contracts import PriorityTrainingRecord
 
 
-def _make_training_data(*coordinates: float) -> PriorityTrainingData:
+def _make_training_data(
+    coordinates: tuple[float, ...],
+    *,
+    labels: tuple[float, ...] | None = None,
+    dosages: tuple[float, ...] | None = None,
+) -> PriorityTrainingData:
+    if labels is None:
+        labels = tuple(float(index % 2) for index in range(len(coordinates)))
+    if dosages is None:
+        dosages = tuple(float(index % 3) for index in range(len(coordinates)))
+    if len(labels) != len(coordinates):
+        raise ValueError("labels must align with coordinates")
+    if len(dosages) != len(coordinates):
+        raise ValueError("dosages must align with coordinates")
+
     records = tuple(
         PriorityTrainingRecord(
-            label=float(index % 2),
+            label=float(labels[index]),
             ancestry_coordinate=(float(coordinate),),
-            variant_dosages={},
+            variant_dosages={"rs1": float(dosages[index])},
             covariates=None,
         )
         for index, coordinate in enumerate(coordinates)
     )
     return PriorityTrainingData(
         records=records,
-        variant_names=(),
-        variant_dosage_fields=(),
+	    variant_names=("rs1",),
+	    variant_dosage_fields=("dosage__rs1",),
         covariate_names=(),
         sample_count=len(records),
         ancestry_dimension=1,
         has_additional_covariates=False,
     )
+
+
+def _target_variant() -> PriorityTargetVariant:
+    return PriorityTargetVariant(name="rs1", dosage_field="dosage__rs1", column_index=0)
 
 
 def _distances(
@@ -44,7 +72,7 @@ def _distances(
 
 
 def test_radius_for_percentage_returns_exact_empirical_cutoff() -> None:
-    training_data = _make_training_data(-5.0, -1.0, 2.0, 4.0)
+    training_data = _make_training_data((-5.0, -1.0, 2.0, 4.0))
     ancestry_coordinate = PriorityAncestryCoordinate(values=(0.0,), dimension=1)
 
     radius = radius_for_percentage(training_data, ancestry_coordinate, 50.0)
@@ -55,7 +83,7 @@ def test_radius_for_percentage_returns_exact_empirical_cutoff() -> None:
 
 
 def test_radius_for_percentage_rounds_down_non_exact_percentage() -> None:
-    training_data = _make_training_data(-5.0, -1.0, 2.0, 4.0)
+    training_data = _make_training_data((-5.0, -1.0, 2.0, 4.0))
     ancestry_coordinate = PriorityAncestryCoordinate(values=(0.0,), dimension=1)
 
     radius = radius_for_percentage(training_data, ancestry_coordinate, 30.0)
@@ -66,7 +94,7 @@ def test_radius_for_percentage_rounds_down_non_exact_percentage() -> None:
 
 
 def test_radius_for_percentage_assigns_tied_boundary_distance_to_inner_region() -> None:
-    training_data = _make_training_data(-1.0, 1.0, 3.0, 4.0)
+    training_data = _make_training_data((-1.0, 1.0, 3.0, 4.0))
     ancestry_coordinate = PriorityAncestryCoordinate(values=(0.0,), dimension=1)
 
     radius = radius_for_percentage(training_data, ancestry_coordinate, 25.0)
@@ -77,7 +105,7 @@ def test_radius_for_percentage_assigns_tied_boundary_distance_to_inner_region() 
 
 
 def test_equal_count_intervals_partition_samples_evenly() -> None:
-    training_data = _make_training_data(-1.0, 2.0, -3.0, 4.0, -5.0, 6.0)
+    training_data = _make_training_data((-1.0, 2.0, -3.0, 4.0, -5.0, 6.0))
     ancestry_coordinate = PriorityAncestryCoordinate(values=(0.0,), dimension=1)
 
     intervals = equal_count_intervals(training_data, ancestry_coordinate, 3)
@@ -96,7 +124,7 @@ def test_equal_count_intervals_partition_samples_evenly() -> None:
 
 
 def test_equal_count_intervals_distributes_non_divisible_sample_count() -> None:
-    training_data = _make_training_data(-1.0, 2.0, -3.0, 4.0, -5.0)
+    training_data = _make_training_data((-1.0, 2.0, -3.0, 4.0, -5.0))
     ancestry_coordinate = PriorityAncestryCoordinate(values=(0.0,), dimension=1)
 
     intervals = equal_count_intervals(training_data, ancestry_coordinate, 3)
@@ -110,7 +138,7 @@ def test_equal_count_intervals_distributes_non_divisible_sample_count() -> None:
 
 
 def test_equal_count_intervals_assigns_tied_boundary_distance_to_earlier_interval() -> None:
-    training_data = _make_training_data(-1.0, 1.0, -1.0, 2.0)
+    training_data = _make_training_data((-1.0, 1.0, -1.0, 2.0))
     ancestry_coordinate = PriorityAncestryCoordinate(values=(0.0,), dimension=1)
 
     intervals = equal_count_intervals(training_data, ancestry_coordinate, 2)
@@ -124,7 +152,7 @@ def test_equal_count_intervals_assigns_tied_boundary_distance_to_earlier_interva
 
 
 def test_equal_count_interval_densities_match_interval_counts_over_1d_shell_length() -> None:
-    training_data = _make_training_data(-1.0, 2.0, -3.0, 4.0, -5.0, 6.0)
+    training_data = _make_training_data((-1.0, 2.0, -3.0, 4.0, -5.0, 6.0))
     ancestry_coordinate = PriorityAncestryCoordinate(values=(0.0,), dimension=1)
 
     densities = equal_count_interval_densities(training_data, ancestry_coordinate, 3)
@@ -136,7 +164,7 @@ def test_equal_count_interval_densities_match_interval_counts_over_1d_shell_leng
 
 
 def test_equal_count_interval_densities_return_zero_for_empty_zero_volume_intervals() -> None:
-    training_data = _make_training_data(-1.0, 3.0)
+    training_data = _make_training_data((-1.0, 3.0))
     ancestry_coordinate = PriorityAncestryCoordinate(values=(0.0,), dimension=1)
 
     densities = equal_count_interval_densities(training_data, ancestry_coordinate, 4)
@@ -144,3 +172,158 @@ def test_equal_count_interval_densities_return_zero_for_empty_zero_volume_interv
     assert math.isclose(densities[0], 0.5)
     assert math.isclose(densities[1], 0.25)
     assert densities[2:] == [0.0, 0.0]
+
+
+def test_minimum_radius_for_sample_count_clamps_to_usable_total() -> None:
+    training_data = _make_training_data(
+        (-4.0, -1.0, 2.0, 5.0),
+        dosages=(0.0, float("nan"), 1.0, 2.0),
+    )
+    ancestry_coordinate = PriorityAncestryCoordinate(values=(0.0,), dimension=1)
+
+    radius, effective_min_samples = minimum_radius_for_sample_count(
+        training_data,
+        ancestry_coordinate,
+        _target_variant(),
+        10,
+    )
+
+    distances = _distances(training_data, ancestry_coordinate)
+    usable_distances = [
+        distance
+        for distance, record in zip(distances, training_data.records)
+        if math.isfinite(record.variant_dosages["rs1"])
+    ]
+    assert effective_min_samples == 3
+    assert sum(distance < radius for distance in usable_distances) == 3
+
+
+def test_dosage_entropy_by_interval_tracks_per_ring_dosage_diversity() -> None:
+    training_data = _make_training_data(
+        (-1.0, 1.0, -3.0, 3.0),
+        dosages=(0.0, 0.0, 0.0, 2.0),
+    )
+    ancestry_coordinate = PriorityAncestryCoordinate(values=(0.0,), dimension=1)
+
+    entropies = dosage_entropy_by_interval(
+        training_data,
+        ancestry_coordinate,
+        _target_variant(),
+        2,
+    )
+
+    assert entropies[0] == pytest.approx(0.0)
+    assert entropies[1] == pytest.approx(1.0)
+
+
+def test_dosage_entropy_by_cumulative_radius_returns_radii_with_entropy() -> None:
+    training_data = _make_training_data(
+        (-1.0, 1.0, -3.0, 3.0),
+        dosages=(0.0, 0.0, 0.0, 2.0),
+    )
+    ancestry_coordinate = PriorityAncestryCoordinate(values=(0.0,), dimension=1)
+
+    radii_and_entropy = dosage_entropy_by_cumulative_radius(
+        training_data,
+        ancestry_coordinate,
+        _target_variant(),
+        2,
+    )
+
+    assert len(radii_and_entropy) == 2
+    assert radii_and_entropy[0][0] < radii_and_entropy[1][0]
+    assert radii_and_entropy[0][1] == pytest.approx(0.0)
+    assert radii_and_entropy[1][1] == pytest.approx(0.8112781244591328)
+
+
+def test_effect_size_by_interval_uses_shared_logistic_estimator(monkeypatch: pytest.MonkeyPatch) -> None:
+    training_data = _make_training_data(
+        (-1.0, 1.0, -3.0, 3.0),
+        labels=(0.0, 1.0, 0.0, 1.0),
+        dosages=(0.0, 1.0, 1.0, 2.0),
+    )
+    ancestry_coordinate = PriorityAncestryCoordinate(values=(0.0,), dimension=1)
+    call_counter = {"count": 0}
+
+    def counting_estimator(*args: object, **kwargs: object) -> float:
+        call_counter["count"] += 1
+        return real_estimate_marginal_logistic_effect(*args, **kwargs)
+
+    monkeypatch.setattr(
+        variant_helpers,
+        "estimate_marginal_logistic_effect",
+        counting_estimator,
+    )
+
+    effect_sizes = effect_size_by_interval(
+        training_data,
+        ancestry_coordinate,
+        _target_variant(),
+        2,
+        min_samples=2,
+    )
+
+    assert len(effect_sizes) == 2
+    assert call_counter["count"] == 2
+    assert all(math.isfinite(value) for value in effect_sizes)
+
+
+def test_effect_size_standard_error_by_interval_returns_infinity_for_unidentifiable_region() -> None:
+    training_data = _make_training_data(
+        (-1.0, 3.0),
+        labels=(0.0, 1.0),
+        dosages=(0.0, 2.0),
+    )
+    ancestry_coordinate = PriorityAncestryCoordinate(values=(0.0,), dimension=1)
+
+    standard_errors = effect_size_standard_error_by_interval(
+        training_data,
+        ancestry_coordinate,
+        _target_variant(),
+        4,
+        min_samples=1,
+    )
+
+    assert standard_errors == [math.inf, math.inf, math.inf, math.inf]
+
+
+def test_effect_size_by_cumulative_radius_returns_radius_effect_pairs() -> None:
+    training_data = _make_training_data(
+        (-1.0, 1.0, -3.0, 3.0),
+        labels=(0.0, 1.0, 0.0, 1.0),
+        dosages=(0.0, 1.0, 1.0, 2.0),
+    )
+    ancestry_coordinate = PriorityAncestryCoordinate(values=(0.0,), dimension=1)
+
+    radii_and_effects = effect_size_by_cumulative_radius(
+        training_data,
+        ancestry_coordinate,
+        _target_variant(),
+        2,
+        min_samples=2,
+    )
+
+    assert len(radii_and_effects) == 2
+    assert radii_and_effects[0][0] < radii_and_effects[1][0]
+    assert all(math.isfinite(effect_size) for _, effect_size in radii_and_effects)
+
+
+def test_effect_size_standard_error_by_cumulative_radius_returns_radius_error_pairs() -> None:
+    training_data = _make_training_data(
+        (-1.0, 1.0, -3.0, 3.0),
+        labels=(0.0, 1.0, 0.0, 1.0),
+        dosages=(0.0, 1.0, 1.0, 2.0),
+    )
+    ancestry_coordinate = PriorityAncestryCoordinate(values=(0.0,), dimension=1)
+
+    radii_and_errors = effect_size_standard_error_by_cumulative_radius(
+        training_data,
+        ancestry_coordinate,
+        _target_variant(),
+        2,
+        min_samples=2,
+    )
+
+    assert len(radii_and_errors) == 2
+    assert radii_and_errors[0][0] < radii_and_errors[1][0]
+    assert all(math.isfinite(standard_error) for _, standard_error in radii_and_errors)

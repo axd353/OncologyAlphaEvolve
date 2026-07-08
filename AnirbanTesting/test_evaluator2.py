@@ -17,7 +17,7 @@ from funsearch_pipeline.logging_utils import configure_file_logger
 from funsearch_pipeline.program_database.database import CycleProgramsDatabase
 
 """
- PYTHONDONTWRITEBYTECODE=1 pytest -s -q -p no:cacheprovider test_evaluator.py
+PYTHONDONTWRITEBYTECODE=1 pytest -s -q -p no:cacheprovider test_evaluator2.py
 """
 
 NO_COVARIATES_TRAINING = (
@@ -51,23 +51,33 @@ def _write_text(path: Path, content: str) -> Path:
     path.write_text(content)
     return path
 
+
 PRIORITY_FUNCTION_SOURCE = (
     "def priority(\n"
     "    training_data: PriorityTrainingData,\n"
     "    ancestry_coordinate: PriorityAncestryCoordinate,\n"
     "    target_variant: PriorityTargetVariant,\n"
     ") -> float:\n"
-    "    densities = equal_count_interval_densities(training_data, ancestry_coordinate, 6)\n"
-    "    intervals = equal_count_intervals(training_data, ancestry_coordinate, 6)\n"
-    "    if len(densities) < 2:\n"
-    "        return intervals[0][0]\n"
-    "    drop_index = max(range(1, len(densities)), key=lambda index: densities[index - 1] - densities[index])\n"
-    "    return intervals[drop_index][0]\n"
+    "    radii_and_effects = effect_size_by_cumulative_radius(\n"
+    "        training_data,\n"
+    "        ancestry_coordinate,\n"
+    "        target_variant,\n"
+    "        6,\n"
+    "    )\n"
+    "    if not radii_and_effects:\n"
+    "        return 0.0\n"
+    "    if len(radii_and_effects) == 1:\n"
+    "        return radii_and_effects[0][0]\n"
+    "    drop_index = max(\n"
+    "        range(1, len(radii_and_effects)),\n"
+    "        key=lambda index: abs(radii_and_effects[index - 1][1] - radii_and_effects[index][1]),\n"
+    "    )\n"
+    "    return radii_and_effects[drop_index][0]\n"
 )
 
 
 def test_manual_procedure2_evaluation() -> None:
-    run_root = Path(__file__).resolve().parent / "test_evaluator"
+    run_root = Path(__file__).resolve().parent / "test_evaluator2"
     if run_root.exists():
         shutil.rmtree(run_root)
     run_root.mkdir(parents=True, exist_ok=True)
@@ -76,11 +86,11 @@ def test_manual_procedure2_evaluation() -> None:
         run_root / "seed_priority.py",
         PRIORITY_FUNCTION_SOURCE,
     )
-    log_path = run_root / "test_evaluator.log"
+    log_path = run_root / "test_evaluator2.log"
     logger = configure_file_logger(
         log_path,
         "INFO",
-        logger_name="anirban.manual.test_evaluator",
+        logger_name="anirban.manual.test_evaluator2",
     )
     experiment_dir = run_root / "experiment"
     experiment_dir.mkdir(parents=True, exist_ok=True)

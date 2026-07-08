@@ -1,0 +1,21 @@
+{
+  "global_best_score": 0.5888853292152947,
+  "islands": [
+    {
+      "best_score": 0.5888853292152947,
+      "island_id": 0,
+      "num_clusters": 1,
+      "num_programs": 1
+    },
+    {
+      "best_score": 0.5888853292152947,
+      "island_id": 1,
+      "num_clusters": 1,
+      "num_programs": 1
+    }
+  ],
+  "metadata": {
+    "stage": "manual_bootstrap"
+  },
+  "num_islands": 2
+}

@@ -1,11 +1,23 @@
+from funsearch_pipeline.priority_tools import PriorityAncestryCoordinate
+from funsearch_pipeline.priority_tools import PriorityTargetVariant
+from funsearch_pipeline.priority_tools import PriorityTrainingData
+from funsearch_pipeline.priority_tools import equal_count_interval_densities
+from funsearch_pipeline.priority_tools import equal_count_intervals
+
+
 def priority(
     training_data,
     ancestry_coordinate,
     target_variant,
 ) -> float:
-    """Simple seed priority function used to bootstrap the program database."""
+    """Choose the interval boundary after the sharpest density drop-off."""
 
-    ancestry_dimensionality = float(ancestry_coordinate.dimension)
-    variant_name_length = float(len(target_variant.name))
-    sample_count = float(training_data.sample_count)
-    return ancestry_dimensionality * 0.01 + variant_name_length * 0.001 + sample_count * 0.0
+    densities = equal_count_interval_densities(training_data, ancestry_coordinate, 6)
+    intervals = equal_count_intervals(training_data, ancestry_coordinate, 6)
+    if len(densities) < 2:
+        return intervals[0][0]
+    drop_index = max(
+        range(1, len(densities)),
+        key=lambda index: densities[index - 1] - densities[index],
+    )
+    return intervals[drop_index][0]
