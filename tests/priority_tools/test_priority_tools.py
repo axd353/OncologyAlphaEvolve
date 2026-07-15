@@ -151,6 +151,23 @@ def test_equal_count_intervals_assigns_tied_boundary_distance_to_earlier_interva
     assert counts == [3, 1]
 
 
+def test_equal_count_intervals_accept_upper_bound_of_thirty() -> None:
+    training_data = _make_training_data(tuple(float(index) for index in range(30)))
+    ancestry_coordinate = PriorityAncestryCoordinate(values=(0.0,), dimension=1)
+
+    intervals = equal_count_intervals(training_data, ancestry_coordinate, 30)
+
+    assert len(intervals) == 30
+
+
+def test_equal_count_intervals_reject_more_than_thirty() -> None:
+    training_data = _make_training_data(tuple(float(index) for index in range(31)))
+    ancestry_coordinate = PriorityAncestryCoordinate(values=(0.0,), dimension=1)
+
+    with pytest.raises(ValueError, match=r"\[1, 30\]"):
+        equal_count_intervals(training_data, ancestry_coordinate, 31)
+
+
 def test_equal_count_interval_densities_match_interval_counts_over_1d_shell_length() -> None:
     training_data = _make_training_data((-1.0, 2.0, -3.0, 4.0, -5.0, 6.0))
     ancestry_coordinate = PriorityAncestryCoordinate(values=(0.0,), dimension=1)
@@ -285,6 +302,49 @@ def test_effect_size_standard_error_by_interval_returns_infinity_for_unidentifia
     )
 
     assert standard_errors == [math.inf, math.inf, math.inf, math.inf]
+
+
+def test_effect_size_by_cumulative_radius_accepts_upper_bound_of_thirty() -> None:
+    coordinates = tuple(float(index) for index in range(30))
+    labels = tuple(float(index % 2) for index in range(30))
+    dosages = tuple(float(index % 3) for index in range(30))
+    training_data = _make_training_data(
+        coordinates,
+        labels=labels,
+        dosages=dosages,
+    )
+    ancestry_coordinate = PriorityAncestryCoordinate(values=(0.0,), dimension=1)
+
+    radii_and_effects = effect_size_by_cumulative_radius(
+        training_data,
+        ancestry_coordinate,
+        _target_variant(),
+        30,
+        min_samples=1,
+    )
+
+    assert len(radii_and_effects) == 30
+
+
+def test_effect_size_by_cumulative_radius_rejects_more_than_thirty() -> None:
+    coordinates = tuple(float(index) for index in range(31))
+    labels = tuple(float(index % 2) for index in range(31))
+    dosages = tuple(float(index % 3) for index in range(31))
+    training_data = _make_training_data(
+        coordinates,
+        labels=labels,
+        dosages=dosages,
+    )
+    ancestry_coordinate = PriorityAncestryCoordinate(values=(0.0,), dimension=1)
+
+    with pytest.raises(ValueError, match=r"\[1, 30\]"):
+        effect_size_by_cumulative_radius(
+            training_data,
+            ancestry_coordinate,
+            _target_variant(),
+            31,
+            min_samples=1,
+        )
 
 
 def test_effect_size_by_cumulative_radius_returns_radius_effect_pairs() -> None:

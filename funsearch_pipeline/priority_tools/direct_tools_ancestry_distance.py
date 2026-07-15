@@ -63,7 +63,7 @@ def equal_count_intervals(
             measured. This is the exact same `PriorityAncestryCoordinate` object
             that the priority function receives as its `ancestry_coordinate`
             argument.
-        n: Number of intervals to produce. Must be an integer in `[1, 20]`.
+        n: Number of intervals to produce. Must be an integer in `[1, 30]`.
 
     Output:
         List of `n` interval pairs `[(0.0, r1), (r1, r2), ..., (r_{n-1}, r_n)]`.
@@ -79,7 +79,7 @@ def equal_count_intervals(
     Raises:
         TypeError: if `n` is not an integer.
         ValueError: if the dataset is empty, the contract shapes are inconsistent,
-            or `n` falls outside `[1, 20]`.
+            or `n` falls outside `[1, 30]`.
     """
 
     sorted_distances = _sorted_ancestry_distances(training_data, ancestry_coordinate)
@@ -105,7 +105,7 @@ def equal_count_interval_densities(
         ancestry_coordinate: The exact same `PriorityAncestryCoordinate` object
             that the priority function receives as its `ancestry_coordinate`
             argument.
-        n: Number of intervals to produce. Must be an integer in `[1, 20]`.
+        n: Number of intervals to produce. Must be an integer in `[1, 30]`.
 
     Output:
         List of `n` densities, ordered from the closest ancestry region to the
@@ -123,7 +123,7 @@ def equal_count_interval_densities(
     Raises:
         TypeError: if `n` is not an integer.
         ValueError: if the dataset is empty, the contract shapes are inconsistent,
-            `n` falls outside `[1, 20]`, or a returned interval has zero
+            `n` falls outside `[1, 30]`, or a returned interval has zero
             Euclidean region volume while still containing samples.
     """
 

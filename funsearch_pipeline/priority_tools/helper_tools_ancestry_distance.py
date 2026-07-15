@@ -188,7 +188,7 @@ def _equal_count_shell_upper_bounds(
     Input:
         sorted_distances: Distances sorted in ascending order.
         shell_count: Number of shells to create. Must be an integer in
-            `[1, 20]`.
+            `[1, 30]`.
 
     Output:
         Tuple `(r1, r2, ..., r_n)` of shell upper bounds. Each corresponding
@@ -201,14 +201,14 @@ def _equal_count_shell_upper_bounds(
 
     Raises:
         TypeError: if `shell_count` is not an integer.
-        ValueError: if the shell count is outside `[1, 20]`.
+        ValueError: if the shell count is outside `[1, 30]`.
     """
 
     if isinstance(shell_count, bool) or not isinstance(shell_count, Integral):
         raise TypeError("n must be an integer.")
     numeric_shell_count = int(shell_count)
-    if numeric_shell_count < 1 or numeric_shell_count > 20:
-        raise ValueError("n must lie in the inclusive range [1, 20].")
+    if numeric_shell_count < 1 or numeric_shell_count > 30:
+        raise ValueError("n must lie in the inclusive range [1, 30].")
 
     sample_count = len(sorted_distances)
     base_shell_size = sample_count // numeric_shell_count

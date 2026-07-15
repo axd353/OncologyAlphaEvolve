@@ -28,7 +28,7 @@ def dosage_entropy_by_interval(
         target_variant: The exact same `PriorityTargetVariant` object that the
             priority function receives as its `target_variant` argument.
         n: Number of equal-count ancestry-distance intervals. Must be an integer
-            in `[1, 20]`. The interval boundaries are the same as those returned
+            in `[1, 30]`. The interval boundaries are the same as those returned
             by `equal_count_intervals(training_data, ancestry_coordinate, n)`.
 
     Output:
@@ -43,7 +43,7 @@ def dosage_entropy_by_interval(
     Raises:
         TypeError: if `n` is not an integer.
         ValueError: if the dataset is empty, the contract shapes are
-            inconsistent, or `n` falls outside `[1, 20]`.
+            inconsistent, or `n` falls outside `[1, 30]`.
     """
 
     return [
@@ -72,7 +72,7 @@ def dosage_entropy_by_cumulative_radius(
             argument.
         target_variant: The exact same `PriorityTargetVariant` object that the
             priority function receives as its `target_variant` argument.
-        n: Number of cumulative radii. Must be an integer in `[1, 20]`. The
+        n: Number of cumulative radii. Must be an integer in `[1, 30]`. The
             radii are the cumulative upper bounds of the equal-count intervals.
 
     Output:
@@ -94,7 +94,7 @@ def dosage_entropy_by_cumulative_radius(
     Raises:
         TypeError: if `n` is not an integer.
         ValueError: if the dataset is empty, the contract shapes are
-            inconsistent, or `n` falls outside `[1, 20]`.
+            inconsistent, or `n` falls outside `[1, 30]`.
     """
 
     return [
@@ -125,7 +125,7 @@ def effect_size_by_interval(
         target_variant: The exact same `PriorityTargetVariant` object that the
             priority function receives as its `target_variant` argument.
         n: Number of equal-count ancestry-distance intervals. Must be an integer
-            in `[1, 20]`.
+            in `[1, 30]`.
         min_samples: Minimum number of records required in one interval before a
             marginal effect is attempted. Must be a positive integer.
 
@@ -147,7 +147,7 @@ def effect_size_by_interval(
     Raises:
         TypeError: if `n` or `min_samples` is not an integer.
         ValueError: if the dataset is empty, the contract shapes are
-            inconsistent, `n` falls outside `[1, 20]`, or `min_samples` is not
+            inconsistent, `n` falls outside `[1, 30]`, or `min_samples` is not
             positive.
     """
 
@@ -183,7 +183,7 @@ def effect_size_standard_error_by_interval(
         target_variant: The exact same `PriorityTargetVariant` object that the
             priority function receives as its `target_variant` argument.
         n: Number of equal-count ancestry-distance intervals. Must be an integer
-            in `[1, 20]`.
+            in `[1, 30]`.
         min_samples: Minimum number of records required in one interval before a
             marginal effect is attempted. Must be a positive integer.
 
@@ -204,7 +204,7 @@ def effect_size_standard_error_by_interval(
     Raises:
         TypeError: if `n` or `min_samples` is not an integer.
         ValueError: if the dataset is empty, the contract shapes are
-            inconsistent, `n` falls outside `[1, 20]`, or `min_samples` is not
+            inconsistent, `n` falls outside `[1, 30]`, or `min_samples` is not
             positive.
     """
 
@@ -239,7 +239,7 @@ def effect_size_by_cumulative_radius(
             argument.
         target_variant: The exact same `PriorityTargetVariant` object that the
             priority function receives as its `target_variant` argument.
-        n: Number of cumulative radii. Must be an integer in `[1, 20]`.
+        n: Number of cumulative radii. Must be an integer in `[1, 30]`.
         min_samples: Minimum number of records required inside one cumulative
             ball before a marginal effect is attempted. Must be a positive
             integer.
@@ -271,7 +271,7 @@ def effect_size_by_cumulative_radius(
     Raises:
         TypeError: if `n` or `min_samples` is not an integer.
         ValueError: if the dataset is empty, the contract shapes are
-            inconsistent, `n` falls outside `[1, 20]`, or `min_samples` is not
+            inconsistent, `n` falls outside `[1, 30]`, or `min_samples` is not
             positive.
     """
 
@@ -309,7 +309,7 @@ def effect_size_standard_error_by_cumulative_radius(
             argument.
         target_variant: The exact same `PriorityTargetVariant` object that the
             priority function receives as its `target_variant` argument.
-        n: Number of cumulative radii. Must be an integer in `[1, 20]`.
+        n: Number of cumulative radii. Must be an integer in `[1, 30]`.
         min_samples: Minimum number of records required inside one cumulative
             ball before a marginal effect is attempted. Must be a positive
             integer.
@@ -339,7 +339,7 @@ def effect_size_standard_error_by_cumulative_radius(
     Raises:
         TypeError: if `n` or `min_samples` is not an integer.
         ValueError: if the dataset is empty, the contract shapes are
-            inconsistent, `n` falls outside `[1, 20]`, or `min_samples` is not
+            inconsistent, `n` falls outside `[1, 30]`, or `min_samples` is not
             positive.
     """
 

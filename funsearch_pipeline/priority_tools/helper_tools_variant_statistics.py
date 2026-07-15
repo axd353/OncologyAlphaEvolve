@@ -69,8 +69,8 @@ def _validated_interval_count(n: int) -> int:
     if isinstance(n, bool) or not isinstance(n, Integral):
         raise TypeError("n must be an integer.")
     numeric_n = int(n)
-    if numeric_n < 1 or numeric_n > 20:
-        raise ValueError("n must lie in the inclusive range [1, 20].")
+    if numeric_n < 1 or numeric_n > 30:
+        raise ValueError("n must lie in the inclusive range [1, 30].")
     return numeric_n
 
 
