@@ -152,7 +152,7 @@ def _build_single_completion_request(
         cycle_index=request.cycle_index,
         island_id=request.island_shard.island_id,
         version_generated=prompt.version_generated,
-        prompt_code=prompt.code,
+        prompt_code=_compose_sampler_input(prompt),
         system_prompt=request.system_prompt,
         model=request.sampler_settings.model,
         candidates_per_island_per_cycle=1,
@@ -161,6 +161,40 @@ def _build_single_completion_request(
         temperature=request.sampler_settings.temperature,
         max_output_tokens=request.sampler_settings.max_output_tokens,
     )
+
+
+def _compose_sampler_input(prompt: IslandPrompt) -> str:
+    """Add a small natural-language bridge ahead of the raw code prompt.
+
+    Input:
+        prompt: Island prompt containing the sampled prior implementations and
+            the header for the next version.
+
+    Output:
+        Text input for the sampler backend consisting of a short instruction
+        block followed by the raw Python prompt.
+    """
+
+    if prompt.version_generated <= 0:
+        raise ValueError("Sampler prompts must generate at least version 1.")
+
+    if prompt.version_generated == 1:
+        bridge = (
+            "The code prompt below shows one prior priority function, priority_v0.\n"
+            "Your job is to return a complete definition of priority_v1 as a further improvement.\n"
+            "Return only the definition of priority_v1 with the correct input and output signature.\n\n"
+        )
+    else:
+        previous_version = prompt.version_generated - 1
+        bridge = (
+            "The code prompt below shows prior priority functions from the same island.\n"
+            f"priority_v{previous_version} is a higher-scored improvement over priority_v{previous_version - 1}.\n"
+            f"A plausible strategy is to identify what made priority_v{previous_version} better than priority_v{previous_version - 1} and improve further in that direction.\n"
+            "You may also try a completely novel direction of improvement.\n"
+            f"Your job is to return a complete definition of priority_v{prompt.version_generated} as a further improvement.\n"
+            f"Return only the definition of priority_v{prompt.version_generated} with the correct input and output signature.\n\n"
+        )
+    return bridge + prompt.code
 
 
 def _format_sampler_cpu_binding() -> tuple[str, str]:

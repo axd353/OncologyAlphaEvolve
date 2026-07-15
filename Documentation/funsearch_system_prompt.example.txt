@@ -1,12 +1,1 @@
-You are improving a Python priority function named priority.
-
-Requirements:
-- Return only the function body continuation for the next priority version.
-- Preserve the signature priority(training_data, ancestry_coordinate, target_variant) -> float.
-- Prefer simple, numerically stable logic.
-- Do not add markdown fences.
-
-Available context:
-- The prompt already contains priority_v0 and priority_v1 sampled from the same island.
-- The surrounding oracle pipeline will adapt data access through GenomicsHelpers/oracle_data_adapter.py.
-- Later versions may allow vector outputs, so avoid assuming ancestry_coordinate has fixed dimensionality.
+/nfs/home/adas23/projects/AlphaEvolve/Collaterals/Run1/funsearch_system_prompt.example.txt

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ast
 import math
 from typing import Callable
 
@@ -40,8 +41,13 @@ def build_candidate_program(
         `CandidateProgram` containing the compiled function and full source.
     """
 
-    evolved_function, program_source = upstream_evaluator._sample_to_program(
+    normalized_completion = _normalize_completion(
         raw_completion,
+        version_generated=version_generated,
+        function_to_evolve=function_to_evolve,
+    )
+    evolved_function, program_source = upstream_evaluator._sample_to_program(
+        normalized_completion,
         version_generated,
         template,
         function_to_evolve,
@@ -50,10 +56,60 @@ def build_candidate_program(
         island_id=island_id,
         version_generated=version_generated,
         sample_index=sample_index,
-        raw_completion=raw_completion,
+        raw_completion=normalized_completion,
         evolved_function=evolved_function,
         program_source=program_source,
         function_name=function_to_evolve,
+    )
+
+
+def _normalize_completion(
+    raw_completion: str,
+    *,
+    version_generated: int | None,
+    function_to_evolve: str,
+) -> str:
+    """Accept either a bare body or a full versioned function definition.
+
+    Input:
+        raw_completion: Raw model text.
+        version_generated: Version suffix expected for this prompt.
+        function_to_evolve: Base priority function name.
+
+    Output:
+        Function body text consumable by upstream `_sample_to_program`.
+    """
+
+    stripped = raw_completion.strip()
+    if not stripped:
+        return raw_completion
+    if stripped.startswith("def "):
+        if version_generated is None:
+            raise ValueError("A full function definition is not valid for the seed candidate.")
+        return _extract_function_body_from_definition(
+            stripped,
+            expected_function_name=f"{function_to_evolve}_v{version_generated}",
+        )
+    return raw_completion
+
+
+def _extract_function_body_from_definition(
+    source: str,
+    *,
+    expected_function_name: str,
+) -> str:
+    """Extract the body from a full generated function definition."""
+
+    module = ast.parse(source)
+    for node in module.body:
+        if isinstance(node, ast.FunctionDef) and node.name == expected_function_name:
+            function_text = ast.get_source_segment(source, node)
+            if function_text is None:
+                break
+            parsed_function = code_manipulation.text_to_function(function_text)
+            return parsed_function.body + "\n"
+    raise ValueError(
+        f"Expected completion to define {expected_function_name!r}."
     )
 
 

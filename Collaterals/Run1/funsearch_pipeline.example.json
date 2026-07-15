@@ -14,8 +14,8 @@
     "main_output_dir": "../funsearch_runs",
     "seed_priority_path": "./funsearch_priority_seed_example.py",
     "function_to_evolve": "priority",
-    "max_cycles": 20,
-    "stop_after_no_improvement_cycles": 5,
+    "max_cycles": 8,
+    "stop_after_no_improvement_cycles": 3,
     "random_seed": 1234
   },
   "program_database": {
@@ -27,7 +27,7 @@
       "cluster_sampling_temperature_period": "Period, measured in programs registered in an island, over which the cluster sampling temperature linearly decays before restarting its schedule."
     },
     "functions_per_prompt": 2,
-    "num_islands": 8,
+    "num_islands": 4,
     "cluster_sampling_temperature_init": 0.1,
     "cluster_sampling_temperature_period": 30000
   },
@@ -84,7 +84,7 @@
         },
         "name": "no_covariates",
         "training_pickles": [
-          "/lustre/isaac24/scratch/adas23/dbGapData/MECProstateCancer/MultiStagePythonCodeOutput/20260703_193925/stage4/train_AA.pk",
+          "/lustre/isaac24/scratch/adas23/dbGapData/MECProstateCancer/MultiStagePythonCodeOutput/20260703_193925/stage4/train_AA.pkl",
           "/lustre/isaac24/scratch/adas23/dbGapData/MECProstateCancer/MultiStagePythonCodeOutput/20260703_193925/stage4/train_LA.pkl"
         ],
         "testing_pickles": [
@@ -106,7 +106,7 @@
         },
         "name": "with_covariates",
         "training_pickles": [
-          "/lustre/isaac24/scratch/adas23/dbGapData/MECProstateCancer/MultiStagePythonCodeOutput/20260703_193925/stage4/train_AA_add_covs.pk",
+          "/lustre/isaac24/scratch/adas23/dbGapData/MECProstateCancer/MultiStagePythonCodeOutput/20260703_193925/stage4/train_AA_add_covs.pkl",
           "/lustre/isaac24/scratch/adas23/dbGapData/MECProstateCancer/MultiStagePythonCodeOutput/20260703_193925/stage4/train_LA_add_covs.pkl"
         ],
         "testing_pickles": [

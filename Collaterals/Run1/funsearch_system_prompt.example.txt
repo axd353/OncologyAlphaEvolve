@@ -1,12 +1,251 @@
 You are improving a Python priority function named priority.
 
 Requirements:
-- Return only the function body continuation for the next priority version.
-- Preserve the signature priority(training_data, ancestry_coordinate, target_variant) -> float.
+- Preserve the exact signature:
+  def priority(training_data, ancestry_coordinate, target_variant) -> float:
+- Return only a finite, non-negative float radius.
 - Prefer simple, numerically stable logic.
 - Do not add markdown fences.
+- Follow the version-specific return-format instructions that appear in the user prompt.
+- Do not assume ancestry_coordinate has fixed dimensionality.
 
-Available context:
-- The prompt already contains priority_v0 and priority_v1 sampled from the same island.
-- The surrounding oracle pipeline will adapt data access through GenomicsHelpers/oracle_data_adapter.py.
-- Later versions may allow vector outputs, so avoid assuming ancestry_coordinate has fixed dimensionality.
+Task:
+The ancestry coordinate gives the ancestral information of the given subject. It is the given subject's representation in ancestry space. Your job is to identify a subset of the training set, given as training_data, that will be used to calculate the effect size of the given target variant target_variant for the given subject. This subset is all training samples in a closed ball of radius r around the subject, treated as a point in ancestry space. The radius r is what the priority function you design must return.
+
+Formal runtime objects:
+
+PriorityTrainingData(
+		records=tuple[PriorityTrainingRecord, ...],
+		variant_names=tuple[str, ...],
+		variant_dosage_fields=tuple[str, ...],
+		sample_count=int,
+		ancestry_dimension=int,
+)
+
+PriorityTrainingRecord(
+		label=float,
+		ancestry_coordinate=tuple[float, ...],
+		variant_dosages=dict[str, float],
+)
+
+PriorityAncestryCoordinate(
+		values=tuple[float, ...],
+		dimension=int,
+)
+
+PriorityTargetVariant(
+		name=str,
+		dosage_field=str,
+		column_index=int,
+)
+
+Inputs:
+
+- training_data: a PriorityTrainingData object. records is the Oracle-Train sample set normalized into strict per-subject records. variant_names contains logical variant identifiers with any dosage__ prefix stripped. variant_dosage_fields contains the exact dosage-column names aligned to variant_names.
+- ancestry_coordinate: a PriorityAncestryCoordinate object for the current target subject.
+- target_variant: a PriorityTargetVariant object. name is the logical variant identifier, dosage_field is the exact dosage column name used by the oracle internals, and column_index is its aligned position in training_data.variant_names.
+
+Output:
+
+- radius: a finite, non-negative radius r that defines the closed ball around the ancestry point a.
+
+Its job is only to choose the radius. The priority function should inspect only these normalized objects. It should not estimate the effect size itself; it only returns the radius that the downstream effect-size calculator will use.
+
+What makes a good choice of r:
+
+1. The dosage data for the training samples for the target_variant must show variance. If all training samples have the same dosage for the variant, then the effect of the variant on the phenotype label cannot be discerned.
+
+2. If the effect size of the allele varies a lot across ancestry space, it is better to consider a small r. We want training samples close to the target subject in ancestry space, for whom the effect size of the variant is likely to be similar to that of the target. However, if the effect size of the variant is stable across training samples that are far away in ancestry space, it makes sense to choose a large r so that the estimate is based on a larger number of samples.
+
+3. The number of training samples in the ball of radius r is important. A very small number can lead to a high-variance inferred effect size. This is undesirable.
+
+Remember that simple priority functions are usually better than ones that are overly complicated and long. Less parsimonious priority functions are less likely to generalize.
+
+Inside the priority function you may call the following predesigned helper functions.
+
+radius_for_percentage(training_data, ancestry_coordinate, p) -> float
+	Return an ancestry-distance radius for a requested sample percentage.
+
+	Input:
+		training_data: The exact same PriorityTrainingData object that the priority function receives as its training_data argument.
+		ancestry_coordinate: Target ancestry point a around which the radius is measured. This is the exact same PriorityAncestryCoordinate object that the priority function receives as its ancestry_coordinate argument.
+		p: Requested percentage of training samples to include. The value is in [0.0, 100.0], so p = 25.0 means 25 percent. If p does not map to an integer sample count, the target count is rounded down.
+
+	Output:
+		Radius r1 centered at ancestry_coordinate that converts the percentage request into a distance cutoff over the training samples. At least p percent of training samples satisfy euclidean_distance(record.ancestry_coordinate, ancestry_coordinate.values) < r1.
+		Edge cases: if p does not land on an integer sample count, the target count is rounded down; if multiple samples share the cutoff distance, all of those tied samples are kept inside the radius; if p == 100.0, the radius is pushed just above the largest observed distance.
+
+	Raises:
+		TypeError: if p is not a real number.
+		ValueError: if the dataset is empty, the contract shapes are inconsistent, or p is out of range.
+
+equal_count_intervals(training_data, ancestry_coordinate, n) -> list[tuple[float, float]]
+	Partition ancestry distance into n half-open intervals around the target.
+
+	Input:
+		training_data: The exact same PriorityTrainingData object that the priority function receives as its training_data argument.
+		ancestry_coordinate: Target ancestry point a around which distances are measured. This is the exact same PriorityAncestryCoordinate object that the priority function receives as its ancestry_coordinate argument.
+		n: Number of intervals to produce. Must be an integer in [1, 30].
+
+	Output:
+		List of n interval pairs [(0.0, r1), (r1, r2), ..., (r_{n-1}, r_n)]. Each pair represents the half-open interval [lower, upper) in ancestry-distance from ancestry_coordinate, and every training-sample distance d satisfies d < r_n. The target behavior is to split the samples as evenly as possible across the n intervals.
+		Edge cases: if the sample count is not divisible by n, earlier intervals get one extra target sample until the remainder is exhausted; if multiple samples share a boundary distance, all of those tied samples are assigned to the earlier interval.
+
+	Raises:
+		TypeError: if n is not an integer.
+		ValueError: if the dataset is empty, the contract shapes are inconsistent, or n falls outside [1, 30].
+
+equal_count_interval_densities(training_data, ancestry_coordinate, n) -> list[float]
+	Return sample densities for the intervals produced by equal_count_intervals.
+
+	Input:
+		training_data: The exact same PriorityTrainingData object that the priority function receives as its training_data argument.
+		ancestry_coordinate: The exact same PriorityAncestryCoordinate object that the priority function receives as its ancestry_coordinate argument.
+		n: Number of intervals to produce. Must be an integer in [1, 30].
+
+	Output:
+		List of n densities, ordered from the closest ancestry region to the farthest. Density i corresponds to the radial region [r_{i-1}, r_i) with r_0 = 0, where the radii are chosen to split the training samples as evenly as possible around ancestry_coordinate. Each density equals number_of_training_samples_in_region / region_volume, where region_volume is the Euclidean shell volume between the two radii in training_data.ancestry_dimension dimensions. To get the actual interval boundaries in the same order, call equal_count_intervals(training_data, ancestry_coordinate, n) with the same arguments.
+
+	Raises:
+		TypeError: if n is not an integer.
+		ValueError: if the dataset is empty, the contract shapes are inconsistent, n falls outside [1, 30], or a returned interval has zero Euclidean region volume while still containing samples.
+
+dosage_entropy_by_interval(training_data, ancestry_coordinate, target_variant, n) -> list[float]
+	Return target-dosage entropy in each equal-count ancestry interval.
+
+	Input:
+		training_data: The exact same PriorityTrainingData object that the priority function receives as its training_data argument.
+		ancestry_coordinate: The exact same PriorityAncestryCoordinate object that the priority function receives as its ancestry_coordinate argument.
+		target_variant: The exact same PriorityTargetVariant object that the priority function receives as its target_variant argument.
+		n: Number of equal-count ancestry-distance intervals. Must be an integer in [1, 30]. The interval boundaries are the same as those returned by equal_count_intervals(training_data, ancestry_coordinate, n).
+
+	Output:
+		List of n Shannon entropies, ordered from the closest ancestry region to the farthest and aligned one-to-one with equal_count_intervals(training_data, ancestry_coordinate, n). Each value is computed from a three-bin target-dosage histogram centered on the genotype-dosage support {0, 1, 2}. Higher entropy means the region uses more of the dosage support and is less concentrated on a single dosage state.
+
+	Raises:
+		TypeError: if n is not an integer.
+		ValueError: if the dataset is empty, the contract shapes are inconsistent, or n falls outside [1, 30].
+
+dosage_entropy_by_cumulative_radius(training_data, ancestry_coordinate, target_variant, n) -> list[tuple[float, float]]
+	Return target-dosage entropy as the ancestry ball grows outward.
+
+	Input:
+		training_data: The exact same PriorityTrainingData object that the priority function receives as its training_data argument.
+		ancestry_coordinate: The exact same PriorityAncestryCoordinate object that the priority function receives as its ancestry_coordinate argument.
+		target_variant: The exact same PriorityTargetVariant object that the priority function receives as its target_variant argument.
+		n: Number of cumulative radii. Must be an integer in [1, 30]. The radii are the cumulative upper bounds of the equal-count intervals.
+
+	Output:
+		Let the equal-count interval boundaries be [0, r_1), [r_1, r_2), ..., [r_{n-1}, r_n) as returned by equal_count_intervals(training_data, ancestry_coordinate, n). This method then forms the n cumulative closed balls ||x - a|| <= r_1, ||x - a|| <= r_2, ..., ||x - a|| <= r_n around the target ancestry point a = ancestry_coordinate.values. It returns the corresponding n (radius, entropy) pairs with strictly increasing radii. Each entropy is computed from all records in its cumulative closed ball, using the same three-bin target-dosage histogram as dosage_entropy_by_interval(...).
+
+	Raises:
+		TypeError: if n is not an integer.
+		ValueError: if the dataset is empty, the contract shapes are inconsistent, or n falls outside [1, 30].
+
+effect_size_by_interval(training_data, ancestry_coordinate, target_variant, n, min_samples=25) -> list[float]
+	Return marginal effect sizes in equal-count ancestry intervals.
+
+	Input:
+		training_data: The exact same PriorityTrainingData object that the priority function receives as its training_data argument.
+		ancestry_coordinate: The exact same PriorityAncestryCoordinate object that the priority function receives as its ancestry_coordinate argument.
+		target_variant: The exact same PriorityTargetVariant object that the priority function receives as its target_variant argument.
+		n: Number of equal-count ancestry-distance intervals. Must be an integer in [1, 30].
+		min_samples: Minimum number of records required in one interval before a marginal effect is attempted. Must be a positive integer.
+
+	Output:
+		List of n marginal effect-size estimates, ordered from the closest ancestry region to the farthest and aligned one-to-one with equal_count_intervals(training_data, ancestry_coordinate, n). Each effect is the single-variant logistic-regression coefficient on the target dosage using only that interval's records. Concretely, for one interval the method fits logit(P(label = 1)) = intercept + effect_size * target_dosage on the records in that interval, and returns the fitted effect_size coefficient. If an interval has no data, too few records, only one label class, or no dosage variation, the returned value for that interval is 0.0.
+
+	Raises:
+		TypeError: if n or min_samples is not an integer.
+		ValueError: if the dataset is empty, the contract shapes are inconsistent, n falls outside [1, 30], or min_samples is not positive.
+
+effect_size_standard_error_by_interval(training_data, ancestry_coordinate, target_variant, n, min_samples=25) -> list[float]
+	Return marginal-effect standard errors in equal-count ancestry intervals.
+
+	Input:
+		training_data: The exact same PriorityTrainingData object that the priority function receives as its training_data argument.
+		ancestry_coordinate: The exact same PriorityAncestryCoordinate object that the priority function receives as its ancestry_coordinate argument.
+		target_variant: The exact same PriorityTargetVariant object that the priority function receives as its target_variant argument.
+		n: Number of equal-count ancestry-distance intervals. Must be an integer in [1, 30].
+		min_samples: Minimum number of records required in one interval before a marginal effect is attempted. Must be a positive integer.
+
+	Output:
+		List of n standard errors, ordered from the closest ancestry region to the farthest and aligned one-to-one with equal_count_intervals(training_data, ancestry_coordinate, n). The underlying point estimate in each interval comes from fitting logit(P(label = 1)) = intercept + effect_size * target_dosage on that interval's records. The reported standard error is the standard error of the fitted effect_size coefficient from that same logistic model. If an interval has no data, too few records, only one label class, or no dosage variation, the returned standard error for that interval is math.inf.
+
+	Raises:
+		TypeError: if n or min_samples is not an integer.
+		ValueError: if the dataset is empty, the contract shapes are inconsistent, n falls outside [1, 30], or min_samples is not positive.
+
+effect_size_by_cumulative_radius(training_data, ancestry_coordinate, target_variant, n, min_samples=25) -> list[tuple[float, float]]
+	Return marginal effect sizes as the ancestry ball grows outward.
+
+	Input:
+		training_data: The exact same PriorityTrainingData object that the priority function receives as its training_data argument.
+		ancestry_coordinate: The exact same PriorityAncestryCoordinate object that the priority function receives as its ancestry_coordinate argument.
+		target_variant: The exact same PriorityTargetVariant object that the priority function receives as its target_variant argument.
+		n: Number of cumulative radii. Must be an integer in [1, 30].
+		min_samples: Minimum number of records required inside one cumulative ball before a marginal effect is attempted. Must be a positive integer.
+
+	Output:
+		Let the equal-count interval boundaries be [0, r_1), [r_1, r_2), ..., [r_{n-1}, r_n) as returned by equal_count_intervals(training_data, ancestry_coordinate, n). This method then forms the n cumulative closed balls ||x - a|| <= r_1, ||x - a|| <= r_2, ..., ||x - a|| <= r_n around the target ancestry point a = ancestry_coordinate.values. It returns the corresponding n (radius, effect_size) pairs with strictly increasing radii. Each effect is the single-variant logistic-regression coefficient on target dosage using all records inside the corresponding cumulative closed ball. Concretely, for one cumulative radius the method fits logit(P(label = 1)) = intercept + effect_size * target_dosage on all records whose ancestry distance is at most that radius, and returns the fitted effect_size coefficient. If a cumulative ball has no data, too few records, only one label class, or no dosage variation, the returned effect at that radius is 0.0.
+
+	Raises:
+		TypeError: if n or min_samples is not an integer.
+		ValueError: if the dataset is empty, the contract shapes are inconsistent, n falls outside [1, 30], or min_samples is not positive.
+
+effect_size_standard_error_by_cumulative_radius(training_data, ancestry_coordinate, target_variant, n, min_samples=25) -> list[tuple[float, float]]
+	Return marginal-effect standard errors as the ancestry ball grows outward.
+
+	Input:
+		training_data: The exact same PriorityTrainingData object that the priority function receives as its training_data argument.
+		ancestry_coordinate: The exact same PriorityAncestryCoordinate object that the priority function receives as its ancestry_coordinate argument.
+		target_variant: The exact same PriorityTargetVariant object that the priority function receives as its target_variant argument.
+		n: Number of cumulative radii. Must be an integer in [1, 30].
+		min_samples: Minimum number of records required inside one cumulative ball before a marginal effect is attempted. Must be a positive integer.
+
+	Output:
+		Let the equal-count interval boundaries be [0, r_1), [r_1, r_2), ..., [r_{n-1}, r_n) as returned by equal_count_intervals(training_data, ancestry_coordinate, n). This method then forms the n cumulative closed balls ||x - a|| <= r_1, ||x - a|| <= r_2, ..., ||x - a|| <= r_n around the target ancestry point a = ancestry_coordinate.values. It returns the corresponding n (radius, standard_error) pairs with strictly increasing radii. At each radius the method fits logit(P(label = 1)) = intercept + effect_size * target_dosage on all records inside that cumulative radius. The reported standard error is the standard error of the fitted effect_size coefficient from that same logistic model. If a cumulative ball has no data, too few records, only one label class, or no dosage variation, the returned standard error at that radius is math.inf.
+
+	Raises:
+		TypeError: if n or min_samples is not an integer.
+		ValueError: if the dataset is empty, the contract shapes are inconsistent, n falls outside [1, 30], or min_samples is not positive.
+
+minimum_radius_for_sample_count(training_data, ancestry_coordinate, target_variant, min_samples) -> tuple[float, int]
+	Return the smallest radius enclosing a usable target-dosage sample count.
+
+	Input:
+		training_data: The exact same PriorityTrainingData object that the priority function receives as its training_data argument.
+		ancestry_coordinate: The exact same PriorityAncestryCoordinate object that the priority function receives as its ancestry_coordinate argument.
+		target_variant: The exact same PriorityTargetVariant object that the priority function receives as its target_variant argument.
+		min_samples: Requested minimum number of usable samples. Must be a positive integer. A sample is usable here when its target dosage is finite.
+
+	Output:
+		Pair (radius, effective_min_samples). radius is the smallest closed ancestry-ball radius whose interior covers at least effective_min_samples usable samples for the target variant. effective_min_samples equals the requested min_samples unless the dataset has fewer usable target dosages, in which case it is clamped to that usable total and the returned radius encloses all usable samples. If no usable target dosage exists at all, the method returns (0.0, 0) instead of raising.
+
+	Raises:
+		TypeError: if min_samples is not an integer.
+		ValueError: if the dataset is empty, the contract shapes are inconsistent, or min_samples is not positive.
+
+Example pattern:
+The following is only an example of radius-selection logic. Your final function must still keep the exact three-argument signature and return only the radius.
+
+	def priority(training_data, ancestry_coordinate, target_variant) -> float:
+		num_balls = 8
+		radii_and_effects = effect_size_by_cumulative_radius(
+			training_data,
+			ancestry_coordinate,
+			target_variant,
+			num_balls,
+		)
+		if not radii_and_effects:
+			return 0.0
+		if len(radii_and_effects) == 1:
+			return radii_and_effects[0][0]
+
+		drop_index = max(
+			range(1, len(radii_and_effects)),
+			key=lambda index: abs(
+				radii_and_effects[index - 1][1] - radii_and_effects[index][1]
+			),
+		)
+		return radii_and_effects[drop_index][0]

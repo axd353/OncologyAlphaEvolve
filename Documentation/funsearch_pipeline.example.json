@@ -84,7 +84,7 @@
         },
         "name": "no_covariates",
         "training_pickles": [
-          "/lustre/isaac24/scratch/adas23/dbGapData/MECProstateCancer/MultiStagePythonCodeOutput/20260703_193925/stage4/train_AA.pk",
+          "/lustre/isaac24/scratch/adas23/dbGapData/MECProstateCancer/MultiStagePythonCodeOutput/20260703_193925/stage4/train_AA.pkl",
           "/lustre/isaac24/scratch/adas23/dbGapData/MECProstateCancer/MultiStagePythonCodeOutput/20260703_193925/stage4/train_LA.pkl"
         ],
         "testing_pickles": [
@@ -106,7 +106,7 @@
         },
         "name": "with_covariates",
         "training_pickles": [
-          "/lustre/isaac24/scratch/adas23/dbGapData/MECProstateCancer/MultiStagePythonCodeOutput/20260703_193925/stage4/train_AA_add_covs.pk",
+          "/lustre/isaac24/scratch/adas23/dbGapData/MECProstateCancer/MultiStagePythonCodeOutput/20260703_193925/stage4/train_AA_add_covs.pkl",
           "/lustre/isaac24/scratch/adas23/dbGapData/MECProstateCancer/MultiStagePythonCodeOutput/20260703_193925/stage4/train_LA_add_covs.pkl"
         ],
         "testing_pickles": [
