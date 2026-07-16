@@ -1,0 +1,103 @@
+cycle=1 island=3 experiment_dir=/nfs/home/adas23/projects/AlphaEvolve/prio_func_disc_runs/oracle_priority_20260716_044537 sampler_start
+cycle=1 island=3 sampler_cpu pid=1778971 current_cpu=unknown allowed_cpus=[5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 23, 95, 96, 97, 98, 99, 100, 102, 103, 104, 105, 108, 109, 111, 115, 116, 117, 118, 119, 120, 121, 129, 130, 131, 132]
+sample_index=0 full_prompt_begin island=3
+def priority_v0(training_data, ancestry_coordinate, target_variant) -> float:
+    densities = equal_count_interval_densities(training_data, ancestry_coordinate, 6)
+    intervals = equal_count_intervals(training_data, ancestry_coordinate, 6)
+    if len(densities) < 2:
+        return intervals[0][0]
+    drop_index = max(
+        range(1, len(densities)),
+        key=lambda index: densities[index - 1] - densities[index],
+    )
+    return intervals[drop_index][0]
+
+
+def priority_v1(training_data, ancestry_coordinate, target_variant) -> float:
+  """Improved version of `priority_v0`."""
+sample_index=0 full_prompt_end island=3
+sample_index=0 prompt_path=/nfs/home/adas23/projects/AlphaEvolve/prio_func_disc_runs/oracle_priority_20260716_044537/cycle_0001/sampler_outputs/island_003/sample_000/prompt.py version_generated=2
+cycle=1 island=3 backend=openai model=gpt-5.4-mini candidates=1
+sample_index=0 response_id=resp_076faf5811a41c47006a586208f904819e925a0f05f0faee24
+2026-07-16 00:46:04 | INFO | procedure2_pair_worker initialized pid=1779254 pair=no_covariates current_cpu=unknown allowed_cpus=[5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 23, 95, 96, 97, 98, 99, 100, 102, 103, 104, 105, 108, 109, 111, 115, 116, 117, 118, 119, 120, 121, 129, 130, 131, 132]
+2026-07-16 00:46:05 | INFO | procedure2_pair_worker initialized pid=1779257 pair=with_covariates current_cpu=unknown allowed_cpus=[5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 23, 95, 96, 97, 98, 99, 100, 102, 103, 104, 105, 108, 109, 111, 115, 116, 117, 118, 119, 120, 121, 129, 130, 131, 132]
+sample_index=0 attempt=1 registered=true first_success=true full_priority_function_begin
+    import math
+
+    try:
+        usable_radius, effective_min_samples = minimum_radius_for_sample_count(
+            training_data,
+            ancestry_coordinate,
+            target_variant,
+            25,
+        )
+    except Exception:
+        return 0.0
+
+    if effective_min_samples <= 0 or not math.isfinite(usable_radius):
+        return 0.0
+
+    try:
+        radii_effects = effect_size_by_cumulative_radius(
+            training_data,
+            ancestry_coordinate,
+            target_variant,
+            6,
+            min_samples=25,
+        )
+    except Exception:
+        return float(usable_radius)
+
+    if not radii_effects:
+        return float(usable_radius)
+
+    radii = [max(0.0, float(r)) for r, _ in radii_effects]
+    effects = [float(e) for _, e in radii_effects]
+
+    if len(radii) == 1:
+        return radii[0] if math.isfinite(radii[0]) and radii[0] >= 0.0 else 0.0
+
+    finite_effects = [e for e in effects if math.isfinite(e)]
+    if not finite_effects:
+        return float(usable_radius)
+
+    effect_span = max(finite_effects) - min(finite_effects)
+    if effect_span <= 1e-12:
+        chosen = radii[-1]
+    else:
+        diffs = []
+        for i in range(1, len(effects)):
+            d = abs(effects[i] - effects[i - 1])
+            if not math.isfinite(d):
+                d = float("inf")
+            diffs.append(d)
+
+        best_idx = max(range(len(diffs)), key=lambda i: diffs[i])
+        chosen = radii[best_idx + 1]
+
+        inner_idx = best_idx
+        outer_idx = best_idx + 1
+        inner_radius = radii[inner_idx]
+        outer_radius = radii[outer_idx]
+
+        if math.isfinite(inner_radius) and math.isfinite(outer_radius):
+            local_level = 0.5 * (abs(effects[inner_idx]) + abs(effects[outer_idx]))
+            if local_level < 1e-12:
+                chosen = outer_radius
+            else:
+                instability = diffs[best_idx] / (effect_span + 1e-12)
+                if instability < 0.25:
+                    chosen = radii[-1]
+                elif instability < 0.5:
+                    chosen = outer_radius
+                else:
+                    chosen = inner_radius
+
+    if not math.isfinite(chosen) or chosen < 0.0:
+        return 0.0
+
+    if usable_radius > 0.0:
+        chosen = max(chosen, 0.5 * usable_radius)
+
+    return float(chosen)
+sample_index=0 attempt=1 registered=true after_attempts=1 better_than_present_best=False full_priority_function_end

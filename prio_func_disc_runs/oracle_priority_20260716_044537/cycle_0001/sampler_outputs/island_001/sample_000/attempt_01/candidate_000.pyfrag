@@ -1,0 +1,75 @@
+def priority_v2(training_data, ancestry_coordinate, target_variant) -> float:
+    try:
+        usable_min = 25
+        if getattr(training_data, "sample_count", 0) > 0:
+            usable_min = min(usable_min, max(1, training_data.sample_count // 8))
+        radius, effective_min = minimum_radius_for_sample_count(
+            training_data,
+            ancestry_coordinate,
+            target_variant,
+            usable_min,
+        )
+        if effective_min <= 0:
+            return 0.0
+
+        n = 6
+        intervals = equal_count_intervals(training_data, ancestry_coordinate, n)
+        densities = equal_count_interval_densities(training_data, ancestry_coordinate, n)
+        entropies = dosage_entropy_by_cumulative_radius(
+            training_data,
+            ancestry_coordinate,
+            target_variant,
+            n,
+        )
+        effects = effect_size_by_cumulative_radius(
+            training_data,
+            ancestry_coordinate,
+            target_variant,
+            n,
+            min_samples=max(1, effective_min),
+        )
+        ses = effect_size_standard_error_by_cumulative_radius(
+            training_data,
+            ancestry_coordinate,
+            target_variant,
+            n,
+            min_samples=max(1, effective_min),
+        )
+
+        if not intervals:
+            return 0.0
+
+        # Prefer a radius near the first substantial change in effect size,
+        # but keep enough samples and avoid highly unstable regions.
+        scores = []
+        for i, (r, eff) in enumerate(effects):
+            se = ses[i][1]
+            entropy = entropies[i][1]
+            density = densities[i] if i < len(densities) else 0.0
+            stability = 0.0 if not (se > 0.0 and se == se) else abs(eff) / (se + 1e-12)
+            local_change = 0.0
+            if i > 0:
+                local_change = abs(eff - effects[i - 1][1])
+            score = (
+                1.5 * local_change
+                + 0.5 * stability
+                + 0.25 * entropy
+                + 0.10 * density
+                - 0.05 * r
+            )
+            scores.append(score)
+
+        if not scores:
+            return radius if radius == radius and radius >= 0.0 else 0.0
+
+        best_i = max(range(len(scores)), key=lambda i: scores[i])
+        chosen = effects[best_i][0]
+
+        if not (chosen == chosen) or chosen < 0.0:
+            chosen = radius
+
+        if chosen < 0.0 or not (chosen == chosen):
+            return 0.0
+        return float(chosen)
+    except Exception:
+        return 0.0

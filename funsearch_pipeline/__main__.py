@@ -5,6 +5,12 @@ from pathlib import Path
 
 from funsearch_pipeline.orchestration.runner import run_experiment
 
+"""
+source /nfs/home/adas23/python_environments/OcologyAlphaEvolve/bin/activate
+cd /nfs/home/adas23/projects/AlphaEvolve
+PYTHONPATH=$PWD python -m funsearch_pipeline --config Collaterals/RunSmoke/funsearch_pipeline.example.json
+
+"""
 
 def build_argument_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(

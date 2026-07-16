@@ -1,0 +1,79 @@
+def priority_v2(training_data, ancestry_coordinate, target_variant) -> float:
+    import math
+
+    try:
+        usable_radius, effective_min_samples = minimum_radius_for_sample_count(
+            training_data,
+            ancestry_coordinate,
+            target_variant,
+            25,
+        )
+    except Exception:
+        return 0.0
+
+    if effective_min_samples <= 0 or not math.isfinite(usable_radius):
+        return 0.0
+
+    try:
+        radii_effects = effect_size_by_cumulative_radius(
+            training_data,
+            ancestry_coordinate,
+            target_variant,
+            6,
+            min_samples=25,
+        )
+    except Exception:
+        return float(usable_radius)
+
+    if not radii_effects:
+        return float(usable_radius)
+
+    radii = [max(0.0, float(r)) for r, _ in radii_effects]
+    effects = [float(e) for _, e in radii_effects]
+
+    if len(radii) == 1:
+        return radii[0] if math.isfinite(radii[0]) and radii[0] >= 0.0 else 0.0
+
+    finite_effects = [e for e in effects if math.isfinite(e)]
+    if not finite_effects:
+        return float(usable_radius)
+
+    effect_span = max(finite_effects) - min(finite_effects)
+    if effect_span <= 1e-12:
+        chosen = radii[-1]
+    else:
+        diffs = []
+        for i in range(1, len(effects)):
+            d = abs(effects[i] - effects[i - 1])
+            if not math.isfinite(d):
+                d = float("inf")
+            diffs.append(d)
+
+        best_idx = max(range(len(diffs)), key=lambda i: diffs[i])
+        chosen = radii[best_idx + 1]
+
+        inner_idx = best_idx
+        outer_idx = best_idx + 1
+        inner_radius = radii[inner_idx]
+        outer_radius = radii[outer_idx]
+
+        if math.isfinite(inner_radius) and math.isfinite(outer_radius):
+            local_level = 0.5 * (abs(effects[inner_idx]) + abs(effects[outer_idx]))
+            if local_level < 1e-12:
+                chosen = outer_radius
+            else:
+                instability = diffs[best_idx] / (effect_span + 1e-12)
+                if instability < 0.25:
+                    chosen = radii[-1]
+                elif instability < 0.5:
+                    chosen = outer_radius
+                else:
+                    chosen = inner_radius
+
+    if not math.isfinite(chosen) or chosen < 0.0:
+        return 0.0
+
+    if usable_radius > 0.0:
+        chosen = max(chosen, 0.5 * usable_radius)
+
+    return float(chosen)

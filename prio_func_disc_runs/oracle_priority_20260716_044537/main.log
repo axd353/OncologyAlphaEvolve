@@ -1,0 +1,165 @@
+2026-07-16 00:45:37 | INFO | Created experiment directory /nfs/home/adas23/projects/AlphaEvolve/prio_func_disc_runs/oracle_priority_20260716_044537
+2026-07-16 00:45:37 | INFO | Imputed missing values for dataset pair no_covariates: training={'dosage__rsid_rs1058319': '0.508%', 'dosage__rsid_rs2427345': '0.508%', 'dosage__rsid_rs3761121': '0.508%', 'dosage__rsid_rs381331': '0.508%', 'dosage__rsid_rs6126982': '0.508%', 'dosage__rsid_rs7274624': '0.508%'} (rows=197) scoring={'dosage__rsid_rs10486567': '3.45%', 'dosage__rsid_rs12155172': '3.45%', 'dosage__rsid_rs17621345': '3.45%', 'dosage__rsid_rs3801081': '3.45%', 'dosage__rsid_rs6465657': '3.45%'} (rows=29)
+2026-07-16 00:45:37 | INFO | Prepared Procedure 2 dataset pair no_covariates from training_sources=['/nfs/home/adas23/projects/AlphaEvolve/Data/FunsearchEvaluatorDataSmoke/no_covariates_train.pkl'] testing_sources=['/nfs/home/adas23/projects/AlphaEvolve/Data/FunsearchEvaluatorDataSmoke/no_covariates_test.pkl'] oracle_train_pickle=/nfs/home/adas23/projects/AlphaEvolve/prio_func_disc_runs/oracle_priority_20260716_044537/preprocessed/no_covariates/oracle_train.pkl oracle_train_samples=158 calibration_pickle=/nfs/home/adas23/projects/AlphaEvolve/prio_func_disc_runs/oracle_priority_20260716_044537/preprocessed/no_covariates/calibration.pkl calibration_samples=39 scoring_pickle=/nfs/home/adas23/projects/AlphaEvolve/prio_func_disc_runs/oracle_priority_20260716_044537/preprocessed/no_covariates/scoring.pkl scoring_samples=29
+2026-07-16 00:45:37 | INFO | Imputed missing values for dataset pair with_covariates: training={'dosage__rsid_rs1933488': '0.508%', 'dosage__rsid_rs2018336': '0.508%', 'dosage__rsid_rs2273669': '0.508%', 'dosage__rsid_rs339331': '0.508%', 'dosage__rsid_rs4646283': '0.508%', 'dosage__rsid_rs4711748': '0.508%', 'dosage__rsid_rs628031': '0.508%', 'dosage__rsid_rs6455682': '0.508%', 'dosage__rsid_rs651164': '0.508%', 'dosage__rsid_rs7744313': '0.508%', 'dosage__rsid_rs9364554': '0.508%', 'bmi_cat': '2.03%', 'current_smoking': '1.02%', 'ever_smoking': '1.02%', 'alcohol_intake_cat': '2.54%', 'packyears_smoking_cat': '6.09%', 'physical_activity_cat': '3.05%', 'lycopene_density_cat': '2.54%', 'percent_fat_cat': '2.54%', 'calcium_density_cat': '2.54%'} (rows=197) scoring={'dosage__rsid_rs10486567': '3.45%', 'dosage__rsid_rs12155172': '3.45%', 'dosage__rsid_rs17621345': '3.45%', 'dosage__rsid_rs3801081': '3.45%', 'dosage__rsid_rs6465657': '3.45%', 'bmi_cat': '6.9%', 'current_smoking': '6.9%', 'ever_smoking': '6.9%', 'alcohol_intake_cat': '6.9%', 'packyears_smoking_cat': '6.9%', 'physical_activity_cat': '6.9%', 'lycopene_density_cat': '6.9%', 'percent_fat_cat': '6.9%', 'calcium_density_cat': '6.9%'} (rows=29)
+2026-07-16 00:45:37 | INFO | Prepared Procedure 2 dataset pair with_covariates from training_sources=['/nfs/home/adas23/projects/AlphaEvolve/Data/FunsearchEvaluatorDataSmoke/with_covariates_train.pkl'] testing_sources=['/nfs/home/adas23/projects/AlphaEvolve/Data/FunsearchEvaluatorDataSmoke/with_covariates_test.pkl'] oracle_train_pickle=/nfs/home/adas23/projects/AlphaEvolve/prio_func_disc_runs/oracle_priority_20260716_044537/preprocessed/with_covariates/oracle_train.pkl oracle_train_samples=158 calibration_pickle=/nfs/home/adas23/projects/AlphaEvolve/prio_func_disc_runs/oracle_priority_20260716_044537/preprocessed/with_covariates/calibration.pkl calibration_samples=39 scoring_pickle=/nfs/home/adas23/projects/AlphaEvolve/prio_func_disc_runs/oracle_priority_20260716_044537/preprocessed/with_covariates/scoring.pkl scoring_samples=29
+2026-07-16 00:45:37 | INFO | procedure2_pair_worker initialized pid=1778910 pair=no_covariates current_cpu=unknown allowed_cpus=[5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 23, 95, 96, 97, 98, 99, 100, 102, 103, 104, 105, 108, 109, 111, 115, 116, 117, 118, 119, 120, 121, 129, 130, 131, 132]
+2026-07-16 00:45:37 | INFO | procedure2_pair_worker initialized pid=1778913 pair=with_covariates current_cpu=unknown allowed_cpus=[5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 23, 95, 96, 97, 98, 99, 100, 102, 103, 104, 105, 108, 109, 111, 115, 116, 117, 118, 119, 120, 121, 129, 130, 131, 132]
+2026-07-16 00:45:59 | INFO | Registered seed priority function with reduced score 0.5421837257170075.
+                The full score is OrderedDict([('no_covariates', 0.4925607287449393), ('with_covariates', 0.5918067226890756), ('simplicity', -93.0), ('mean', 0.5421837257170075)]).
+2026-07-16 00:46:34 | ERROR | Sampling failed for island 3 during cycle 1: unexpected indent (<unknown>, line 3)
+concurrent.futures.process._RemoteTraceback: 
+"""
+Traceback (most recent call last):
+  File "/spack/spack-0.17.1/apps/linux-rhel8-cascadelake/gcc-10.2.0/python-3.9.10-y63csltfuw5dhi5qffpdm4zmmfupfkqg/lib/python3.9/concurrent/futures/process.py", line 243, in _process_worker
+    r = call_item.fn(*call_item.args, **call_item.kwargs)
+  File "/nfs/home/adas23/projects/AlphaEvolve/funsearch_pipeline/sampling/island_sampler.py", line 271, in run_island_sampler
+    prompt = request.island_shard.get_prompt()
+  File "/nfs/home/adas23/projects/AlphaEvolve/funsearch_pipeline/program_database/database.py", line 114, in get_prompt
+    code, version_generated = self.island.get_prompt()
+  File "/nfs/home/adas23/projects/AlphaEvolve/funsearch/implementation/programs_database.py", line 236, in get_prompt
+    return self._generate_prompt(sorted_implementations), version_generated
+  File "/nfs/home/adas23/projects/AlphaEvolve/funsearch/implementation/programs_database.py", line 257, in _generate_prompt
+    code_manipulation.text_to_function(implementation))
+  File "/nfs/home/adas23/projects/AlphaEvolve/funsearch/implementation/code_manipulation.py", line 166, in text_to_function
+    program = text_to_program(text)
+  File "/nfs/home/adas23/projects/AlphaEvolve/funsearch/implementation/code_manipulation.py", line 161, in text_to_program
+    raise e
+  File "/nfs/home/adas23/projects/AlphaEvolve/funsearch/implementation/code_manipulation.py", line 155, in text_to_program
+    tree = ast.parse(text)
+  File "/spack/spack-0.17.1/apps/linux-rhel8-cascadelake/gcc-10.2.0/python-3.9.10-y63csltfuw5dhi5qffpdm4zmmfupfkqg/lib/python3.9/ast.py", line 50, in parse
+    return compile(source, filename, mode, flags,
+  File "<unknown>", line 3
+    densities = equal_count_interval_densities(training_data, ancestry_coordinate, 6)
+IndentationError: unexpected indent
+"""
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/nfs/home/adas23/projects/AlphaEvolve/funsearch_pipeline/orchestration/runner.py", line 142, in _run_sampling_phase
+    results.append(future.result())
+  File "/spack/spack-0.17.1/apps/linux-rhel8-cascadelake/gcc-10.2.0/python-3.9.10-y63csltfuw5dhi5qffpdm4zmmfupfkqg/lib/python3.9/concurrent/futures/_base.py", line 439, in result
+    return self.__get_result()
+  File "/spack/spack-0.17.1/apps/linux-rhel8-cascadelake/gcc-10.2.0/python-3.9.10-y63csltfuw5dhi5qffpdm4zmmfupfkqg/lib/python3.9/concurrent/futures/_base.py", line 391, in __get_result
+    raise self._exception
+  File "<unknown>", line 3
+    densities = equal_count_interval_densities(training_data, ancestry_coordinate, 6)
+IndentationError: unexpected indent
+2026-07-16 00:46:35 | ERROR | Sampling failed for island 0 during cycle 1: unexpected indent (<unknown>, line 3)
+concurrent.futures.process._RemoteTraceback: 
+"""
+Traceback (most recent call last):
+  File "/spack/spack-0.17.1/apps/linux-rhel8-cascadelake/gcc-10.2.0/python-3.9.10-y63csltfuw5dhi5qffpdm4zmmfupfkqg/lib/python3.9/concurrent/futures/process.py", line 243, in _process_worker
+    r = call_item.fn(*call_item.args, **call_item.kwargs)
+  File "/nfs/home/adas23/projects/AlphaEvolve/funsearch_pipeline/sampling/island_sampler.py", line 271, in run_island_sampler
+    prompt = request.island_shard.get_prompt()
+  File "/nfs/home/adas23/projects/AlphaEvolve/funsearch_pipeline/program_database/database.py", line 114, in get_prompt
+    code, version_generated = self.island.get_prompt()
+  File "/nfs/home/adas23/projects/AlphaEvolve/funsearch/implementation/programs_database.py", line 236, in get_prompt
+    return self._generate_prompt(sorted_implementations), version_generated
+  File "/nfs/home/adas23/projects/AlphaEvolve/funsearch/implementation/programs_database.py", line 257, in _generate_prompt
+    code_manipulation.text_to_function(implementation))
+  File "/nfs/home/adas23/projects/AlphaEvolve/funsearch/implementation/code_manipulation.py", line 166, in text_to_function
+    program = text_to_program(text)
+  File "/nfs/home/adas23/projects/AlphaEvolve/funsearch/implementation/code_manipulation.py", line 161, in text_to_program
+    raise e
+  File "/nfs/home/adas23/projects/AlphaEvolve/funsearch/implementation/code_manipulation.py", line 155, in text_to_program
+    tree = ast.parse(text)
+  File "/spack/spack-0.17.1/apps/linux-rhel8-cascadelake/gcc-10.2.0/python-3.9.10-y63csltfuw5dhi5qffpdm4zmmfupfkqg/lib/python3.9/ast.py", line 50, in parse
+    return compile(source, filename, mode, flags,
+  File "<unknown>", line 3
+    densities = equal_count_interval_densities(training_data, ancestry_coordinate, 6)
+IndentationError: unexpected indent
+"""
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/nfs/home/adas23/projects/AlphaEvolve/funsearch_pipeline/orchestration/runner.py", line 142, in _run_sampling_phase
+    results.append(future.result())
+  File "/spack/spack-0.17.1/apps/linux-rhel8-cascadelake/gcc-10.2.0/python-3.9.10-y63csltfuw5dhi5qffpdm4zmmfupfkqg/lib/python3.9/concurrent/futures/_base.py", line 439, in result
+    return self.__get_result()
+  File "/spack/spack-0.17.1/apps/linux-rhel8-cascadelake/gcc-10.2.0/python-3.9.10-y63csltfuw5dhi5qffpdm4zmmfupfkqg/lib/python3.9/concurrent/futures/_base.py", line 391, in __get_result
+    raise self._exception
+  File "<unknown>", line 3
+    densities = equal_count_interval_densities(training_data, ancestry_coordinate, 6)
+IndentationError: unexpected indent
+2026-07-16 00:46:37 | ERROR | Sampling failed for island 2 during cycle 1: unexpected indent (<unknown>, line 3)
+concurrent.futures.process._RemoteTraceback: 
+"""
+Traceback (most recent call last):
+  File "/spack/spack-0.17.1/apps/linux-rhel8-cascadelake/gcc-10.2.0/python-3.9.10-y63csltfuw5dhi5qffpdm4zmmfupfkqg/lib/python3.9/concurrent/futures/process.py", line 243, in _process_worker
+    r = call_item.fn(*call_item.args, **call_item.kwargs)
+  File "/nfs/home/adas23/projects/AlphaEvolve/funsearch_pipeline/sampling/island_sampler.py", line 271, in run_island_sampler
+    prompt = request.island_shard.get_prompt()
+  File "/nfs/home/adas23/projects/AlphaEvolve/funsearch_pipeline/program_database/database.py", line 114, in get_prompt
+    code, version_generated = self.island.get_prompt()
+  File "/nfs/home/adas23/projects/AlphaEvolve/funsearch/implementation/programs_database.py", line 236, in get_prompt
+    return self._generate_prompt(sorted_implementations), version_generated
+  File "/nfs/home/adas23/projects/AlphaEvolve/funsearch/implementation/programs_database.py", line 257, in _generate_prompt
+    code_manipulation.text_to_function(implementation))
+  File "/nfs/home/adas23/projects/AlphaEvolve/funsearch/implementation/code_manipulation.py", line 166, in text_to_function
+    program = text_to_program(text)
+  File "/nfs/home/adas23/projects/AlphaEvolve/funsearch/implementation/code_manipulation.py", line 161, in text_to_program
+    raise e
+  File "/nfs/home/adas23/projects/AlphaEvolve/funsearch/implementation/code_manipulation.py", line 155, in text_to_program
+    tree = ast.parse(text)
+  File "/spack/spack-0.17.1/apps/linux-rhel8-cascadelake/gcc-10.2.0/python-3.9.10-y63csltfuw5dhi5qffpdm4zmmfupfkqg/lib/python3.9/ast.py", line 50, in parse
+    return compile(source, filename, mode, flags,
+  File "<unknown>", line 3
+    try:
+IndentationError: unexpected indent
+"""
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/nfs/home/adas23/projects/AlphaEvolve/funsearch_pipeline/orchestration/runner.py", line 142, in _run_sampling_phase
+    results.append(future.result())
+  File "/spack/spack-0.17.1/apps/linux-rhel8-cascadelake/gcc-10.2.0/python-3.9.10-y63csltfuw5dhi5qffpdm4zmmfupfkqg/lib/python3.9/concurrent/futures/_base.py", line 439, in result
+    return self.__get_result()
+  File "/spack/spack-0.17.1/apps/linux-rhel8-cascadelake/gcc-10.2.0/python-3.9.10-y63csltfuw5dhi5qffpdm4zmmfupfkqg/lib/python3.9/concurrent/futures/_base.py", line 391, in __get_result
+    raise self._exception
+  File "<unknown>", line 3
+    try:
+IndentationError: unexpected indent
+2026-07-16 00:46:39 | ERROR | Sampling failed for island 1 during cycle 1: unexpected indent (<unknown>, line 3)
+concurrent.futures.process._RemoteTraceback: 
+"""
+Traceback (most recent call last):
+  File "/spack/spack-0.17.1/apps/linux-rhel8-cascadelake/gcc-10.2.0/python-3.9.10-y63csltfuw5dhi5qffpdm4zmmfupfkqg/lib/python3.9/concurrent/futures/process.py", line 243, in _process_worker
+    r = call_item.fn(*call_item.args, **call_item.kwargs)
+  File "/nfs/home/adas23/projects/AlphaEvolve/funsearch_pipeline/sampling/island_sampler.py", line 271, in run_island_sampler
+    prompt = request.island_shard.get_prompt()
+  File "/nfs/home/adas23/projects/AlphaEvolve/funsearch_pipeline/program_database/database.py", line 114, in get_prompt
+    code, version_generated = self.island.get_prompt()
+  File "/nfs/home/adas23/projects/AlphaEvolve/funsearch/implementation/programs_database.py", line 236, in get_prompt
+    return self._generate_prompt(sorted_implementations), version_generated
+  File "/nfs/home/adas23/projects/AlphaEvolve/funsearch/implementation/programs_database.py", line 257, in _generate_prompt
+    code_manipulation.text_to_function(implementation))
+  File "/nfs/home/adas23/projects/AlphaEvolve/funsearch/implementation/code_manipulation.py", line 166, in text_to_function
+    program = text_to_program(text)
+  File "/nfs/home/adas23/projects/AlphaEvolve/funsearch/implementation/code_manipulation.py", line 161, in text_to_program
+    raise e
+  File "/nfs/home/adas23/projects/AlphaEvolve/funsearch/implementation/code_manipulation.py", line 155, in text_to_program
+    tree = ast.parse(text)
+  File "/spack/spack-0.17.1/apps/linux-rhel8-cascadelake/gcc-10.2.0/python-3.9.10-y63csltfuw5dhi5qffpdm4zmmfupfkqg/lib/python3.9/ast.py", line 50, in parse
+    return compile(source, filename, mode, flags,
+  File "<unknown>", line 3
+    try:
+IndentationError: unexpected indent
+"""
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/nfs/home/adas23/projects/AlphaEvolve/funsearch_pipeline/orchestration/runner.py", line 142, in _run_sampling_phase
+    results.append(future.result())
+  File "/spack/spack-0.17.1/apps/linux-rhel8-cascadelake/gcc-10.2.0/python-3.9.10-y63csltfuw5dhi5qffpdm4zmmfupfkqg/lib/python3.9/concurrent/futures/_base.py", line 439, in result
+    return self.__get_result()
+  File "/spack/spack-0.17.1/apps/linux-rhel8-cascadelake/gcc-10.2.0/python-3.9.10-y63csltfuw5dhi5qffpdm4zmmfupfkqg/lib/python3.9/concurrent/futures/_base.py", line 391, in __get_result
+    raise self._exception
+  File "<unknown>", line 3
+    try:
+IndentationError: unexpected indent

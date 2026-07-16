@@ -1,8 +1,4 @@
-def priority(
-    training_data,
-    ancestry_coordinate,
-    target_variant,
-) -> float:
+def priority_v0(training_data, ancestry_coordinate, target_variant) -> float:
     densities = equal_count_interval_densities(training_data, ancestry_coordinate, 6)
     intervals = equal_count_intervals(training_data, ancestry_coordinate, 6)
     if len(densities) < 2:
@@ -12,3 +8,8 @@ def priority(
         key=lambda index: densities[index - 1] - densities[index],
     )
     return intervals[drop_index][0]
+
+
+def priority_v1(training_data, ancestry_coordinate, target_variant) -> float:
+  """Improved version of `priority_v0`."""
+

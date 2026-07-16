@@ -1,0 +1,23 @@
+# Core numerics and data handling
+numpy>=1.26
+scipy>=1.11
+pandas>=2.2
+scikit-learn>=1.5
+joblib>=1.4
+tqdm>=4.66
+
+# LLM clients
+openai>=1.35
+anthropic>=0.34
+
+# Optional local model tooling
+transformers>=4.42
+huggingface-hub>=0.24
+datasets>=2.20
+
+# Utility and notebook support
+python-dotenv>=1.0
+absl-py>=2.1
+jupyterlab>=4.2
+ipykernel>=6.29
+pytest>=8.2
