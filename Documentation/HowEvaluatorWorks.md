@@ -108,6 +108,26 @@ This happens in `prepare(...)`, not during candidate scoring, so the persisted `
 
 Because the priority-function contract objects are built from those prepared artifacts, direct and helper tools under `funsearch_pipeline/priority_tools/` should not normally encounter missing dosage values during evaluator-driven runs.
 
+### from db-gap mec to funcsearch
+
+The repository includes a standalone builder at `Data/build_funsearch_evaluator_data.py` that converts the raw MEC dbGaP shards under `Data/RawData/` into evaluator-ready pickles under `Data/FunsearchEvaluatorData/` without modifying the raw inputs.
+
+For each condition (`no_covariates` and `with_covariates`), the builder first combines all six raw shards for that condition (`train_AA`, `train_JA`, `train_LA`, `test_AA`, `test_JA`, `test_LA`) and computes a shared ancestry transform on `PC1` through `PC16`:
+
+- `a*` is the mean ancestry vector across all samples in that condition.
+- `r` is the smallest radius such that at least 95% of those samples lie within Euclidean distance `r` of `a*`.
+- Every output pickle replaces the original ancestry coordinates with `(a - a*) / r` while keeping the same column names.
+
+The builder then writes three non-overlapping datasets per condition:
+
+- `*_heldout.pkl`: 20% of `train_JA`, plus `M_ho` times as many samples from each of `train_AA` and `train_LA`. Because the raw `*_add_covs.pkl` files preserve the same row order as the corresponding base pickles, the builder reuses the same heldout row indices across `no_covariates` and `with_covariates`, so the two heldout outputs represent the same subjects.
+- `*_test.pkl`: all of the raw test shards for that condition, plus an optional `P_add%` sample from the remaining `train_JA` rows and matched counts from the remaining `train_AA` and `train_LA` rows.
+- `*_train.pkl`: every training row left after the heldout and optional test augmentation draws.
+
+The same run also writes `Data/FunsearchEvaluatorData/transformations.txt`, which records the condition-specific ancestry center and radius, and `Data/FunsearchEvaluatorData/build_funsearch_evaluator_data.log`, which records the supplied arguments, the output row counts, and the non-zero source-pickle contributions for every generated dataset.
+
+When wiring these artifacts into a FunSearch run, the current `procedure2` backend can use `*_train.pkl` as its training source and `*_test.pkl` as its scoring source. The `*_heldout.pkl` files remain an explicit reserve split outside the current `procedure2` train/calibration/scoring flow.
+
 ## How `evaluate_candidate(...)` works
 
 `evaluate_candidate(...)` is where the candidate priority function is actually used.
