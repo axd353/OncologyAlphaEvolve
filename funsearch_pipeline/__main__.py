@@ -8,7 +8,8 @@ from funsearch_pipeline.orchestration.runner import run_experiment
 """
 source /nfs/home/adas23/python_environments/OcologyAlphaEvolve/bin/activate
 cd /nfs/home/adas23/projects/AlphaEvolve
-PYTHONPATH=$PWD python -m funsearch_pipeline --config Collaterals/RunSmoke/funsearch_pipeline.example.json
+PYTHONPATH=$PWD python -m funsearch_pipeline --config Collaterals/RunSmoke/funsearch_pipeline.example.json > "prio_func_disc_runs/logger_$(date +%Y%m%d_%H%M%S).log" 2>&1
+PYTHONPATH=$PWD python -m funsearch_pipeline --config Collaterals/Run1/funsearch_pipeline.example.json > "prio_func_disc_runs/logger_$(date +%Y%m%d_%H%M%S).log" 2>&1
 
 """
 

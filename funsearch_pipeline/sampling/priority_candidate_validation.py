@@ -9,6 +9,7 @@ from funsearch.implementation import evaluator as upstream_evaluator
 from funsearch_pipeline.evaluation.procedure2 import _call_priority_function
 from funsearch_pipeline.evaluation.procedure2 import _load_priority_function
 from funsearch_pipeline.evaluation.procedure2 import _validate_priority_signature
+from funsearch_pipeline.program_database.database import _normalize_function_body_indentation
 from funsearch_pipeline.priority_tools.contracts import PriorityAncestryCoordinate
 from funsearch_pipeline.priority_tools.contracts import PriorityTargetVariant
 from funsearch_pipeline.priority_tools.contracts import PriorityTrainingData
@@ -86,11 +87,11 @@ def _normalize_completion(
     if stripped.startswith("def "):
         if version_generated is None:
             raise ValueError("A full function definition is not valid for the seed candidate.")
-        return _extract_function_body_from_definition(
+        return _normalize_function_body_indentation(_extract_function_body_from_definition(
             stripped,
             expected_function_name=f"{function_to_evolve}_v{version_generated}",
-        )
-    return raw_completion
+        ))
+    return _normalize_function_body_indentation(raw_completion)
 
 
 def _extract_function_body_from_definition(

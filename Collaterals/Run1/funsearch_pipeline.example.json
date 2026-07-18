@@ -11,12 +11,12 @@
       "random_seed": "Random seed used for upstream island prompt sampling and tie-breaking."
     },
     "name": "oracle_priority",
-    "main_output_dir": "../funsearch_runs",
+    "main_output_dir": "/nfs/home/adas23/projects/AlphaEvolve/prio_func_disc_runs",
     "seed_priority_path": "./funsearch_priority_seed_example.py",
     "function_to_evolve": "priority",
-    "max_cycles": 8,
+    "max_cycles": 10,
     "stop_after_no_improvement_cycles": 3,
-    "random_seed": 1234
+    "random_seed": 42
   },
   "program_database": {
     "_description": "Controls how many islands exist, how prompts are assembled, and how cluster sampling behaves inside each island.",
@@ -27,7 +27,7 @@
       "cluster_sampling_temperature_period": "Period, measured in programs registered in an island, over which the cluster sampling temperature linearly decays before restarting its schedule."
     },
     "functions_per_prompt": 2,
-    "num_islands": 4,
+    "num_islands": 6,
     "cluster_sampling_temperature_init": 0.1,
     "cluster_sampling_temperature_period": 30000
   },
@@ -44,8 +44,8 @@
     },
     "backend": "openai",
     "system_prompt_path": "./funsearch_system_prompt.example.txt",
-    "model": "gpt-5.4-mini",
-    "candidates_per_island_per_cycle": 4,
+    "model": "gpt-5.4",
+    "candidates_per_island_per_cycle": 8,
     "parallel_workers": 8,
     "temperature": 1.0
   },
@@ -67,8 +67,8 @@
     "oracle_train_fraction": 0.8,
     "preprocessed_dirname": "preprocessed",
     "calibration_penalties": [0.1, 1.0, 10.0],
-    "calibration_partitions": 4,
-    "scoring_partitions": 4,
+    "calibration_partitions": 6,
+    "scoring_partitions": 6,
     "bootstrap_iterations": 200,
     "dataset_pairs": [
       {

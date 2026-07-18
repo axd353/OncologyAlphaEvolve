@@ -5,6 +5,7 @@ pandas>=2.2
 scikit-learn>=1.5
 joblib>=1.4
 tqdm>=4.66
+matplotlib>=3.8
 
 # LLM clients
 openai>=1.35

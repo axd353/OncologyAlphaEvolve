@@ -7,6 +7,7 @@ import copy
 import json
 import math
 import pickle
+import textwrap
 from typing import Any
 
 from funsearch.implementation import code_manipulation
@@ -14,6 +15,18 @@ from funsearch.implementation import config as upstream_config
 from funsearch.implementation import evaluator as upstream_evaluator
 from funsearch.implementation import programs_database as upstream_programs_database
 from funsearch_pipeline.config import ProgramDatabaseSettings
+
+
+def _normalize_function_body_indentation(body: str) -> str:
+    """Normalize a function body to the 2-space base indent upstream expects."""
+
+    dedented_body = textwrap.dedent(body).strip("\n")
+    if not dedented_body:
+        return dedented_body
+    return "\n".join(
+        f"  {line}" if line.strip() else ""
+        for line in dedented_body.splitlines()
+    )
 
 
 @dataclass(frozen=True)
@@ -140,8 +153,9 @@ class IslandShard:
             `CandidateProgram` ready for evaluator execution.
         """
 
+        normalized_completion = _normalize_function_body_indentation(raw_completion)
         evolved_function, program_source = upstream_evaluator._sample_to_program(
-            raw_completion,
+            normalized_completion,
             prompt.version_generated,
             template,
             function_to_evolve,
@@ -150,7 +164,7 @@ class IslandShard:
             island_id=self.island_id,
             version_generated=prompt.version_generated,
             sample_index=sample_index,
-            raw_completion=raw_completion,
+            raw_completion=normalized_completion,
             evolved_function=evolved_function,
             program_source=program_source,
             function_name=function_to_evolve,
@@ -227,6 +241,8 @@ class CycleProgramsDatabase:
         """
 
         template = code_manipulation.text_to_program(seed_program_text)
+        for function in template.functions:
+            function.body = _normalize_function_body_indentation(function.body)
         template.get_function(function_to_evolve)
         return cls(settings=settings, template=template, function_to_evolve=function_to_evolve)
 
@@ -342,8 +358,9 @@ class CycleProgramsDatabase:
             `CandidateProgram` ready for evaluator execution.
         """
 
+        normalized_completion = _normalize_function_body_indentation(raw_completion)
         evolved_function, program_source = upstream_evaluator._sample_to_program(
-            raw_completion,
+            normalized_completion,
             prompt.version_generated,
             self._template,
             self._function_to_evolve,
@@ -352,7 +369,7 @@ class CycleProgramsDatabase:
             island_id=prompt.island_id,
             version_generated=prompt.version_generated,
             sample_index=sample_index,
-            raw_completion=raw_completion,
+            raw_completion=normalized_completion,
             evolved_function=evolved_function,
             program_source=program_source,
             function_name=self._function_to_evolve,
