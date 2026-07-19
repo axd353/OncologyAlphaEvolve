@@ -27,18 +27,24 @@ def _write_plotter_input_pickles(run_dir: Path) -> None:
                     "cycle_index": 1,
                     "island_id": 0,
                     "completed_priority_function_count": 3,
+                    "empty_completion_count": 1,
+                    "total_sampler_attempt_count": 4,
                     "configured_candidates_per_island_per_cycle": 6,
                 },
                 {
                     "cycle_index": 1,
                     "island_id": 1,
                     "completed_priority_function_count": 5,
+                    "empty_completion_count": 2,
+                    "total_sampler_attempt_count": 7,
                     "configured_candidates_per_island_per_cycle": 6,
                 },
                 {
                     "cycle_index": 2,
                     "island_id": 0,
                     "completed_priority_function_count": 4,
+                    "empty_completion_count": 1,
+                    "total_sampler_attempt_count": 5,
                     "configured_candidates_per_island_per_cycle": 6,
                 },
             ]
@@ -90,6 +96,8 @@ def test_compute_conversion_rates_uses_adjacent_funnel_counts() -> None:
                 {
                     "cycle_index": 1,
                     "configured_candidate_slot_count": 12,
+                    "empty_completion_count": 2,
+                    "total_sampler_attempt_count": 10,
                     "completed_priority_function_count": 8,
                     "validated_priority_function_count": 4,
                     "evaluation_completed_count": 2,
@@ -100,7 +108,7 @@ def test_compute_conversion_rates_uses_adjacent_funnel_counts() -> None:
     )
 
     row = rate_table.iloc[0]
-    assert row["completed_over_configured_rate"] == 8 / 12
+    assert row["completed_over_sampler_attempt_rate"] == 8 / 10
     assert row["validated_over_completed_rate"] == 4 / 8
     assert row["evaluated_over_validated_rate"] == 2 / 4
     assert row["improved_over_evaluated_rate"] == 1 / 2
@@ -124,4 +132,6 @@ def test_plot_funsearch_funnel_conversion_rates_saves_selected_formats(tmp_path:
     assert all(path.exists() for path in outputs.figure_paths)
     assert list(outputs.rate_table["cycle_index"]) == [1, 2]
     assert outputs.rate_table.loc[0, "configured_candidate_slot_count"] == 12
+    assert outputs.rate_table.loc[0, "empty_completion_count"] == 3
+    assert outputs.rate_table.loc[0, "total_sampler_attempt_count"] == 11
     assert outputs.rate_table.loc[0, "completed_priority_function_count"] == 8

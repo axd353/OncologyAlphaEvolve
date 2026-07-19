@@ -14,7 +14,8 @@ files from the run directory:
 * `sampler_island_best_improvement_counts.pkl`
 
 The first pickle must include `configured_candidates_per_island_per_cycle`, which
-is written by the current post-processor from `config.used.json`.
+is written by the current post-processor from `config.used.json`. It should also
+include `empty_completion_count` and `total_sampler_attempt_count`.
 
 Rate names
 ==========
@@ -26,10 +27,9 @@ four. The available rate names are:
 * `evaluated`: evaluation completed / validated
 * `improved`: island-best improvements / evaluation completed
 
-Important interpretation note: the sampler can retry several LLM calls inside
-one configured candidate slot. Therefore `completed / configured` may exceed 1.0
-when many retry attempts return non-empty completions. The plotter intentionally
-keeps this visible instead of clipping the rate.
+The `completed` rate uses sampler attempts as its denominator:
+`completed_priority_function_count / total_sampler_attempt_count`. This measures
+the fraction of actual backend attempts that returned non-empty completions.
 
 Outputs
 =======
@@ -94,9 +94,9 @@ RATE_SPECS: dict[str, ConversionRateSpec] = {
     "completed": ConversionRateSpec(
         name="completed",
         numerator_column="completed_priority_function_count",
-        denominator_column="configured_candidate_slot_count",
-        rate_column="completed_over_configured_rate",
-        label="Completed / configured",
+        denominator_column="total_sampler_attempt_count",
+        rate_column="completed_over_sampler_attempt_rate",
+        label="Completed / sampler attempts",
     ),
     "validated": ConversionRateSpec(
         name="validated",
@@ -201,7 +201,8 @@ def build_cycle_funnel_counts(run_dir: str | Path) -> pd.DataFrame:
 
     Output:
         DataFrame with one row per cycle and these count columns:
-        `configured_candidate_slot_count`, `completed_priority_function_count`,
+        `configured_candidate_slot_count`, `total_sampler_attempt_count`,
+        `empty_completion_count`, `completed_priority_function_count`,
         `validated_priority_function_count`, `evaluation_completed_count`, and
         `island_best_improvement_count`.
     """
@@ -216,7 +217,12 @@ def build_cycle_funnel_counts(run_dir: str | Path) -> pd.DataFrame:
             ]
         )
         .groupby("cycle_index", as_index=False)[
-            ["configured_candidate_slot_count", "completed_priority_function_count"]
+            [
+                "configured_candidate_slot_count",
+                "empty_completion_count",
+                "total_sampler_attempt_count",
+                "completed_priority_function_count",
+            ]
         ]
         .sum()
     )
@@ -397,7 +403,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description="Plot selected sequential FunSearch sampler funnel conversion rates.",
         epilog=(
-            "Rate choices: completed=completed/configured, "
+            "Rate choices: completed=completed/sampler_attempts, "
             "validated=validated/completed, evaluated=evaluation_completed/validated, "
             "improved=island_best_improvements/evaluation_completed. "
             "Examples: --rates all; --rates completed validated; "

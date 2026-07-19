@@ -30,6 +30,9 @@ class SamplerLogMetrics:
         island_id: Island id inferred from the sampler log filename.
         completed_priority_function_count: Attempts whose completion was not
             logged as `rejected=empty_completion`.
+        empty_completion_count: Attempts logged as `rejected=empty_completion`.
+        total_sampler_attempt_count: All logged sampler attempts, including
+            empty and non-empty completions.
         validated_priority_function_count: Attempts that got past
             `validate_candidate_priority_function(...)` and reached evaluator
             execution.
@@ -46,6 +49,8 @@ class SamplerLogMetrics:
     cycle_index: int
     island_id: int
     completed_priority_function_count: int
+    empty_completion_count: int
+    total_sampler_attempt_count: int
     validated_priority_function_count: int
     evaluation_completed_count: int
     island_best_improvement_count: int
@@ -135,12 +140,14 @@ def extract_sampler_log_metrics(log_path: str | Path) -> SamplerLogMetrics:
     cycle_index, island_id = _infer_cycle_and_island(normalized_log_path)
     attempts = _collect_attempt_records(normalized_log_path)
     attempt_records = list(attempts.values())
+    empty_completion_count = sum(1 for record in attempt_records if record.empty_completion)
+    completed_priority_function_count = len(attempt_records) - empty_completion_count
     return SamplerLogMetrics(
         cycle_index=cycle_index,
         island_id=island_id,
-        completed_priority_function_count=sum(
-            1 for record in attempt_records if not record.empty_completion
-        ),
+        completed_priority_function_count=completed_priority_function_count,
+        empty_completion_count=empty_completion_count,
+        total_sampler_attempt_count=len(attempt_records),
         validated_priority_function_count=sum(
             1 for record in attempt_records if record.evaluation_failed or record.registered
         ),
@@ -157,6 +164,18 @@ def count_completed_priority_functions_in_sampler_log(log_path: str | Path) -> i
     """Count non-empty LLM completions in one sampler log."""
 
     return extract_sampler_log_metrics(log_path).completed_priority_function_count
+
+
+def count_empty_completions_in_sampler_log(log_path: str | Path) -> int:
+    """Count sampler attempts logged as `rejected=empty_completion`."""
+
+    return extract_sampler_log_metrics(log_path).empty_completion_count
+
+
+def count_total_sampler_attempts_in_sampler_log(log_path: str | Path) -> int:
+    """Count all logged sampler attempts in one sampler log."""
+
+    return extract_sampler_log_metrics(log_path).total_sampler_attempt_count
 
 
 def count_validation_passes_in_sampler_log(log_path: str | Path) -> int:
@@ -222,6 +241,8 @@ def _build_sampler_metrics_dataframe(run_dir: Path) -> pd.DataFrame:
             "cycle_index",
             "island_id",
             "completed_priority_function_count",
+            "empty_completion_count",
+            "total_sampler_attempt_count",
             "validated_priority_function_count",
             "evaluation_completed_count",
             "island_best_improvement_count",
@@ -255,6 +276,10 @@ def _completed_priority_function_counts_dataframe(
         metrics_frame,
         "completed_priority_function_count",
     )
+    completed_counts["empty_completion_count"] = metrics_frame["empty_completion_count"]
+    completed_counts["total_sampler_attempt_count"] = metrics_frame[
+        "total_sampler_attempt_count"
+    ]
     completed_counts["configured_candidates_per_island_per_cycle"] = (
         configured_candidates_per_island_per_cycle
     )

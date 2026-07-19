@@ -9,8 +9,10 @@ from PostProcesingData.funsearch_run_postprocess import EVALUATION_COMPLETED_COU
 from PostProcesingData.funsearch_run_postprocess import ISLAND_BEST_IMPROVEMENT_COUNTS_PICKLE
 from PostProcesingData.funsearch_run_postprocess import VALIDATED_PRIORITY_FUNCTION_COUNTS_PICKLE
 from PostProcesingData.funsearch_run_postprocess import count_completed_priority_functions_in_sampler_log
+from PostProcesingData.funsearch_run_postprocess import count_empty_completions_in_sampler_log
 from PostProcesingData.funsearch_run_postprocess import count_evaluation_completions_in_sampler_log
 from PostProcesingData.funsearch_run_postprocess import count_island_best_improvements_in_sampler_log
+from PostProcesingData.funsearch_run_postprocess import count_total_sampler_attempts_in_sampler_log
 from PostProcesingData.funsearch_run_postprocess import count_validation_passes_in_sampler_log
 from PostProcesingData.funsearch_run_postprocess import extract_sampler_log_metrics
 from PostProcesingData.funsearch_run_postprocess import postprocess_funsearch_run
@@ -45,10 +47,14 @@ def test_extract_sampler_log_metrics_counts_registered_attempt_once(tmp_path: Pa
     assert metrics.cycle_index == 1
     assert metrics.island_id == 0
     assert metrics.completed_priority_function_count == 4
+    assert metrics.empty_completion_count == 1
+    assert metrics.total_sampler_attempt_count == 5
     assert metrics.validated_priority_function_count == 3
     assert metrics.evaluation_completed_count == 2
     assert metrics.island_best_improvement_count == 1
     assert count_completed_priority_functions_in_sampler_log(log_path) == 4
+    assert count_empty_completions_in_sampler_log(log_path) == 1
+    assert count_total_sampler_attempts_in_sampler_log(log_path) == 5
     assert count_validation_passes_in_sampler_log(log_path) == 3
     assert count_evaluation_completions_in_sampler_log(log_path) == 2
     assert count_island_best_improvements_in_sampler_log(log_path) == 1
@@ -132,18 +138,24 @@ def test_postprocess_funsearch_run_moves_logger_and_writes_pickles(tmp_path: Pat
             "cycle_index": 1,
             "island_id": 0,
             "completed_priority_function_count": 3,
+            "empty_completion_count": 1,
+            "total_sampler_attempt_count": 4,
             "configured_candidates_per_island_per_cycle": 6,
         },
         {
             "cycle_index": 1,
             "island_id": 1,
             "completed_priority_function_count": 2,
+            "empty_completion_count": 0,
+            "total_sampler_attempt_count": 2,
             "configured_candidates_per_island_per_cycle": 6,
         },
         {
             "cycle_index": 2,
             "island_id": 0,
             "completed_priority_function_count": 2,
+            "empty_completion_count": 0,
+            "total_sampler_attempt_count": 2,
             "configured_candidates_per_island_per_cycle": 6,
         },
     ]

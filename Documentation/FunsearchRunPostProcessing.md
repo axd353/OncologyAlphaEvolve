@@ -15,13 +15,15 @@ Stored DataFrame fields:
 - `cycle_index`: 1-based FunSearch cycle number.
 - `island_id`: Island id from `island_XXX.log`.
 - `completed_priority_function_count`: Number of sampler attempts in that cycle/island that were not logged as `rejected=empty_completion`.
+- `empty_completion_count`: Number of sampler attempts in that cycle/island that were logged as `rejected=empty_completion`.
+- `total_sampler_attempt_count`: Total logged sampler attempts in that cycle/island, equal to `completed_priority_function_count + empty_completion_count`.
 - `configured_candidates_per_island_per_cycle`: The configured per-island attempt budget loaded from `config.used.json -> sampler.candidates_per_island_per_cycle`.
 
 What it captures:
 
 This is the closest quantity currently recoverable from sampler logs for “the LLM returned a completed priority function.” Operationally it counts non-empty completions. Empty completions caused by timeouts or API failures are excluded.
 
-The extra configured-attempts field gives the denominator that the run was aiming for on every island in every cycle, even when retries inside a sample slot caused more backend calls than that configured budget.
+The empty and total attempt fields make it possible to compute the fraction of actual sampler backend attempts that returned a non-empty completion. The configured-attempts field remains useful as the target number of candidate slots per island, but retries can make `total_sampler_attempt_count` larger than the configured slot count.
 
 Core single-log method:
 
@@ -131,7 +133,7 @@ Required files inside `run_dir`:
 Rate-selection input:
 
 - `--rates all`: plot all adjacent conversion rates.
-- `--rates completed`: plot `completed_priority_function_count / configured_candidate_slot_count`.
+- `--rates completed`: plot `completed_priority_function_count / total_sampler_attempt_count`.
 - `--rates validated`: plot `validated_priority_function_count / completed_priority_function_count`.
 - `--rates evaluated`: plot `evaluation_completed_count / validated_priority_function_count`.
 - `--rates improved`: plot `island_best_improvement_count / evaluation_completed_count`.
@@ -155,9 +157,9 @@ By default, files are saved inside `run_dir`:
 
 The CLI also prints the per-cycle table used for the plot. That table contains the cycle-level summed counts and these rate columns:
 
-- `completed_over_configured_rate`
+- `completed_over_sampler_attempt_rate`
 - `validated_over_completed_rate`
 - `evaluated_over_validated_rate`
 - `improved_over_evaluated_rate`
 
-Note: `completed_over_configured_rate` can be greater than 1.0 in real runs because the sampler may retry several LLM calls inside one configured candidate slot. The plotter intentionally leaves those values unclipped.
+The printed count columns also include `configured_candidate_slot_count`, so you can still compare actual sampler attempts against the configured candidate-slot budget.
