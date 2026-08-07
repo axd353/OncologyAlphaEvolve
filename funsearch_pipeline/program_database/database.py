@@ -91,6 +91,14 @@ class DatabaseSummary:
     islands: tuple[IslandSummary, ...]
 
 
+@dataclass(frozen=True)
+class BestProgramArtifact:
+    island_id: int
+    reduced_score: float
+    scores_per_test: dict[str, float] | None
+    program_source: str
+
+
 @dataclass
 class IslandShard:
     """Process-local mutable copy of one upstream FunSearch island.
@@ -484,6 +492,48 @@ class CycleProgramsDatabase:
         if not finite_scores:
             return None
         return max(finite_scores)
+
+    def build_global_best_program_artifact(self) -> BestProgramArtifact | None:
+        """Return the best program across islands as runnable source.
+
+        Input:
+            No arguments; reads the current best program and score for each
+            island.
+
+        Output:
+            `BestProgramArtifact` for the highest-scoring island, or `None`
+            when no best program has been registered yet.
+        """
+
+        best_island_id: int | None = None
+        best_score = -float("inf")
+        for island_id, score in enumerate(self._database._best_score_per_island):
+            if not math.isfinite(score):
+                continue
+            if best_island_id is None or score > best_score:
+                best_island_id = island_id
+                best_score = float(score)
+
+        if best_island_id is None:
+            return None
+
+        best_program = self._database._best_program_per_island[best_island_id]
+        if best_program is None:
+            return None
+
+        program = copy.deepcopy(self._template)
+        target_function = program.get_function(self._function_to_evolve)
+        target_function.args = best_program.args
+        target_function.body = best_program.body
+        target_function.return_type = best_program.return_type
+        target_function.docstring = best_program.docstring
+        best_scores = self._database._best_scores_per_test_per_island[best_island_id]
+        return BestProgramArtifact(
+            island_id=best_island_id,
+            reduced_score=best_score,
+            scores_per_test=dict(best_scores) if best_scores is not None else None,
+            program_source=str(program),
+        )
 
     def build_summary(self) -> DatabaseSummary:
         """Build a JSON-serializable summary of the current database state.

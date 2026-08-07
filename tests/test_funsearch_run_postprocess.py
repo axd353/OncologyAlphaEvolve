@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import json
 
 import pandas as pd
 
@@ -16,6 +17,8 @@ from PostProcesingData.funsearch_run_postprocess import count_total_sampler_atte
 from PostProcesingData.funsearch_run_postprocess import count_validation_passes_in_sampler_log
 from PostProcesingData.funsearch_run_postprocess import extract_sampler_log_metrics
 from PostProcesingData.funsearch_run_postprocess import postprocess_funsearch_run
+from PostProcesingData.funsearch_run_postprocess import write_cycle_best_priority_files
+from funsearch_pipeline.orchestration.runner import run_experiment
 
 
 def _write_text(path: Path, contents: str) -> Path:
@@ -173,3 +176,80 @@ def test_postprocess_funsearch_run_moves_logger_and_writes_pickles(tmp_path: Pat
         {"cycle_index": 1, "island_best_improvement_count": 1},
         {"cycle_index": 2, "island_best_improvement_count": 1},
     ]
+
+
+def test_write_cycle_best_priority_files_materializes_best_program_per_cycle(
+    tmp_path: Path,
+) -> None:
+    seed_path = _write_text(
+        tmp_path / "seed_priority.py",
+        "from __future__ import annotations\n"
+        "from collections.abc import Sequence\n"
+        "from typing import Any\n\n"
+        "def priority(training_data: Any, ancestry_coordinate: Sequence[float], target_variant: Any) -> float:\n"
+        "    return 0.5\n",
+    )
+    system_prompt_path = _write_text(
+        tmp_path / "system_prompt.txt",
+        "Return only a valid indented Python function body.\n",
+    )
+    output_root = tmp_path / "runs"
+    config_path = _write_text(
+        tmp_path / "config.json",
+        json.dumps(
+            {
+                "experiment": {
+                    "name": "postprocess_best_prio",
+                    "main_output_dir": str(output_root),
+                    "seed_priority_path": str(seed_path),
+                    "function_to_evolve": "priority",
+                    "max_cycles": 2,
+                    "stop_after_no_improvement_cycles": 2,
+                    "random_seed": 7,
+                },
+                "program_database": {
+                    "functions_per_prompt": 2,
+                    "num_islands": 2,
+                    "cluster_sampling_temperature_init": 0.1,
+                    "cluster_sampling_temperature_period": 100,
+                },
+                "sampler": {
+                    "backend": "deterministic",
+                    "system_prompt_path": str(system_prompt_path),
+                    "model": "deterministic-model",
+                    "candidates_per_island_per_cycle": 1,
+                    "parallel_workers": 1,
+                },
+                "evaluator": {
+                    "backend": "deterministic",
+                    "metric": "synthetic",
+                    "oracle_train_fraction": 0.8,
+                    "preprocessed_dirname": "preprocessed",
+                    "calibration_penalties": [1.0],
+                },
+                "logging": {"level": "INFO"},
+                "priority_tools": {"module_names": []},
+            },
+            indent=2,
+        ),
+    )
+
+    experiment_dir = run_experiment(config_path)
+    (experiment_dir / "cycle_9999").mkdir()
+
+    written_paths = write_cycle_best_priority_files(experiment_dir)
+
+    assert written_paths == (
+        experiment_dir / "cycle_0001" / "best_prio.py",
+        experiment_dir / "cycle_0002" / "best_prio.py",
+    )
+    cycle_0001_best = (experiment_dir / "cycle_0001" / "best_prio.py").read_text()
+    cycle_0002_best = (experiment_dir / "cycle_0002" / "best_prio.py").read_text()
+
+    assert "# Best priority function at end of cycle_0001." in cycle_0001_best
+    assert "def priority(" in cycle_0001_best
+    assert "return 11.010000" in cycle_0001_best
+    assert "# Best priority function at end of cycle_0002." in cycle_0002_best
+    assert "def priority(" in cycle_0002_best
+    assert "return 21.010000" in cycle_0002_best
+    assert not (experiment_dir / "cycle_9999" / "best_prio.py").exists()

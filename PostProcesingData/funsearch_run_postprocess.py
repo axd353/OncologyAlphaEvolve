@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from pathlib import Path
 import argparse
 import json
+import pickle
 import re
 import shutil
 
@@ -14,6 +15,7 @@ COMPLETED_PRIORITY_FUNCTION_COUNTS_PICKLE = "sampler_completed_priority_function
 VALIDATED_PRIORITY_FUNCTION_COUNTS_PICKLE = "sampler_validated_priority_function_counts.pkl"
 EVALUATION_COMPLETED_COUNTS_PICKLE = "sampler_evaluation_completed_counts.pkl"
 ISLAND_BEST_IMPROVEMENT_COUNTS_PICKLE = "sampler_island_best_improvement_counts.pkl"
+BEST_PRIORITY_FILENAME = "best_prio.py"
 
 _CYCLE_DIR_RE = re.compile(r"^cycle_(\d+)$")
 _ISLAND_LOG_RE = re.compile(r"^island_(\d+)\.log$")
@@ -88,6 +90,17 @@ def _iter_sampler_logs(run_dir: Path) -> list[Path]:
     if not log_paths:
         raise FileNotFoundError(f"No sampler logs found under {run_dir}")
     return log_paths
+
+
+def _iter_cycle_dirs(run_dir: Path) -> list[Path]:
+    cycle_dirs = [
+        path
+        for path in sorted(run_dir.iterdir())
+        if path.is_dir() and _CYCLE_DIR_RE.match(path.name)
+    ]
+    if not cycle_dirs:
+        raise FileNotFoundError(f"No cycle directories found under {run_dir}")
+    return cycle_dirs
 
 
 def _infer_cycle_and_island(log_path: Path) -> tuple[int, int]:
@@ -297,6 +310,63 @@ def _per_cycle_improvement_dataframe(metrics_frame: pd.DataFrame) -> pd.DataFram
     )
 
 
+def write_cycle_best_priority_files(run_dir: str | Path) -> tuple[Path, ...]:
+    """Write one `best_prio.py` file per completed cycle.
+
+    Input:
+        run_dir: FunSearch experiment directory such as
+            `prio_func_disc_runs/oracle_priority_20260716_050704`.
+
+    Output:
+        Tuple of created or reused `cycle_XXXX/best_prio.py` paths for cycle
+        directories that contain `program_db_end.pkl`.
+    """
+
+    normalized_run_dir = _normalize_run_dir(run_dir)
+    written_paths: list[Path] = []
+
+    for cycle_dir in _iter_cycle_dirs(normalized_run_dir):
+        snapshot_path = cycle_dir / "program_db_end.pkl"
+        if not snapshot_path.exists():
+            continue
+
+        with snapshot_path.open("rb") as handle:
+            database = pickle.load(handle)
+
+        artifact = database.build_global_best_program_artifact()
+        if artifact is None:
+            raise ValueError(f"No best program found in cycle snapshot: {snapshot_path}")
+
+        file_lines = [
+            f"# Best priority function at end of {cycle_dir.name}.",
+            f"# source_island_id={artifact.island_id}",
+            f"# reduced_score={artifact.reduced_score:.12g}",
+        ]
+        if artifact.scores_per_test:
+            file_lines.append(
+                "# scores_per_test=" + json.dumps(artifact.scores_per_test, sort_keys=True)
+            )
+        file_contents = "\n".join(file_lines) + "\n\n" + artifact.program_source
+
+        output_path = cycle_dir / BEST_PRIORITY_FILENAME
+        if output_path.exists():
+            existing_contents = output_path.read_text(encoding="utf-8")
+            if existing_contents != file_contents:
+                raise FileExistsError(
+                    f"Refusing to overwrite existing {BEST_PRIORITY_FILENAME}: {output_path}"
+                )
+        else:
+            output_path.write_text(file_contents, encoding="utf-8")
+        written_paths.append(output_path)
+
+    if not written_paths:
+        raise FileNotFoundError(
+            f"No completed cycle snapshots found under {normalized_run_dir}"
+        )
+
+    return tuple(written_paths)
+
+
 def postprocess_funsearch_run(run_dir: str | Path) -> PostProcessingOutputs:
     """Move the matching shell log and persist the requested summary pickles.
 
@@ -359,8 +429,22 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description="Move the matching shell logger file and write FunSearch sampler summary pickles."
     )
+    parser.add_argument(
+        "--best-prio-only",
+        action="store_true",
+        help=(
+            "Only materialize cycle_XXXX/best_prio.py from program_db_end.pkl snapshots. "
+            "Do not move logger files or rewrite summary pickles."
+        ),
+    )
     parser.add_argument("run_dir", help="FunSearch experiment directory to post-process.")
     args = parser.parse_args(argv)
+
+    if args.best_prio_only:
+        best_priority_paths = write_cycle_best_priority_files(args.run_dir)
+        for path in best_priority_paths:
+            print(f"best_priority_path={path}")
+        return 0
 
     outputs = postprocess_funsearch_run(args.run_dir)
     print(f"logger_path={outputs.logger_path}")
