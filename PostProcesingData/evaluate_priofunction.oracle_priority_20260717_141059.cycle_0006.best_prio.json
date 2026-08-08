@@ -1,0 +1,17 @@
+{
+  "prio_function_path": "../prio_func_disc_runs/oracle_priority_20260717_141059/cycle_0006/best_prio.py",
+  "training_pickle_path": "../Data/FunsearchEvaluatorData/no_covariates_train.pkl",
+  "calibrating_pickle_path": "../Data/FunsearchEvaluatorData/no_covariates_test.pkl",
+  "heldout_pickle_path": "../Data/FunsearchEvaluatorData/no_covariates_heldout.pkl",
+  "function_name": "priority",
+  "calibration_penalties": [0.1, 1.0, 10.0],
+  "calibration_partitions": "auto",
+  "scoring_partitions": "auto",
+  "baselines": [
+    {
+      "name": "Mixture Learning",
+      "enabled": true,
+      "alpha": 1.0
+    }
+  ]
+}
