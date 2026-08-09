@@ -6,6 +6,7 @@ import funsearch_pipeline.priority_tools.helper_tools_variant_statistics as vari
 import pytest
 
 from GenomicsHelpers.effect_size_calculator import estimate_marginal_logistic_effect as real_estimate_marginal_logistic_effect
+from funsearch_pipeline.priority_tools import ancestry_novelty_score
 from funsearch_pipeline.priority_tools import dosage_entropy_by_cumulative_radius
 from funsearch_pipeline.priority_tools import dosage_entropy_by_interval
 from funsearch_pipeline.priority_tools import equal_count_interval_densities
@@ -14,8 +15,12 @@ from funsearch_pipeline.priority_tools import effect_size_by_cumulative_radius
 from funsearch_pipeline.priority_tools import effect_size_by_interval
 from funsearch_pipeline.priority_tools import effect_size_standard_error_by_cumulative_radius
 from funsearch_pipeline.priority_tools import effect_size_standard_error_by_interval
+from funsearch_pipeline.priority_tools import label_entropy_by_cumulative_radius
+from funsearch_pipeline.priority_tools import minimum_radius_for_training_percentage
 from funsearch_pipeline.priority_tools import minimum_radius_for_sample_count
 from funsearch_pipeline.priority_tools import radius_for_percentage
+from funsearch_pipeline.priority_tools import standardized_effect_change_by_interval
+from funsearch_pipeline.priority_tools import target_ld_similarity_by_cumulative_radius
 from funsearch_pipeline.priority_tools.contracts import PriorityAncestryCoordinate
 from funsearch_pipeline.priority_tools.contracts import PriorityTargetVariant
 from funsearch_pipeline.priority_tools.contracts import PriorityTrainingData
@@ -59,6 +64,37 @@ def _make_training_data(
 
 def _target_variant() -> PriorityTargetVariant:
     return PriorityTargetVariant(name="rs1", dosage_field="dosage__rs1", column_index=0)
+
+
+def _make_multivariant_training_data(
+    coordinates: tuple[float, ...],
+    *,
+    labels: tuple[float, ...],
+    dosage_rows: tuple[tuple[float, ...], ...],
+) -> PriorityTrainingData:
+    variant_count = len(dosage_rows[0])
+    variant_names = tuple(f"rs{index + 1}" for index in range(variant_count))
+    records = tuple(
+        PriorityTrainingRecord(
+            label=float(labels[index]),
+            ancestry_coordinate=(float(coordinate),),
+            variant_dosages={
+                variant_name: float(dosage_rows[index][variant_index])
+                for variant_index, variant_name in enumerate(variant_names)
+            },
+            covariates=None,
+        )
+        for index, coordinate in enumerate(coordinates)
+    )
+    return PriorityTrainingData(
+        records=records,
+	    variant_names=variant_names,
+	    variant_dosage_fields=tuple(f"dosage__{variant_name}" for variant_name in variant_names),
+        covariate_names=(),
+        sample_count=len(records),
+        ancestry_dimension=1,
+        has_additional_covariates=False,
+    )
 
 
 def _distances(
@@ -215,6 +251,54 @@ def test_minimum_radius_for_sample_count_clamps_to_usable_total() -> None:
     assert sum(distance < radius for distance in usable_distances) == 3
 
 
+def test_minimum_radius_for_training_percentage_rounds_down_and_reports_effective_percentage() -> None:
+    training_data = _make_training_data(
+        (-4.0, -1.0, 2.0, 5.0),
+        dosages=(0.0, float("nan"), 1.0, 2.0),
+    )
+    ancestry_coordinate = PriorityAncestryCoordinate(values=(0.0,), dimension=1)
+
+    radius, effective_percentage = minimum_radius_for_training_percentage(
+        training_data,
+        ancestry_coordinate,
+        _target_variant(),
+        30.0,
+    )
+
+    distances = _distances(training_data, ancestry_coordinate)
+    usable_distances = [
+        distance
+        for distance, record in zip(distances, training_data.records)
+        if math.isfinite(record.variant_dosages["rs1"])
+    ]
+    assert effective_percentage == pytest.approx(25.0)
+    assert sum(distance < radius for distance in usable_distances) == 1
+
+
+def test_minimum_radius_for_training_percentage_clamps_to_usable_total() -> None:
+    training_data = _make_training_data(
+        (-4.0, -1.0, 2.0, 5.0),
+        dosages=(0.0, float("nan"), 1.0, 2.0),
+    )
+    ancestry_coordinate = PriorityAncestryCoordinate(values=(0.0,), dimension=1)
+
+    radius, effective_percentage = minimum_radius_for_training_percentage(
+        training_data,
+        ancestry_coordinate,
+        _target_variant(),
+        100.0,
+    )
+
+    distances = _distances(training_data, ancestry_coordinate)
+    usable_distances = [
+        distance
+        for distance, record in zip(distances, training_data.records)
+        if math.isfinite(record.variant_dosages["rs1"])
+    ]
+    assert effective_percentage == pytest.approx(75.0)
+    assert sum(distance < radius for distance in usable_distances) == 3
+
+
 def test_dosage_entropy_by_interval_tracks_per_ring_dosage_diversity() -> None:
     training_data = _make_training_data(
         (-1.0, 1.0, -3.0, 3.0),
@@ -251,6 +335,37 @@ def test_dosage_entropy_by_cumulative_radius_returns_radii_with_entropy() -> Non
     assert radii_and_entropy[0][0] < radii_and_entropy[1][0]
     assert radii_and_entropy[0][1] == pytest.approx(0.0)
     assert radii_and_entropy[1][1] == pytest.approx(0.8112781244591328)
+
+
+def test_label_entropy_by_cumulative_radius_tracks_case_control_balance() -> None:
+    training_data = _make_training_data(
+        (-1.0, 1.0, -3.0, 3.0),
+        labels=(0.0, 0.0, 0.0, 1.0),
+    )
+    ancestry_coordinate = PriorityAncestryCoordinate(values=(0.0,), dimension=1)
+
+    radii_and_entropy = label_entropy_by_cumulative_radius(
+        training_data,
+        ancestry_coordinate,
+        2,
+    )
+
+    assert len(radii_and_entropy) == 2
+    assert radii_and_entropy[0][1] == pytest.approx(0.0)
+    assert radii_and_entropy[1][1] == pytest.approx(0.8112781244591328)
+
+
+def test_ancestry_novelty_score_is_larger_for_farther_target() -> None:
+    coordinates = tuple(float(index) / 20.0 for index in range(200))
+    training_data = _make_training_data(coordinates)
+    near_coordinate = PriorityAncestryCoordinate(values=(0.5,), dimension=1)
+    far_coordinate = PriorityAncestryCoordinate(values=(20.0,), dimension=1)
+
+    near_score = ancestry_novelty_score(training_data, near_coordinate)
+    far_score = ancestry_novelty_score(training_data, far_coordinate)
+
+    assert near_score > 0.0
+    assert far_score > near_score
 
 
 def test_effect_size_by_interval_uses_shared_logistic_estimator(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -302,6 +417,27 @@ def test_effect_size_standard_error_by_interval_returns_infinity_for_unidentifia
     )
 
     assert standard_errors == [math.inf, math.inf, math.inf, math.inf]
+
+
+def test_standardized_effect_change_by_interval_returns_adjacent_scores() -> None:
+    training_data = _make_training_data(
+        (-1.0, 1.0, -3.0, 3.0),
+        labels=(0.0, 1.0, 0.0, 1.0),
+        dosages=(0.0, 1.0, 1.0, 2.0),
+    )
+    ancestry_coordinate = PriorityAncestryCoordinate(values=(0.0,), dimension=1)
+
+    standardized_changes = standardized_effect_change_by_interval(
+        training_data,
+        ancestry_coordinate,
+        _target_variant(),
+        2,
+        min_samples=2,
+    )
+
+    assert len(standardized_changes) == 1
+    assert math.isfinite(standardized_changes[0])
+    assert standardized_changes[0] >= 0.0
 
 
 def test_effect_size_by_cumulative_radius_accepts_upper_bound_of_thirty() -> None:
@@ -387,3 +523,28 @@ def test_effect_size_standard_error_by_cumulative_radius_returns_radius_error_pa
     assert len(radii_and_errors) == 2
     assert radii_and_errors[0][0] < radii_and_errors[1][0]
     assert all(math.isfinite(standard_error) for _, standard_error in radii_and_errors)
+
+
+def test_target_ld_similarity_by_cumulative_radius_returns_one_for_matching_profiles() -> None:
+    training_data = _make_multivariant_training_data(
+        coordinates=(-1.0, 1.0, -3.0, 3.0),
+        labels=(0.0, 1.0, 0.0, 1.0),
+        dosage_rows=(
+            (0.0, 0.0),
+            (1.0, 1.0),
+            (0.0, 0.0),
+            (1.0, 1.0),
+        ),
+    )
+    ancestry_coordinate = PriorityAncestryCoordinate(values=(0.0,), dimension=1)
+
+    similarities = target_ld_similarity_by_cumulative_radius(
+        training_data,
+        ancestry_coordinate,
+        _target_variant(),
+        2,
+    )
+
+    assert len(similarities) == 2
+    assert similarities[0][1] == pytest.approx(1.0)
+    assert similarities[1][1] == pytest.approx(1.0)

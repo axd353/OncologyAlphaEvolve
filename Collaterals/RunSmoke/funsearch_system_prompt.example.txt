@@ -210,21 +210,21 @@ effect_size_standard_error_by_cumulative_radius(training_data, ancestry_coordina
 		TypeError: if n or min_samples is not an integer.
 		ValueError: if the dataset is empty, the contract shapes are inconsistent, n falls outside [1, 30], or min_samples is not positive.
 
-minimum_radius_for_sample_count(training_data, ancestry_coordinate, target_variant, min_samples) -> tuple[float, int]
-	Return the smallest radius enclosing a usable target-dosage sample count.
+minimum_radius_for_training_percentage(training_data, ancestry_coordinate, target_variant, percentage) -> tuple[float, float]
+	Return the smallest radius enclosing a requested training-data percentage.
 
 	Input:
 		training_data: The exact same PriorityTrainingData object that the priority function receives as its training_data argument.
 		ancestry_coordinate: The exact same PriorityAncestryCoordinate object that the priority function receives as its ancestry_coordinate argument.
 		target_variant: The exact same PriorityTargetVariant object that the priority function receives as its target_variant argument.
-		min_samples: Requested minimum number of usable samples. Must be a positive integer. A sample is usable here when its target dosage is finite.
+		percentage: Requested percentage of total training samples to cover. The value is in [0.0, 100.0], so percentage = 25.0 means 25 percent. If percentage does not map to an integer sample count, the target count is rounded down. A sample is usable here when its target dosage is finite.
 
 	Output:
-		Pair (radius, effective_min_samples). radius is the smallest closed ancestry-ball radius whose interior covers at least effective_min_samples usable samples for the target variant. effective_min_samples equals the requested min_samples unless the dataset has fewer usable target dosages, in which case it is clamped to that usable total and the returned radius encloses all usable samples. If no usable target dosage exists at all, the method returns (0.0, 0) instead of raising.
+		Pair (radius, effective_percentage). radius is the smallest closed ancestry-ball radius whose interior covers at least the usable sample count implied by percentage after floor rounding. effective_percentage is the actual enclosed usable-sample percentage measured against training_data.sample_count, after rounding and after clamping to the usable target-dosage total. If no usable target dosage exists at all, the method returns (0.0, 0.0) instead of raising.
 
 	Raises:
-		TypeError: if min_samples is not an integer.
-		ValueError: if the dataset is empty, the contract shapes are inconsistent, or min_samples is not positive.
+		TypeError: if percentage is not a real number.
+		ValueError: if the dataset is empty, the contract shapes are inconsistent, or percentage is out of range.
 
 Example pattern:
 The following is only an example of radius-selection logic. Your final function must still keep the exact three-argument signature and return only the radius.

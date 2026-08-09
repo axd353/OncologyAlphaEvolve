@@ -51,6 +51,7 @@ _PRIORITY_TOOLS_IMPORTS = (
     "from funsearch_pipeline.priority_tools import PriorityAncestryCoordinate\n"
     "from funsearch_pipeline.priority_tools import PriorityTargetVariant\n"
     "from funsearch_pipeline.priority_tools import PriorityTrainingData\n"
+    "from funsearch_pipeline.priority_tools import ancestry_novelty_score\n"
     "from funsearch_pipeline.priority_tools import dosage_entropy_by_cumulative_radius\n"
     "from funsearch_pipeline.priority_tools import dosage_entropy_by_interval\n"
     "from funsearch_pipeline.priority_tools import equal_count_interval_densities\n"
@@ -59,8 +60,11 @@ _PRIORITY_TOOLS_IMPORTS = (
     "from funsearch_pipeline.priority_tools import effect_size_by_interval\n"
     "from funsearch_pipeline.priority_tools import effect_size_standard_error_by_cumulative_radius\n"
     "from funsearch_pipeline.priority_tools import effect_size_standard_error_by_interval\n"
-    "from funsearch_pipeline.priority_tools import minimum_radius_for_sample_count\n"
+    "from funsearch_pipeline.priority_tools import label_entropy_by_cumulative_radius\n"
+    "from funsearch_pipeline.priority_tools import minimum_radius_for_training_percentage\n"
     "from funsearch_pipeline.priority_tools import radius_for_percentage\n\n"
+    "from funsearch_pipeline.priority_tools import standardized_effect_change_by_interval\n"
+    "from funsearch_pipeline.priority_tools import target_ld_similarity_by_cumulative_radius\n\n"
 )
 
 _EXPECTED_PRIORITY_PARAMETERS = (
