@@ -1,11 +1,15 @@
 from __future__ import annotations
 
+import ast
+from collections import OrderedDict
 from dataclasses import asdict
 from dataclasses import dataclass
 from pathlib import Path
 import copy
+import hashlib
 import json
 import math
+import numpy as np
 import pickle
 import textwrap
 from typing import Any
@@ -27,6 +31,125 @@ def _normalize_function_body_indentation(body: str) -> str:
         f"  {line}" if line.strip() else ""
         for line in dedented_body.splitlines()
     )
+
+
+def _materialize_program_source(
+    template: code_manipulation.Program,
+    function_to_evolve: str,
+    function: code_manipulation.Function,
+) -> str:
+    """Build full runnable source for one stored upstream function body."""
+
+    program = copy.deepcopy(template)
+    target_function = program.get_function(function_to_evolve)
+    target_function.args = function.args
+    target_function.body = function.body
+    target_function.return_type = function.return_type
+    target_function.docstring = function.docstring
+    return str(program)
+
+
+def _score_function_simplicity(program_source: str, function_name: str) -> float:
+    """Return the evaluator-compatible simplicity score for one function."""
+
+    module = ast.parse(program_source)
+    for node in module.body:
+        if isinstance(node, ast.FunctionDef) and node.name == function_name:
+            return -float(sum(1 for _ in ast.walk(node)))
+    return -float(sum(1 for _ in ast.walk(module)))
+
+
+def _stable_program_digest(program_source: str) -> bytes:
+    """Return a deterministic digest used to subsample baseline programs."""
+
+    return hashlib.sha256(program_source.encode("utf-8")).digest()
+
+
+def _sample_baseline_simplicities(
+    island: upstream_programs_database.Island,
+    *,
+    max_baselines: int,
+) -> list[float]:
+    """Return up to `max_baselines` deterministic simplicity baselines."""
+
+    baselines: list[tuple[bytes, float]] = []
+    for cluster in island._clusters.values():
+        for function in cluster._programs:
+            program_source = _materialize_program_source(
+                island._template,
+                island._function_to_evolve,
+                function,
+            )
+            baselines.append(
+                (
+                    _stable_program_digest(program_source),
+                    _score_function_simplicity(program_source, island._function_to_evolve),
+                )
+            )
+    baselines.sort(key=lambda item: item[0])
+    return [simplicity for _, simplicity in baselines[:max_baselines]]
+
+
+def _compute_simplicity_bonus(
+    candidate_simplicity: float,
+    baseline_simplicities: list[float],
+    *,
+    bonus_max: float,
+) -> float:
+    """Map candidate simplicity rank within the island to a bounded bonus."""
+
+    if bonus_max <= 0.0 or not baseline_simplicities:
+        return 0.0
+
+    num_strictly_greater = sum(
+        baseline_simplicity > candidate_simplicity
+        for baseline_simplicity in baseline_simplicities
+    )
+    num_equal = sum(
+        baseline_simplicity == candidate_simplicity
+        for baseline_simplicity in baseline_simplicities
+    )
+    rank = float(num_strictly_greater) + (float(num_equal) / 2.0)
+    denominator = float(len(baseline_simplicities))
+    return float(bonus_max - (2.0 * bonus_max * (rank / denominator)))
+
+
+def _prepare_scores_for_registration(
+    island: upstream_programs_database.Island,
+    evolved_function: code_manipulation.Function,
+    scores_per_test: dict[str, float],
+    *,
+    simplicity_bonus_max: float,
+) -> dict[str, float]:
+    """Append registration-time scores that depend on the destination island."""
+
+    registered_scores: OrderedDict[str, float] = OrderedDict()
+    for score_name, score_value in scores_per_test.items():
+        if score_name in {"simplicity_bonus", "combined"}:
+            continue
+        registered_scores[score_name] = score_value
+
+    mean_score = upstream_programs_database._reduce_score(registered_scores)
+    candidate_program_source = _materialize_program_source(
+        island._template,
+        island._function_to_evolve,
+        evolved_function,
+    )
+    candidate_simplicity = float(
+        registered_scores.get(
+            "simplicity",
+            _score_function_simplicity(candidate_program_source, island._function_to_evolve),
+        )
+    )
+    baseline_simplicities = _sample_baseline_simplicities(island, max_baselines=100)
+    simplicity_bonus = _compute_simplicity_bonus(
+        candidate_simplicity,
+        baseline_simplicities,
+        bonus_max=simplicity_bonus_max,
+    )
+    registered_scores["simplicity_bonus"] = simplicity_bonus
+    registered_scores["combined"] = mean_score + simplicity_bonus
+    return dict(registered_scores)
 
 
 @dataclass(frozen=True)
@@ -120,6 +243,7 @@ class IslandShard:
     best_score: float
     best_program: code_manipulation.Function | None
     best_scores_per_test: dict[str, float] | None
+    simplicity_bonus_max: float
 
     def get_prompt(self) -> IslandPrompt:
         """Return a prompt from the shard's current island state.
@@ -187,20 +311,25 @@ class IslandShard:
 
         Input:
             candidate_program: Evaluated candidate to add to the island.
-            scores_per_test: Pair-level scores plus final reduced score under
-                the `mean` key.
+            scores_per_test: Evaluator scores including the base `mean` score.
 
         Output:
             `True` when this candidate improves the shard's best reduced score;
             otherwise `False`.
         """
 
-        self.island.register_program(candidate_program.evolved_function, scores_per_test)
-        reduced_score = upstream_programs_database._reduce_score(scores_per_test)
+        registered_scores = _prepare_scores_for_registration(
+            self.island,
+            candidate_program.evolved_function,
+            scores_per_test,
+            simplicity_bonus_max=self.simplicity_bonus_max,
+        )
+        self.island.register_program(candidate_program.evolved_function, registered_scores)
+        reduced_score = upstream_programs_database._reduce_score(registered_scores)
         if reduced_score > self.best_score:
             self.best_score = reduced_score
             self.best_program = candidate_program.evolved_function
-            self.best_scores_per_test = dict(scores_per_test)
+            self.best_scores_per_test = dict(registered_scores)
             return True
         return False
 
@@ -320,7 +449,7 @@ class CycleProgramsDatabase:
         """Register the seed function into every island.
 
         Input:
-            scores_per_test: Bootstrap scores returned by the evaluator.
+            scores_per_test: Bootstrap evaluator scores containing base `mean`.
 
         Output:
             Mutates all upstream islands so every island starts from the same
@@ -329,10 +458,16 @@ class CycleProgramsDatabase:
 
         seed_function = copy.deepcopy(self._template.get_function(self._function_to_evolve))
         for island_id in range(self.num_islands):
+            registered_scores = _prepare_scores_for_registration(
+                self._database._islands[island_id],
+                seed_function,
+                scores_per_test,
+                simplicity_bonus_max=self._settings.simplicity_bonus_max,
+            )
             self._database._register_program_in_island(
                 copy.deepcopy(seed_function),
                 island_id,
-                scores_per_test,
+                registered_scores,
             )
 
     def get_prompt_for_island(self, island_id: int) -> IslandPrompt:
@@ -392,16 +527,22 @@ class CycleProgramsDatabase:
 
         Input:
             candidate_program: Candidate to add.
-            scores_per_test: Pair-level scores plus reduced mean score.
+            scores_per_test: Evaluator scores including the base `mean` score.
 
         Output:
             Mutates the corresponding parent island.
         """
 
+        registered_scores = _prepare_scores_for_registration(
+            self._database._islands[candidate_program.island_id],
+            candidate_program.evolved_function,
+            scores_per_test,
+            simplicity_bonus_max=self._settings.simplicity_bonus_max,
+        )
         self._database._register_program_in_island(
             candidate_program.evolved_function,
             candidate_program.island_id,
-            scores_per_test,
+            registered_scores,
         )
 
     def reset_weak_islands(self) -> None:
@@ -415,7 +556,35 @@ class CycleProgramsDatabase:
             stronger island founder.
         """
 
-        self._database.reset_islands()
+        indices_sorted_by_score = np.argsort(
+            self._database._best_score_per_island
+            + np.random.randn(len(self._database._best_score_per_island)) * 1e-6
+        )
+        num_islands_to_reset = self.num_islands // 2
+        reset_island_ids = indices_sorted_by_score[:num_islands_to_reset]
+        keep_island_ids = indices_sorted_by_score[num_islands_to_reset:]
+
+        for island_id in reset_island_ids:
+            self._database._islands[island_id] = upstream_programs_database.Island(
+                self._template,
+                self._function_to_evolve,
+                self._settings.functions_per_prompt,
+                self._settings.cluster_sampling_temperature_init,
+                self._settings.cluster_sampling_temperature_period,
+            )
+            self._database._best_score_per_island[island_id] = -float("inf")
+            founder_island_id = int(np.random.choice(keep_island_ids))
+            founder = copy.deepcopy(self._database._best_program_per_island[founder_island_id])
+            founder_scores = self._database._best_scores_per_test_per_island[founder_island_id]
+            if founder is None or founder_scores is None:
+                continue
+            reset_scores = _prepare_scores_for_registration(
+                self._database._islands[island_id],
+                founder,
+                dict(founder_scores),
+                simplicity_bonus_max=self._settings.simplicity_bonus_max,
+            )
+            self._database._register_program_in_island(founder, island_id, reset_scores)
 
     def export_island_shards(self) -> list[IslandShard]:
         """Copy every island into an independent shard.
@@ -447,6 +616,7 @@ class CycleProgramsDatabase:
             best_score=self._database._best_score_per_island[island_id],
             best_program=copy.deepcopy(self._database._best_program_per_island[island_id]),
             best_scores_per_test=(dict(best_scores) if best_scores is not None else None),
+            simplicity_bonus_max=self._settings.simplicity_bonus_max,
         )
 
     def combine_island_shards(self, shards: list[IslandShard]) -> None:

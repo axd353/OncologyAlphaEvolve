@@ -14,9 +14,9 @@ For each candidate priority function, the evaluator produces one score per confi
 - the no-additional-covariates condition
 - the additional-covariates condition
 
-Each pair gets its own score because the same priority function is evaluated under both data conditions. The final value used by upstream FunSearch is the mean of the pair scores, stored under `mean` as the last score entry.
+Each pair gets its own score because the same priority function is evaluated under both data conditions. The evaluator stores their average under `mean`, then the program database appends a registration-time `combined` score as the last entry. That final `combined` value is what upstream FunSearch uses for island ranking, best-program tracking, and prompt-function ordering.
 
-The evaluator also records an auxiliary simplicity score for the candidate function body. This is stored before `mean`, so it is visible in the program signature but does not control island ranking.
+The evaluator also records an auxiliary simplicity score for the candidate function body. `simplicity` is defined as the negative AST node count of the candidate function, so values closer to zero are simpler and more negative values are more complex. During registration into an island, the program database compares that simplicity against up to 100 existing functions from the destination island, computes a bounded `simplicity_bonus`, and appends `combined = mean + simplicity_bonus` as the final ranking score.
 
 ## The three oracle parts
 
@@ -148,8 +148,13 @@ For each prepared dataset pair, it does this in order:
 
 The evaluator returns one pair score per dataset pair, plus:
 
-- `simplicity`, an auxiliary score based on AST size of the priority function body. This is not the core ranking signal; it is stored before `mean` for diagnostics and diversity, while `mean` is what upstream FunSearch uses for ranking.
-- `mean`, the mean of the pair scores, which is the final value used by upstream FunSearch for ranking and best-program tracking
+- `simplicity`, an auxiliary score based on AST size of the priority function body.
+- `mean`, the mean of the pair scores.
+
+When that evaluated candidate is registered into an island, the program database appends:
+
+- `simplicity_bonus`, computed from the candidate's simplicity rank relative to up to 100 baseline functions already registered in that island.
+- `combined`, the final ranking score used by upstream FunSearch, defined as `mean + simplicity_bonus`.
 
 When the evaluator moves from calibration to scoring, it uses the combined `oracle_train.pkl + calibration.pkl` data to estimate marginal effect sizes for the scoring subjects. The scoring split itself is only used for the final personalized-risk scoring and AUC calculation.
 
@@ -161,11 +166,37 @@ The pair score is the median ROC AUC from bootstrapping the held-out scoring set
 
 ### Simplicity score
 
-The simplicity score is a negative structural complexity score computed from the candidate function's AST. Smaller functions get a better simplicity value.
+The simplicity score is computed as:
+
+`simplicity = -(number of AST nodes in the candidate priority function)`
+
+That means the direction is inverted relative to a raw size metric:
+
+- higher `simplicity` values are simpler functions because they are less negative and closer to zero
+- lower `simplicity` values are more complicated functions because they have more AST nodes and therefore become more negative
+
+Examples from this run: a compact seed can have `simplicity = -93`, while a much larger evolved function can have `simplicity = -1144`. So `-93` is simpler than `-1144`.
+
+This score is auxiliary only. It is stored in the program signature for diagnostics and diversity, but it is not the value upstream FunSearch uses to rank islands.
 
 ### Mean score
 
-The mean score is the average of the dataset-pair scores. It is stored last under `mean`, and that is the value upstream FunSearch uses for island ranking.
+The mean score is the average of the dataset-pair scores. It is stored under `mean` for diagnostics and as the base input to the final ranking score, but it is no longer the last stored value once the candidate is registered into an island.
+
+### Combined score
+
+The combined score is the final scalar upstream FunSearch ranks on. It is appended last in the score signature during island registration:
+
+`combined = mean + simplicity_bonus`
+
+The simplicity bonus is computed by comparing the candidate's `simplicity` score against up to 100 deterministically sampled baseline functions already registered in the destination island.
+
+- If the island is empty and this is the first registered function, `simplicity_bonus = 0.0`.
+- Otherwise the candidate is placed on a simplicity rank scale relative to the baseline sample.
+- The interpolation range is `[-Y, Y]`, where `Y = program_database.simplicity_bonus_max` from the config file.
+- A uniquely simplest candidate gets `+Y`, a uniquely most complex candidate gets `-Y`, and intermediate ranks interpolate linearly between those endpoints.
+
+Because `combined` is stored last, it is the value upstream FunSearch uses for island ranking, for choosing island founders during resets, and for biasing which prior functions are sampled into prompts.
 
 ## Data flow summary
 
@@ -183,6 +214,8 @@ flowchart TD
     H --> I[Bootstrap ROC AUC and take median]
     I --> J[Pair score]
     J --> K[Mean across pairs]
+    K --> L[Compare simplicity to destination-island baselines]
+    L --> M[Append simplicity_bonus and combined]
 ```
 
 In short: `prepare(...)` creates the data layout, and `evaluate_candidate(...)` uses that layout to score the priority function under each configured pair.

@@ -115,3 +115,99 @@ def test_island_prompt_generation_handles_four_space_candidate_bodies() -> None:
     assert "def priority_v1" in prompt.code
     assert '  """Improved version of `priority_v0`."""' in prompt.code
     assert "  try:" in prompt.code
+
+
+def test_registration_appends_combined_score_and_simplicity_bonus() -> None:
+    seed_text = (
+        "def priority(training_data, ancestry_coordinate, target_variant) -> float:\n"
+        "    radius = 1.0\n"
+        "    if training_data is None:\n"
+        "        return radius\n"
+        "    return radius\n"
+    )
+    database = CycleProgramsDatabase.from_seed_program_text(
+        settings=ProgramDatabaseSettings(
+            functions_per_prompt=2,
+            num_islands=2,
+            cluster_sampling_temperature_init=0.1,
+            cluster_sampling_temperature_period=30000,
+            simplicity_bonus_max=0.008,
+        ),
+        seed_program_text=seed_text,
+        function_to_evolve="priority",
+    )
+    database.register_seed({"simplicity": -999.0, "mean": 0.5})
+
+    shard = database.export_island_shard(0)
+    assert shard.best_scores_per_test is not None
+    assert list(shard.best_scores_per_test) == ["simplicity", "mean", "simplicity_bonus", "combined"]
+    assert shard.best_scores_per_test["simplicity_bonus"] == 0.0
+    assert shard.best_scores_per_test["combined"] == 0.5
+
+    candidate_program = build_candidate_program(
+        template=database.template,
+        function_to_evolve="priority",
+        island_id=0,
+        version_generated=1,
+        raw_completion=(
+            "def priority_v1(training_data, ancestry_coordinate, target_variant) -> float:\n"
+            "    return 0.75\n"
+        ),
+        sample_index=0,
+    )
+
+    improved = shard.register_candidate(
+        candidate_program,
+        {"simplicity": -1.0, "mean": 0.5},
+    )
+
+    assert improved is True
+    assert shard.best_scores_per_test is not None
+    assert list(shard.best_scores_per_test) == ["simplicity", "mean", "simplicity_bonus", "combined"]
+    assert shard.best_scores_per_test["mean"] == 0.5
+    assert shard.best_scores_per_test["simplicity_bonus"] == 0.008
+    assert shard.best_scores_per_test["combined"] == 0.508
+    assert shard.best_score == 0.508
+
+
+def test_reset_weak_islands_recomputes_founder_bonus_for_empty_island() -> None:
+    seed_text = (
+        "def priority(training_data, ancestry_coordinate, target_variant) -> float:\n"
+        "    radius = 1.0\n"
+        "    if training_data is None:\n"
+        "        return radius\n"
+        "    return radius\n"
+    )
+    database = CycleProgramsDatabase.from_seed_program_text(
+        settings=ProgramDatabaseSettings(
+            functions_per_prompt=2,
+            num_islands=2,
+            cluster_sampling_temperature_init=0.1,
+            cluster_sampling_temperature_period=30000,
+            simplicity_bonus_max=0.008,
+        ),
+        seed_program_text=seed_text,
+        function_to_evolve="priority",
+    )
+    database.register_seed({"simplicity": -999.0, "mean": 0.5})
+
+    candidate_program = build_candidate_program(
+        template=database.template,
+        function_to_evolve="priority",
+        island_id=0,
+        version_generated=1,
+        raw_completion=(
+            "def priority_v1(training_data, ancestry_coordinate, target_variant) -> float:\n"
+            "    return 0.75\n"
+        ),
+        sample_index=0,
+    )
+    database.register_candidate(candidate_program, {"simplicity": -1.0, "mean": 0.5})
+
+    database.reset_weak_islands()
+
+    reset_shard = database.export_island_shard(1)
+    assert reset_shard.best_scores_per_test is not None
+    assert reset_shard.best_scores_per_test["mean"] == 0.5
+    assert reset_shard.best_scores_per_test["simplicity_bonus"] == 0.0
+    assert reset_shard.best_scores_per_test["combined"] == 0.5

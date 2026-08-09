@@ -24,12 +24,14 @@
       "functions_per_prompt": "Number of previous priority functions to include in each island prompt. With value 2, established islands show two prior functions; brand-new islands show one because only the seed exists.",
       "num_islands": "Number of independent islands. Each cycle creates one sampler worker per island shard, up to sampler.parallel_workers concurrent processes.",
       "cluster_sampling_temperature_init": "Initial softmax temperature for sampling score clusters inside an island. Lower values favor high-scoring clusters more strongly.",
-      "cluster_sampling_temperature_period": "Period, measured in programs registered in an island, over which the cluster sampling temperature linearly decays before restarting its schedule."
+      "cluster_sampling_temperature_period": "Period, measured in programs registered in an island, over which the cluster sampling temperature linearly decays before restarting its schedule.",
+      "simplicity_bonus_max": "Maximum absolute bonus added to the base mean score when computing the final combined ranking score. If this value is Y, the registration-time simplicity bonus is interpolated in the range [-Y, Y] from the candidate's simplicity rank relative to up to 100 baseline functions already in the destination island."
     },
     "functions_per_prompt": 2,
     "num_islands": 6,
     "cluster_sampling_temperature_init": 0.1,
-    "cluster_sampling_temperature_period": 30000
+    "cluster_sampling_temperature_period": 30000,
+    "simplicity_bonus_max": 0.008
   },
   "sampler": {
     "_description": "Controls the LLM backend, system prompt, model name, and per-island sampling cadence.",
