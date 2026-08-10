@@ -155,8 +155,8 @@ PYTHONPATH=$PWD python Data/build_funsearch_evaluator_data.py
 
 Optional arguments:
 
-```bash
-PYTHONPATH=$PWD python Data/build_funsearch_evaluator_data.py --p-add 0 --m-ho 3 --random-seed 7
+``` bash
+PYTHONPATH=$PWD python Data/build_funsearch_evaluator_data.py --p-add 25 --m-ho 3 --random-seed 7 --output-dir AlphaEvolve/Data/FunsearchEvaluatorData
 ```
 
 This populates `Data/FunsearchEvaluatorData/` and refreshes `transformations.txt` and `build_funsearch_evaluator_data.log`.
