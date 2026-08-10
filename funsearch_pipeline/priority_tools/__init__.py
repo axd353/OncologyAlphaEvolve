@@ -12,7 +12,6 @@ from .direct_tools_variant_statistics import effect_size_standard_error_by_cumul
 from .direct_tools_variant_statistics import effect_size_standard_error_by_interval
 from .direct_tools_variant_statistics import label_entropy_by_cumulative_radius
 from .direct_tools_variant_statistics import minimum_radius_for_training_percentage
-from .direct_tools_variant_statistics import minimum_radius_for_sample_count
 from .direct_tools_variant_statistics import standardized_effect_change_by_interval
 from .direct_tools_variant_statistics import target_ld_similarity_by_cumulative_radius
 from .contracts import AncestryCoordinate
@@ -44,7 +43,6 @@ __all__ = [
 	"effect_size_standard_error_by_interval",
 	"label_entropy_by_cumulative_radius",
 	"minimum_radius_for_training_percentage",
-	"minimum_radius_for_sample_count",
 	"radius_for_percentage",
 	"standardized_effect_change_by_interval",
 	"target_ld_similarity_by_cumulative_radius",

@@ -15,7 +15,8 @@ TRAIN_POPULATIONS = ("AA", "JA", "LA")
 DEFAULT_RAW_DATA_DIR = Path(__file__).resolve().parent / "RawData"
 DEFAULT_OUTPUT_DIR = Path(__file__).resolve().parent / "FunsearchEvaluatorData"
 DEFAULT_LOG_FILENAME = "build_funsearch_evaluator_data.log"
-DEFAULT_TRANSFORMATIONS_PATH = DEFAULT_OUTPUT_DIR / "transformations.txt"
+DEFAULT_TRANSFORMATIONS_FILENAME = "transformations.txt"
+DEFAULT_TRACKING_FILENAME = "output_row_tracking.pkl"
 
 
 @dataclass(frozen=True)
@@ -124,6 +125,8 @@ def main() -> None:
     output_dir = args.output_dir.resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
     log_path = output_dir / DEFAULT_LOG_FILENAME
+    transformations_path = output_dir / DEFAULT_TRANSFORMATIONS_FILENAME
+    tracking_path = output_dir / DEFAULT_TRACKING_FILENAME
     logger = configure_logger(log_path)
     logger.info(
         "Starting evaluator data build raw_data_dir=%s output_dir=%s p_add=%s m_ho=%d random_seed=%d",
@@ -144,10 +147,11 @@ def main() -> None:
         logger=logger,
     )
     transforms: dict[str, StandardizationTransform] = {}
+    tracking_frames: list[pd.DataFrame] = []
 
     for condition, child_sequence in zip(CONDITIONS, child_sequences[1:]):
         condition_rng = np.random.default_rng(child_sequence)
-        transform = build_condition_datasets(
+        transform, condition_tracking = build_condition_datasets(
             spec=condition,
             raw_data_dir=args.raw_data_dir,
             output_dir=output_dir,
@@ -158,9 +162,13 @@ def main() -> None:
             logger=logger,
         )
         transforms[condition.name] = transform
+        tracking_frames.append(condition_tracking)
 
-    write_transformations_file(DEFAULT_TRANSFORMATIONS_PATH, transforms)
-    logger.info("Wrote ancestry transformations to %s", DEFAULT_TRANSFORMATIONS_PATH)
+    write_transformations_file(transformations_path, transforms)
+    logger.info("Wrote ancestry transformations to %s", transformations_path)
+    tracking_frame = pd.concat(tracking_frames, ignore_index=True)
+    tracking_frame.to_pickle(tracking_path)
+    logger.info("Wrote output row tracking to %s rows=%d", tracking_path, len(tracking_frame))
     logger.info("Log file path=%s", log_path)
     logger.info("Finished evaluator data build")
 
@@ -213,8 +221,12 @@ def build_condition_datasets(
     rng: np.random.Generator,
     shared_heldout_positions: dict[str, np.ndarray],
     logger: logging.Logger,
-) -> StandardizationTransform:
+) -> tuple[StandardizationTransform, pd.DataFrame]:
     source_frames = load_source_frames(spec, raw_data_dir)
+    source_paths = {
+        source_name: (raw_data_dir / source_name).resolve()
+        for source_name in (*spec.train_files, *spec.test_files)
+    }
     transform = compute_standardization_transform(source_frames.values())
     standardized_frames = {
         source_name: standardize_ancestry_columns(frame, transform)
@@ -278,16 +290,21 @@ def build_condition_datasets(
         remaining_positions=remaining_positions,
     )
 
-    heldout_dataset, heldout_source_counts = assemble_dataset(
+    heldout_output_name = f"{spec.name}_heldout.pkl"
+    heldout_dataset, heldout_source_counts, heldout_tracking = assemble_dataset(
         standardized_frames,
+        source_paths,
         [
             (train_aa, heldout_positions[train_aa]),
             (train_ja, heldout_positions[train_ja]),
             (train_la, heldout_positions[train_la]),
         ],
+        output_name=heldout_output_name,
     )
-    test_dataset, test_source_counts = assemble_dataset(
+    test_output_name = f"{spec.name}_test.pkl"
+    test_dataset, test_source_counts, test_tracking = assemble_dataset(
         standardized_frames,
+        source_paths,
         [
             (test_aa, np.arange(len(standardized_frames[test_aa]), dtype=int)),
             (test_ja, np.arange(len(standardized_frames[test_ja]), dtype=int)),
@@ -296,20 +313,24 @@ def build_condition_datasets(
             (train_ja, test_train_positions[train_ja]),
             (train_la, test_train_positions[train_la]),
         ],
+        output_name=test_output_name,
     )
-    train_dataset, train_source_counts = assemble_dataset(
+    train_output_name = f"{spec.name}_train.pkl"
+    train_dataset, train_source_counts, train_tracking = assemble_dataset(
         standardized_frames,
+        source_paths,
         [
             (train_aa, np.array(sorted(remaining_positions[train_aa]), dtype=int)),
             (train_ja, np.array(sorted(remaining_positions[train_ja]), dtype=int)),
             (train_la, np.array(sorted(remaining_positions[train_la]), dtype=int)),
         ],
+        output_name=train_output_name,
     )
 
     condition_outputs = {
-        f"{spec.name}_heldout.pkl": (heldout_dataset, heldout_source_counts),
-        f"{spec.name}_test.pkl": (test_dataset, test_source_counts),
-        f"{spec.name}_train.pkl": (train_dataset, train_source_counts),
+        heldout_output_name: (heldout_dataset, heldout_source_counts),
+        test_output_name: (test_dataset, test_source_counts),
+        train_output_name: (train_dataset, train_source_counts),
     }
     for output_name, (dataset, source_counts) in condition_outputs.items():
         output_path = output_dir / output_name
@@ -328,7 +349,11 @@ def build_condition_datasets(
         format_float(transform.radius),
         ",".join(format_float(value) for value in transform.center),
     )
-    return transform
+    condition_tracking = pd.concat(
+        [heldout_tracking, test_tracking, train_tracking],
+        ignore_index=True,
+    )
+    return transform, condition_tracking
 
 
 def load_source_frames(spec: ConditionSpec, raw_data_dir: Path) -> dict[str, pd.DataFrame]:
@@ -434,18 +459,53 @@ def validate_train_partitioning(
 
 def assemble_dataset(
     standardized_frames: dict[str, pd.DataFrame],
+    source_paths: dict[str, Path],
     selections: list[tuple[str, np.ndarray]],
-) -> tuple[pd.DataFrame, dict[str, int]]:
+    *,
+    output_name: str,
+) -> tuple[pd.DataFrame, dict[str, int], pd.DataFrame]:
     parts: list[pd.DataFrame] = []
+    tracking_parts: list[pd.DataFrame] = []
     source_counts: dict[str, int] = {}
+    output_row_number = 0
     for source_name, positions in selections:
         if positions.size == 0:
             continue
         parts.append(standardized_frames[source_name].iloc[positions].copy())
         source_counts[source_name] = int(positions.size)
+        tracking_parts.append(
+            pd.DataFrame(
+                {
+                    "output_pickle_name": output_name,
+                    "output_row_number": np.arange(
+                        output_row_number,
+                        output_row_number + len(positions),
+                        dtype=int,
+                    ),
+                    "source_pickle_name": source_name,
+                    "source_pickle_path": str(source_paths[source_name]),
+                    "source_row_number": positions.astype(int),
+                }
+            )
+        )
+        output_row_number += len(positions)
     if not parts:
-        return standardized_frames[next(iter(standardized_frames))].iloc[0:0].copy(), {}
-    return pd.concat(parts, ignore_index=True), source_counts
+        empty_dataset = standardized_frames[next(iter(standardized_frames))].iloc[0:0].copy()
+        empty_tracking = pd.DataFrame(
+            columns=[
+                "output_pickle_name",
+                "output_row_number",
+                "source_pickle_name",
+                "source_pickle_path",
+                "source_row_number",
+            ]
+        )
+        return empty_dataset, {}, empty_tracking
+    return (
+        pd.concat(parts, ignore_index=True),
+        source_counts,
+        pd.concat(tracking_parts, ignore_index=True),
+    )
 
 
 def write_transformations_file(

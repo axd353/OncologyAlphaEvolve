@@ -124,7 +124,7 @@ The builder then writes three non-overlapping datasets per condition:
 - `*_test.pkl`: all of the raw test shards for that condition, plus an optional `P_add%` sample from the remaining `train_JA` rows and matched counts from the remaining `train_AA` and `train_LA` rows.
 - `*_train.pkl`: every training row left after the heldout and optional test augmentation draws.
 
-The same run also writes `Data/FunsearchEvaluatorData/transformations.txt`, which records the condition-specific ancestry center and radius, and `Data/FunsearchEvaluatorData/build_funsearch_evaluator_data.log`, which records the supplied arguments, the output row counts, and the non-zero source-pickle contributions for every generated dataset.
+The same run also writes `transformations.txt`, which records the condition-specific ancestry center and radius, `build_funsearch_evaluator_data.log`, which records the supplied arguments, the output row counts, and the non-zero source-pickle contributions for every generated dataset, and `output_row_tracking.pkl`, which maps each output row back to its source raw-data pickle path and source row number before ancestry standardization.
 
 When wiring these artifacts into a FunSearch run, the current `procedure2` backend can use `*_train.pkl` as its training source and `*_test.pkl` as its scoring source. The `*_heldout.pkl` files remain an explicit reserve split outside the current `procedure2` train/calibration/scoring flow.
 

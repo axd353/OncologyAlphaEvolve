@@ -120,8 +120,10 @@ The builder writes:
 - `Data/FunsearchEvaluatorData/with_covariates_heldout.pkl`
 - `Data/FunsearchEvaluatorData/transformations.txt`
 - `Data/FunsearchEvaluatorData/build_funsearch_evaluator_data.log`
+- `Data/FunsearchEvaluatorData/output_row_tracking.pkl`
 
 `transformations.txt` is the authoritative record of the fitted ancestry centers and radii.
+`output_row_tracking.pkl` is a pandas DataFrame you can filter by output pickle name and output row number to recover the original raw-data pickle path and source row number for that row.
 
 ## Commands
 
