@@ -78,14 +78,20 @@ _DEFAULT_SCORING_PARTITIONS = 1
 
 
 @dataclass(frozen=True)
+class PreparedFoldArtifacts:
+    fold_index: int
+    calibration_pickle: str
+    scoring_pickle: str
+
+
+@dataclass(frozen=True)
 class PreparedDatasetPair:
     name: str
     raw_training_pickles: tuple[str, ...]
     raw_testing_pickles: tuple[str, ...]
     has_additional_covariates: bool
     oracle_train_pickle: str
-    calibration_pickle: str
-    scoring_pickle: str
+    fold_artifacts: tuple[PreparedFoldArtifacts, ...]
 
 
 @dataclass(frozen=True)
@@ -98,8 +104,15 @@ class CalibrationModel:
 
 
 @dataclass(frozen=True)
-class PairEvaluationResult:
+class FoldEvaluationResult:
+    name: str
     score: float
+    metadata: dict[str, Any]
+
+
+@dataclass(frozen=True)
+class PairEvaluationResult:
+    fold_results: tuple[FoldEvaluationResult, ...]
     metadata: dict[str, Any]
 
 
@@ -111,6 +124,7 @@ class Procedure2PriorityEvaluator:
         *,
         settings: EvaluatorSettings,
         function_name: str,
+        random_seed: int = 0,
         logger: logging.Logger | None = None,
     ) -> None:
         """Create the Procedure 2 evaluator.
@@ -125,6 +139,7 @@ class Procedure2PriorityEvaluator:
 
         self._settings = settings
         self._function_name = function_name
+        self._random_seed = random_seed
         self._logger = logger
         self._prepared_pairs: tuple[PreparedDatasetPair, ...] = ()
 
@@ -136,7 +151,7 @@ class Procedure2PriorityEvaluator:
             No arguments; reads the last `prepare` result.
 
         Output:
-            Tuple describing oracle-train, calibration, and scoring artifact
+            Tuple describing oracle-train and per-fold calibration/scoring artifact
             paths for each configured pair.
         """
 
@@ -149,7 +164,7 @@ class Procedure2PriorityEvaluator:
             experiment_dir: Root experiment directory.
 
         Output:
-            Creates or loads per-pair oracle-train, calibration, and scoring
+            Creates or loads per-pair oracle-train plus fold-specific calibration and scoring
             pickles, plus `procedure2_layout.json` describing their paths.
         """
 
@@ -158,7 +173,13 @@ class Procedure2PriorityEvaluator:
         manifest_path = preprocessed_root / "procedure2_layout.json"
 
         if manifest_path.exists():
-            self._prepared_pairs = _load_prepared_pairs_manifest(manifest_path)
+            manifest_num_folds, prepared_pairs = _load_prepared_pairs_manifest(manifest_path)
+            if manifest_num_folds != self._settings.num_folds:
+                raise ValueError(
+                    "Prepared evaluator manifest num_folds does not match current config: "
+                    f"manifest={manifest_num_folds} config={self._settings.num_folds}."
+                )
+            self._prepared_pairs = prepared_pairs
             return
 
         prepared_pairs: list[PreparedDatasetPair] = []
@@ -174,6 +195,7 @@ class Procedure2PriorityEvaluator:
                     "oracle_train_fraction": self._settings.oracle_train_fraction,
                     "metric": self._settings.metric,
                     "calibration_penalties": self._settings.calibration_penalties,
+                    "num_folds": self._settings.num_folds,
                     "dataset_pairs": [asdict(pair) for pair in self._prepared_pairs],
                 },
                 indent=2,
@@ -186,7 +208,7 @@ class Procedure2PriorityEvaluator:
         preprocessed_root: Path,
         dataset_pair: DatasetPairConfig,
     ) -> PreparedDatasetPair:
-        """Prepare persisted oracle-train, calibration, and scoring pickles.
+        """Prepare persisted oracle-train plus fold-specific calibration/scoring pickles.
 
         Input:
             preprocessed_root: Root preprocessing directory.
@@ -199,16 +221,19 @@ class Procedure2PriorityEvaluator:
         pair_root = preprocessed_root / dataset_pair.name
         pair_root.mkdir(parents=True, exist_ok=True)
         oracle_train_pickle = dataset_pair.oracle_train_pickle or pair_root / "oracle_train.pkl"
-        calibration_pickle = dataset_pair.calibration_pickle or pair_root / "calibration.pkl"
-        scoring_pickle = dataset_pair.scoring_pickle or pair_root / "scoring.pkl"
+        fold_artifacts = _build_fold_artifacts(
+            pair_root=pair_root,
+            calibration_base_path=dataset_pair.calibration_pickle,
+            scoring_base_path=dataset_pair.scoring_pickle,
+            num_folds=self._settings.num_folds,
+        )
         prepared_pair = PreparedDatasetPair(
             name=dataset_pair.name,
             raw_training_pickles=tuple(str(path) for path in dataset_pair.training_pickles),
             raw_testing_pickles=tuple(str(path) for path in dataset_pair.testing_pickles),
             has_additional_covariates=dataset_pair.has_additional_covariates,
             oracle_train_pickle=str(oracle_train_pickle),
-            calibration_pickle=str(calibration_pickle),
-            scoring_pickle=str(scoring_pickle),
+            fold_artifacts=fold_artifacts,
         )
 
         if all(
@@ -221,43 +246,40 @@ class Procedure2PriorityEvaluator:
         ):
             missing_paths = [
                 path
-                for path in (
-                    prepared_pair.oracle_train_pickle,
-                    prepared_pair.calibration_pickle,
-                    prepared_pair.scoring_pickle,
-                )
+                for path in _iter_prepared_artifact_paths(prepared_pair)
                 if not Path(path).exists()
             ]
             if missing_paths:
                 raise FileNotFoundError(f"Prepared evaluator pickle(s) not found: {missing_paths}")
             return prepared_pair
 
-        if all(
-            Path(path).exists()
-            for path in (
-                prepared_pair.oracle_train_pickle,
-                prepared_pair.calibration_pickle,
-                prepared_pair.scoring_pickle,
-            )
-        ):
+        if all(Path(path).exists() for path in _iter_prepared_artifact_paths(prepared_pair)):
             return prepared_pair
 
         combined_training, training_imputed_counts = _impute_missing_feature_columns(
             _load_and_combine_pickles(dataset_pair.training_pickles)
         )
         combined_training_sample_count = _dataset_length(combined_training)
-        oracle_train, calibration = _split_training_data(
-            combined_training,
-            oracle_train_fraction=self._settings.oracle_train_fraction,
-        )
-        scoring, scoring_imputed_counts = _impute_missing_feature_columns(
+        oracle_train = combined_training
+        combined_scoring, scoring_imputed_counts = _impute_missing_feature_columns(
             _load_and_combine_pickles(dataset_pair.testing_pickles)
         )
-        scoring_sample_count = _dataset_length(scoring)
+        scoring_sample_count = _dataset_length(combined_scoring)
+        calibration_and_scoring_folds = _split_scoring_data_into_folds(
+            combined_scoring,
+            num_folds=self._settings.num_folds,
+            random_seed=_stable_prepare_seed(self._random_seed, dataset_pair.name),
+        )
 
         _write_pickle(prepared_pair.oracle_train_pickle, oracle_train)
-        _write_pickle(prepared_pair.calibration_pickle, calibration)
-        _write_pickle(prepared_pair.scoring_pickle, scoring)
+        fold_sizes: list[int] = []
+        for fold_artifact, (calibration, scoring) in zip(
+            prepared_pair.fold_artifacts,
+            calibration_and_scoring_folds,
+        ):
+            _write_pickle(fold_artifact.calibration_pickle, calibration)
+            _write_pickle(fold_artifact.scoring_pickle, scoring)
+            fold_sizes.append(_dataset_length(scoring))
         if self._logger is not None:
             self._logger.info(
                 "Imputed missing values for dataset pair %s: training=%s (rows=%d) scoring=%s (rows=%d)",
@@ -275,18 +297,29 @@ class Procedure2PriorityEvaluator:
             )
             self._logger.info(
                 "Prepared Procedure 2 dataset pair %s from training_sources=%s testing_sources=%s "
-                "oracle_train_pickle=%s oracle_train_samples=%d calibration_pickle=%s calibration_samples=%d "
-                "scoring_pickle=%s scoring_samples=%d",
+                "oracle_train_pickle=%s oracle_train_samples=%d num_folds=%d scoring_fold_sizes=%s",
                 dataset_pair.name,
                 [str(path) for path in dataset_pair.training_pickles],
                 [str(path) for path in dataset_pair.testing_pickles],
                 prepared_pair.oracle_train_pickle,
                 _dataset_length(oracle_train),
-                prepared_pair.calibration_pickle,
-                _dataset_length(calibration),
-                prepared_pair.scoring_pickle,
-                _dataset_length(scoring),
+                self._settings.num_folds,
+                fold_sizes,
             )
+            for fold_artifact, (calibration, scoring) in zip(
+                prepared_pair.fold_artifacts,
+                calibration_and_scoring_folds,
+            ):
+                self._logger.info(
+                    "Prepared Procedure 2 dataset pair %s fold=%d calibration_pickle=%s calibration_samples=%d "
+                    "scoring_pickle=%s scoring_samples=%d",
+                    dataset_pair.name,
+                    fold_artifact.fold_index,
+                    fold_artifact.calibration_pickle,
+                    _dataset_length(calibration),
+                    fold_artifact.scoring_pickle,
+                    _dataset_length(scoring),
+                )
         return prepared_pair
 
     def evaluate_candidate(self, candidate: CandidateProgram) -> EvaluatedCandidate | None:
@@ -317,8 +350,9 @@ class Procedure2PriorityEvaluator:
             return None
 
         pair_scores = tuple(
-            PairScore(name=pair_name, score=result.score)
-            for pair_name, result in pair_results.items()
+            PairScore(name=fold_result.name, score=fold_result.score)
+            for result in pair_results.values()
+            for fold_result in result.fold_results
         )
         reduced_score = float(np.mean([pair_score.score for pair_score in pair_scores]))
         return EvaluatedCandidate(
@@ -406,98 +440,139 @@ def _evaluate_prepared_pair(
     _validate_priority_signature(priority_function)
 
     oracle_train = _read_pickle(prepared_pair.oracle_train_pickle)
-    calibration = _read_pickle(prepared_pair.calibration_pickle)
-    scoring = _read_pickle(prepared_pair.scoring_pickle)
     variant_names = _list_variant_names(oracle_train)
     if not variant_names:
         raise ValueError(f"No dosage columns found for pair {prepared_pair.name!r}.")
 
-    calibration_labels = _extract_labels(calibration)
-    calibration_oracle_features = _build_calibration_oracle_feature_matrix(
-        training_data=oracle_train,
-        calibration_data=calibration,
-        variant_names=variant_names,
-        candidate_source=candidate_source,
-        function_name=function_name,
-        calibration_partitions=int(
-            getattr(settings, "calibration_partitions", _DEFAULT_CALIBRATION_PARTITIONS)
-        ),
-    )
-    calibration_covariates = _extract_covariates(
-        calibration,
-        include_covariates=prepared_pair.has_additional_covariates,
-    )
-    calibration_model = _fit_best_calibration_model(
-        oracle_features=calibration_oracle_features,
-        covariates=calibration_covariates,
-        labels=calibration_labels,
-        penalties=settings.calibration_penalties,
-    )
+    fold_results: list[FoldEvaluationResult] = []
+    for fold_artifact in prepared_pair.fold_artifacts:
+        calibration = _read_pickle(fold_artifact.calibration_pickle)
+        scoring = _read_pickle(fold_artifact.scoring_pickle)
 
-    oracle_training_for_scoring = _combine_data_objects([oracle_train, calibration])
-    scoring_labels = _extract_labels(scoring)
-    scoring_oracle_features = _build_scoring_oracle_feature_matrix(
-        training_data=oracle_training_for_scoring,
-        scoring_data=scoring,
-        variant_names=variant_names,
-        candidate_source=candidate_source,
-        function_name=function_name,
-        scoring_partitions=int(
-            getattr(settings, "scoring_partitions", _DEFAULT_SCORING_PARTITIONS)
-        ),
-    )
-    scoring_covariates = _extract_covariates(
-        scoring,
-        include_covariates=prepared_pair.has_additional_covariates,
-    )
-    risk_scores = _predict_linear_score(
-        calibration_model,
-        oracle_features=scoring_oracle_features,
-        covariates=scoring_covariates,
-    )
-    direct_auc = _safe_roc_auc(scoring_labels, risk_scores)
-    bootstrap_auc_median = _bootstrap_auc_median(
-        labels=scoring_labels,
-        risk_scores=risk_scores,
-        bootstrap_iterations=int(
-            getattr(settings, "bootstrap_iterations", _DEFAULT_BOOTSTRAP_ITERATIONS)
-        ),
-        random_seed=_stable_bootstrap_seed(candidate_source, prepared_pair.name),
-    )
+        calibration_labels = _extract_labels(calibration)
+        calibration_oracle_features = _build_calibration_oracle_feature_matrix(
+            training_data=oracle_train,
+            calibration_data=calibration,
+            variant_names=variant_names,
+            candidate_source=candidate_source,
+            function_name=function_name,
+            calibration_partitions=int(
+                getattr(settings, "calibration_partitions", _DEFAULT_CALIBRATION_PARTITIONS)
+            ),
+        )
+        calibration_covariates = _extract_covariates(
+            calibration,
+            include_covariates=prepared_pair.has_additional_covariates,
+        )
+        calibration_model = _fit_best_calibration_model(
+            oracle_features=calibration_oracle_features,
+            covariates=calibration_covariates,
+            labels=calibration_labels,
+            penalties=settings.calibration_penalties,
+        )
 
-    return PairEvaluationResult(
-        score=bootstrap_auc_median,
-        metadata={
-            "direct_auc": direct_auc,
-            "bootstrap_auc_median": bootstrap_auc_median,
-            "bootstrap_iterations": int(
+        oracle_training_for_scoring = _combine_data_objects([oracle_train, calibration])
+        scoring_labels = _extract_labels(scoring)
+        scoring_oracle_features = _build_scoring_oracle_feature_matrix(
+            training_data=oracle_training_for_scoring,
+            scoring_data=scoring,
+            variant_names=variant_names,
+            candidate_source=candidate_source,
+            function_name=function_name,
+            scoring_partitions=int(
+                getattr(settings, "scoring_partitions", _DEFAULT_SCORING_PARTITIONS)
+            ),
+        )
+        scoring_covariates = _extract_covariates(
+            scoring,
+            include_covariates=prepared_pair.has_additional_covariates,
+        )
+        risk_scores = _predict_linear_score(
+            calibration_model,
+            oracle_features=scoring_oracle_features,
+            covariates=scoring_covariates,
+        )
+        direct_auc = _safe_roc_auc(scoring_labels, risk_scores)
+        bootstrap_auc_median = _bootstrap_auc_median(
+            labels=scoring_labels,
+            risk_scores=risk_scores,
+            bootstrap_iterations=int(
                 getattr(settings, "bootstrap_iterations", _DEFAULT_BOOTSTRAP_ITERATIONS)
             ),
-            "selected_calibration_penalty": calibration_model.penalty,
-            "calibration_log_loss": calibration_model.calibration_log_loss,
+            random_seed=_stable_bootstrap_seed(
+                candidate_source,
+                f"{prepared_pair.name}_fold_{fold_artifact.fold_index}",
+            ),
+        )
+        fold_name = f"{prepared_pair.name}_fold_{fold_artifact.fold_index}"
+        fold_results.append(
+            FoldEvaluationResult(
+                name=fold_name,
+                score=bootstrap_auc_median,
+                metadata={
+                    "fold_index": fold_artifact.fold_index,
+                    "direct_auc": direct_auc,
+                    "bootstrap_auc_median": bootstrap_auc_median,
+                    "bootstrap_iterations": int(
+                        getattr(settings, "bootstrap_iterations", _DEFAULT_BOOTSTRAP_ITERATIONS)
+                    ),
+                    "selected_calibration_penalty": calibration_model.penalty,
+                    "calibration_log_loss": calibration_model.calibration_log_loss,
+                    "num_variants": len(variant_names),
+                    "num_oracle_train_samples": _dataset_length(oracle_train),
+                    "num_calibration_samples": _dataset_length(calibration),
+                    "num_scoring_samples": _dataset_length(scoring),
+                    "used_additional_covariates": prepared_pair.has_additional_covariates,
+                    "calibration_pickle": fold_artifact.calibration_pickle,
+                    "scoring_pickle": fold_artifact.scoring_pickle,
+                },
+            )
+        )
+
+    return PairEvaluationResult(
+        fold_results=tuple(fold_results),
+        metadata={
+            "num_folds": len(fold_results),
             "num_variants": len(variant_names),
             "num_oracle_train_samples": _dataset_length(oracle_train),
-            "num_calibration_samples": _dataset_length(calibration),
-            "num_scoring_samples": _dataset_length(scoring),
             "used_additional_covariates": prepared_pair.has_additional_covariates,
+            "mean_score": float(np.mean([result.score for result in fold_results])),
+            "folds": {result.name: result.metadata for result in fold_results},
         },
     )
 
 
-def _load_prepared_pairs_manifest(manifest_path: Path) -> tuple[PreparedDatasetPair, ...]:
+def _load_prepared_pairs_manifest(manifest_path: Path) -> tuple[int, tuple[PreparedDatasetPair, ...]]:
     manifest = json.loads(manifest_path.read_text())
-    return tuple(
+    prepared_pairs = tuple(
         PreparedDatasetPair(
             name=str(raw_pair["name"]),
             raw_training_pickles=tuple(raw_pair.get("raw_training_pickles", ())),
             raw_testing_pickles=tuple(raw_pair.get("raw_testing_pickles", ())),
             has_additional_covariates=bool(raw_pair["has_additional_covariates"]),
             oracle_train_pickle=str(raw_pair["oracle_train_pickle"]),
-            calibration_pickle=str(raw_pair["calibration_pickle"]),
-            scoring_pickle=str(raw_pair["scoring_pickle"]),
+            fold_artifacts=tuple(
+                PreparedFoldArtifacts(
+                    fold_index=int(raw_fold["fold_index"]),
+                    calibration_pickle=str(raw_fold["calibration_pickle"]),
+                    scoring_pickle=str(raw_fold["scoring_pickle"]),
+                )
+                for raw_fold in (
+                    raw_pair["fold_artifacts"]
+                    if "fold_artifacts" in raw_pair
+                    else (
+                        {
+                            "fold_index": 1,
+                            "calibration_pickle": raw_pair["calibration_pickle"],
+                            "scoring_pickle": raw_pair["scoring_pickle"],
+                        },
+                    )
+                )
+            ),
         )
         for raw_pair in manifest.get("dataset_pairs", [])
     )
+    return int(manifest.get("num_folds", 1)), prepared_pairs
 
 
 def _read_pickle(path: str | Path) -> Any:
@@ -593,25 +668,80 @@ def _combine_data_objects(data_objects: Sequence[Any]) -> Any:
     raise TypeError("Cannot combine mixed training data container types.")
 
 
-def _split_training_data(
-    training_data: Any,
+def _build_fold_artifacts(
     *,
-    oracle_train_fraction: float,
-) -> tuple[Any, Any]:
-    sample_count = _dataset_length(training_data)
-    if sample_count < 2:
-        raise ValueError("At least two training samples are required for oracle/calibration split.")
-
-    rng = np.random.default_rng(0)
-    shuffled_indices = rng.permutation(sample_count)
-    split_index = int(round(sample_count * oracle_train_fraction))
-    split_index = min(max(split_index, 1), sample_count - 1)
-    oracle_indices = shuffled_indices[:split_index]
-    calibration_indices = shuffled_indices[split_index:]
-    return (
-        _select_rows(training_data, oracle_indices),
-        _select_rows(training_data, calibration_indices),
+    pair_root: Path,
+    calibration_base_path: Path | None,
+    scoring_base_path: Path | None,
+    num_folds: int,
+) -> tuple[PreparedFoldArtifacts, ...]:
+    return tuple(
+        PreparedFoldArtifacts(
+            fold_index=fold_index,
+            calibration_pickle=str(
+                _numbered_pickle_path(
+                    calibration_base_path or pair_root / "calibration.pkl",
+                    fold_index,
+                )
+            ),
+            scoring_pickle=str(
+                _numbered_pickle_path(
+                    scoring_base_path or pair_root / "scoring.pkl",
+                    fold_index,
+                )
+            ),
+        )
+        for fold_index in range(1, num_folds + 1)
     )
+
+
+def _numbered_pickle_path(base_path: Path, fold_index: int) -> Path:
+    suffix = base_path.suffix or ".pkl"
+    stem = base_path.stem if base_path.suffix else base_path.name
+    return base_path.with_name(f"{stem}_{fold_index}{suffix}")
+
+
+def _iter_prepared_artifact_paths(prepared_pair: PreparedDatasetPair) -> tuple[str, ...]:
+    return (prepared_pair.oracle_train_pickle,) + tuple(
+        path
+        for fold_artifact in prepared_pair.fold_artifacts
+        for path in (fold_artifact.calibration_pickle, fold_artifact.scoring_pickle)
+    )
+
+
+def _split_scoring_data_into_folds(
+    scoring_data: Any,
+    *,
+    num_folds: int,
+    random_seed: int,
+) -> tuple[tuple[Any, Any], ...]:
+    sample_count = _dataset_length(scoring_data)
+    if sample_count < num_folds:
+        raise ValueError(
+            "At least as many testing samples as evaluator.num_folds are required to build scoring folds. "
+            f"Got samples={sample_count} num_folds={num_folds}."
+        )
+
+    rng = np.random.default_rng(random_seed)
+    shuffled_indices = rng.permutation(sample_count)
+    fold_indices = tuple(np.array(indices, dtype=int) for indices in np.array_split(shuffled_indices, num_folds))
+    return tuple(
+        (
+            _select_rows(
+                scoring_data,
+                np.concatenate(
+                    [indices for other_index, indices in enumerate(fold_indices) if other_index != fold_position]
+                ).astype(int),
+            ),
+            _select_rows(scoring_data, fold_indices[fold_position]),
+        )
+        for fold_position in range(num_folds)
+    )
+
+
+def _stable_prepare_seed(base_seed: int, pair_name: str) -> int:
+    digest = hashlib.sha256(f"{base_seed}:{pair_name}".encode("utf-8")).digest()
+    return int.from_bytes(digest[:8], "big") % (2**32)
 
 
 def _dataset_length(data: Any) -> int:

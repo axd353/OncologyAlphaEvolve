@@ -12,6 +12,7 @@ def build_evaluator(
     settings: EvaluatorSettings,
     *,
     function_name: str,
+    random_seed: int = 0,
     logger: logging.Logger | None = None,
 ) -> PriorityFunctionEvaluator:
     """Construct the configured priority-function evaluator.
@@ -30,6 +31,7 @@ def build_evaluator(
         return Procedure2PriorityEvaluator(
             settings=settings,
             function_name=function_name,
+            random_seed=random_seed,
             logger=logger,
         )
     raise ValueError(f"Unsupported evaluator backend: {settings.backend}")

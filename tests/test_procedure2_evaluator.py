@@ -109,11 +109,16 @@ def test_procedure2_evaluator_scores_seed_priority_function(tmp_path: Path) -> N
     assert result is not None
     assert (tmp_path / "preprocessed" / "no_covariates" / "oracle_train.pkl").exists()
     scores = result.scores_per_test()
-    assert list(scores) == ["no_covariates", "simplicity", "mean"]
-    assert scores["no_covariates"] > 0.9
-    assert scores["mean"] == scores["no_covariates"]
+    assert list(scores) == ["no_covariates_fold_1", "no_covariates_fold_2", "simplicity", "mean"]
+    assert scores["no_covariates_fold_1"] > 0.9
+    assert scores["no_covariates_fold_2"] > 0.9
+    assert scores["mean"] == np.mean([
+        scores["no_covariates_fold_1"],
+        scores["no_covariates_fold_2"],
+    ])
     assert scores["simplicity"] < 0.0
     assert result.metadata["procedure2_pairs"]["no_covariates"]["num_variants"] == 2
+    assert result.metadata["procedure2_pairs"]["no_covariates"]["num_folds"] == 2
 
 
 def test_procedure2_scores_two_pairs_in_parallel(tmp_path: Path) -> None:
@@ -174,7 +179,14 @@ def test_procedure2_scores_two_pairs_in_parallel(tmp_path: Path) -> None:
 
     assert result is not None
     scores = result.scores_per_test()
-    assert list(scores) == ["pair_one", "pair_two", "simplicity", "mean"]
+    assert list(scores) == [
+        "pair_one_fold_1",
+        "pair_one_fold_2",
+        "pair_two_fold_1",
+        "pair_two_fold_2",
+        "simplicity",
+        "mean",
+    ]
     assert set(result.metadata["procedure2_pairs"]) == {"pair_one", "pair_two"}
     log_text = log_path.read_text()
     assert "procedure2_pair_worker initialized" in log_text
@@ -229,13 +241,15 @@ def test_procedure2_prepare_logs_first_materialization(tmp_path: Path) -> None:
     evaluator.prepare(experiment_dir)
 
     log_text = log_path.read_text()
-    assert log_text.count("Prepared Procedure 2 dataset pair no_covariates") == 1
+    assert log_text.count("Prepared Procedure 2 dataset pair no_covariates from") == 1
     assert str(train_a) in log_text
     assert str(train_b) in log_text
     assert str(test_path) in log_text
-    assert "oracle_train_samples=64" in log_text
-    assert "calibration_samples=16" in log_text
-    assert "scoring_samples=30" in log_text
+    assert "oracle_train_samples=80" in log_text
+    assert "num_folds=2" in log_text
+    assert "scoring_fold_sizes=[15, 15]" in log_text
+    assert "calibration_samples=15" in log_text
+    assert "scoring_samples=15" in log_text
 
 
 def test_procedure2_imputes_missing_dosages_before_scoring(tmp_path: Path) -> None:
@@ -294,7 +308,7 @@ def test_procedure2_imputes_missing_dosages_before_scoring(tmp_path: Path) -> No
     evaluator.prepare(tmp_path)
 
     prepared_scoring = pd.read_pickle(
-        tmp_path / "preprocessed" / "no_covariates" / "scoring.pkl"
+        tmp_path / "preprocessed" / "no_covariates" / "scoring_1.pkl"
     )
     assert not prepared_scoring["dosage__risk"].isna().any()
 

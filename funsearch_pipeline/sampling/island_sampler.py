@@ -46,6 +46,7 @@ class IslandSamplerRequest:
     function_to_evolve: str
     sampler_settings: SamplerSettings
     evaluator_settings: EvaluatorSettings
+    experiment_random_seed: int
     logging_level: str
     experiment_dir: Path
     system_prompt: str
@@ -259,6 +260,7 @@ def run_island_sampler(request: IslandSamplerRequest) -> IslandSamplerResult:
     evaluator = build_evaluator(
         request.evaluator_settings,
         function_name=request.function_to_evolve,
+        random_seed=request.experiment_random_seed,
         logger=evaluator_logger,
     )
     evaluator.prepare(request.experiment_dir)

@@ -9,12 +9,12 @@ The main implementation lives in [funsearch_pipeline/evaluation/procedure2.py](f
 
 ## What the evaluator scores
 
-For each candidate priority function, the evaluator produces one score per configured dataset pair. In the current pipeline, there are two pairs:
+For each candidate priority function, the evaluator produces one score per prepared fold. In the current pipeline, there are typically two configured dataset pairs:
 
 - the no-additional-covariates condition
 - the additional-covariates condition
 
-Each pair gets its own score because the same priority function is evaluated under both data conditions. The evaluator stores their average under `mean`, then the program database appends a registration-time `combined` score as the last entry. That final `combined` value is what upstream FunSearch uses for island ranking, best-program tracking, and prompt-function ordering.
+Each pair contributes `num_folds` fold scores because the same priority function is evaluated repeatedly under fold-specific calibration/scoring splits for that condition. The evaluator stores the average of all fold scores under `mean`, then the program database appends a registration-time `combined` score as the last entry. That final `combined` value is what upstream FunSearch uses for island ranking, best-program tracking, and prompt-function ordering.
 
 The evaluator also records an auxiliary simplicity score for the candidate function body. `simplicity` is defined as the negative AST node count of the candidate function, so values closer to zero are simpler and more negative values are more complex. During registration into an island, the program database compares that simplicity against up to 100 existing functions from the destination island, computes a bounded `simplicity_bonus`, and appends `combined = mean + simplicity_bonus` as the final ranking score.
 
@@ -82,14 +82,16 @@ Then it scores the held-out scoring set with the fitted coefficients and compute
 For each configured dataset pair, it does the following:
 
 1. Concatenate the raw training pickle shards.
-2. Split the combined training set into two parts using `evaluator.oracle_train_fraction`.
-3. Write the first part to `oracle_train.pkl`.
-4. Write the second part to `calibration.pkl`.
-5. Concatenate the raw testing pickle shards and write them to `scoring.pkl`.
+2. Impute missing dosage and covariate values in that combined training data.
+3. Write the full combined result to `oracle_train.pkl`.
+4. Concatenate the raw testing pickle shards.
+5. Impute missing dosage and covariate values in that combined testing data.
+6. Randomly split the combined testing data into `evaluator.num_folds` disjoint folds using a deterministic seed derived from `experiment.random_seed` and the pair name.
+7. For each fold `i`, write `scoring_i.pkl` as fold `i` and `calibration_i.pkl` as the concatenation of all remaining folds.
 
-If the evaluator is configured with already prepared paths (`oracle_train_pickle`, `calibration_pickle`, `scoring_pickle`), those are reused instead of rebuilding the split.
+If the evaluator is configured with already prepared paths (`oracle_train_pickle`, `calibration_pickle`, `scoring_pickle`), those are treated as base paths for the persisted artifacts. The evaluator reuses the first materialized `oracle_train.pkl` plus numbered `calibration_i.pkl` and `scoring_i.pkl` files on later `prepare(...)` calls.
 
-In normal runs, worker-local evaluators also call `prepare(...)`, but they reuse the same prepared artifacts if the manifest or pickles already exist. The evaluator only creates the three pickles the first time a pair is materialized in a run.
+In normal runs, worker-local evaluators also call `prepare(...)`, but they reuse the same prepared artifacts if the manifest or pickles already exist. The evaluator only creates these artifacts the first time a pair is materialized in a run.
 
 The first time a pair is actually materialized, the evaluator logs:
 
@@ -104,7 +106,7 @@ Before the prepared pickles are written, the evaluator imputes missing feature v
 - dosage columns are mean-imputed
 - additional covariate columns are mode-imputed
 
-This happens in `prepare(...)`, not during candidate scoring, so the persisted `oracle_train.pkl`, `calibration.pkl`, and `scoring.pkl` artifacts already contain the cleaned values used by later evaluation steps. The covariate columns are also cast to float at this stage so pandas nullable `NA` values do not leak into downstream feature extraction.
+This happens in `prepare(...)`, not during candidate scoring, so the persisted `oracle_train.pkl`, `calibration_i.pkl`, and `scoring_i.pkl` artifacts already contain the cleaned values used by later evaluation steps. The covariate columns are also cast to float at this stage so pandas nullable `NA` values do not leak into downstream feature extraction.
 
 Because the priority-function contract objects are built from those prepared artifacts, direct and helper tools under `funsearch_pipeline/priority_tools/` should not normally encounter missing dosage values during evaluator-driven runs.
 
@@ -132,37 +134,37 @@ When wiring these artifacts into a FunSearch run, the current `procedure2` backe
 
 `evaluate_candidate(...)` is where the candidate priority function is actually used.
 
-For each prepared dataset pair, it does this in order:
+For each prepared dataset pair, it does this for every fold-specific `calibration_i.pkl` and `scoring_i.pkl` pair:
 
-1. Load `oracle_train.pkl`, `calibration.pkl`, and `scoring.pkl`.
+1. Load `oracle_train.pkl`, `calibration_i.pkl`, and `scoring_i.pkl`.
 2. Extract the dosage column names from the oracle-train data.
 3. Build the strict priority-function contract objects.
 4. For each scoring subject and each variant:
-   - call the priority function to get a radius
-   - call `effect_size_calculator(...)` with that radius
-   - multiply the estimated effect size by the subject dosage to get an oracle contribution
+    - call the priority function to get a radius
+    - call `effect_size_calculator(...)` with that radius
+    - multiply the estimated effect size by the subject dosage to get an oracle contribution
 5. Fit the ridge-penalized logistic calibration model on the calibration split.
 6. Apply the fitted model to the scoring split.
 7. Compute ROC AUC on the scoring labels.
-8. Bootstrap the scoring set AUC and keep the median bootstrap AUC as the pair score.
+8. Bootstrap the scoring set AUC and keep the median bootstrap AUC as the fold score.
 
-The evaluator returns one pair score per dataset pair, plus:
+The evaluator returns one fold score per prepared fold, plus:
 
 - `simplicity`, an auxiliary score based on AST size of the priority function body.
-- `mean`, the mean of the pair scores.
+- `mean`, the mean of all fold scores across all configured dataset pairs.
 
 When that evaluated candidate is registered into an island, the program database appends:
 
 - `simplicity_bonus`, computed from the candidate's simplicity rank relative to up to 100 baseline functions already registered in that island.
 - `combined`, the final ranking score used by upstream FunSearch, defined as `mean + simplicity_bonus`.
 
-When the evaluator moves from calibration to scoring, it uses the combined `oracle_train.pkl + calibration.pkl` data to estimate marginal effect sizes for the scoring subjects. The scoring split itself is only used for the final personalized-risk scoring and AUC calculation.
+When the evaluator moves from calibration to scoring, it uses the combined `oracle_train.pkl + calibration_i.pkl` data to estimate marginal effect sizes for the scoring subjects. The scoring split itself is only used for the final personalized-risk scoring and AUC calculation.
 
 ## Where each score comes from
 
-### Pair score
+### Fold score
 
-The pair score is the median ROC AUC from bootstrapping the held-out scoring set. It measures how well the calibrated personalized risk scores align with the disease labels for that pair.
+The fold score is the median ROC AUC from bootstrapping the held-out scoring fold. It measures how well the calibrated personalized risk scores align with the disease labels for that fold.
 
 ### Simplicity score
 
@@ -181,7 +183,7 @@ This score is auxiliary only. It is stored in the program signature for diagnost
 
 ### Mean score
 
-The mean score is the average of the dataset-pair scores. It is stored under `mean` for diagnostics and as the base input to the final ranking score, but it is no longer the last stored value once the candidate is registered into an island.
+The mean score is the average of all fold scores across all configured conditions. With two conditions and `num_folds = N`, the evaluator averages `2N` fold scores. It is stored under `mean` for diagnostics and as the base input to the final ranking score, but it is no longer the last stored value once the candidate is registered into an island.
 
 ### Combined score
 
@@ -204,7 +206,7 @@ The flow for one candidate is:
 
 ```mermaid
 flowchart TD
-    A[Prepared oracle-train/calibration/scoring pickles] --> B[Load candidate priority function]
+    A[Prepared oracle-train plus fold-specific calibration/scoring pickles] --> B[Load candidate priority function]
     B --> C[Build strict oracle contract objects]
     C --> D[Call priority_function(training_data, ancestry_coordinate, target_variant)]
     D --> E[Call effect_size_calculator with returned radius]
@@ -212,10 +214,10 @@ flowchart TD
     F --> G[Fit ridge logistic calibration]
     G --> H[Score held-out scoring set]
     H --> I[Bootstrap ROC AUC and take median]
-    I --> J[Pair score]
-    J --> K[Mean across pairs]
+    I --> J[Fold score]
+    J --> K[Mean across all folds]
     K --> L[Compare simplicity to destination-island baselines]
     L --> M[Append simplicity_bonus and combined]
 ```
 
-In short: `prepare(...)` creates the data layout, and `evaluate_candidate(...)` uses that layout to score the priority function under each configured pair.
+In short: `prepare(...)` creates the data layout, and `evaluate_candidate(...)` uses that layout to score the priority function under each configured pair and fold.

@@ -27,9 +27,11 @@ For the `procedure2` evaluator backend, the path is:
 1. Concatenate all configured `training_pickles` for the dataset pair.
 2. If the combined object is a pandas DataFrame, impute missing dosage columns by column mean.
 3. If additional covariate columns are present, impute those by column mode and cast them to float.
-4. Split the combined training rows into `oracle_train.pkl` and `calibration.pkl` using `evaluator.oracle_train_fraction`.
-5. Build a strict `PriorityTrainingData` contract object from `oracle_train.pkl` when calibrating a candidate.
-6. Build a strict `PriorityTrainingData` contract object from `oracle_train + calibration` when scoring the held-out testing set.
+4. Write the full combined result to `oracle_train.pkl`.
+5. Concatenate all configured `testing_pickles` for the dataset pair, impute them the same way, and randomly split the combined testing rows into `evaluator.num_folds` folds.
+6. Write `scoring_i.pkl` for fold `i` and `calibration_i.pkl` for the concatenation of the remaining folds.
+7. Build a strict `PriorityTrainingData` contract object from `oracle_train.pkl` when calibrating a candidate.
+8. Build a strict `PriorityTrainingData` contract object from `oracle_train + calibration_i` when scoring `scoring_i`.
 
 So the priority function sees a normalized contract object, not the original pickle container directly.
 
@@ -39,7 +41,7 @@ The only built-in evaluator-side transformations are:
 
 - concatenation of the listed pickle shards
 - missing-value imputation for dosage and configured covariate columns
-- deterministic oracle-train versus calibration split
+- deterministic fold construction from the combined testing set
 - conversion into strict contract objects before the priority function is called
 
 ## How raw MEC data is transformed into `Data/FunsearchEvaluatorData`

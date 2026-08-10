@@ -93,11 +93,12 @@ One pair worker handles one prepared dataset pair, for example:
 
 Inside that worker, it:
 
-1. loads `oracle_train.pkl`, `calibration.pkl`, and `scoring.pkl`
-2. builds the oracle feature matrix for calibration
-3. fits the ridge calibration model
-4. builds the oracle feature matrix for scoring
-5. computes AUC and bootstrap statistics
+1. loads `oracle_train.pkl`
+2. iterates over the prepared fold-specific `calibration_i.pkl` and `scoring_i.pkl` artifacts for that pair
+3. builds the oracle feature matrix for calibration
+4. fits the ridge calibration model
+5. builds the oracle feature matrix for scoring
+6. computes AUC and bootstrap statistics
 
 ### How many pair workers are spawned
 
@@ -113,7 +114,7 @@ $$
 \end{cases}
 $$
 
-So with the current sample config, which defines two pairs, the evaluator spawns two pair workers per candidate evaluation.
+So with the current sample config, which defines two pairs, the evaluator spawns two pair workers per candidate evaluation. Each of those workers then processes all configured folds for its pair sequentially while reusing the prepared artifacts written on the first `prepare(...)` call.
 
 ### Can this be controlled through the config?
 

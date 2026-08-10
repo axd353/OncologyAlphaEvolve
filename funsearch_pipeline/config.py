@@ -95,6 +95,7 @@ class EvaluatorSettings:
     scoring_partitions: int
     bootstrap_iterations: int
     dataset_pairs: tuple[DatasetPairConfig, ...]
+    num_folds: int = 2
 
 
 @dataclass(frozen=True)
@@ -209,6 +210,8 @@ def _validate_config(config: PipelineConfig) -> None:
         raise ValueError(
             "At least one evaluator.dataset_pairs entry is required for the procedure2 evaluator."
         )
+    if config.evaluator.backend == "procedure2" and config.evaluator.num_folds < 2:
+        raise ValueError("evaluator.num_folds must be at least 2 for the procedure2 evaluator.")
     if config.evaluator.calibration_partitions < 1:
         raise ValueError("evaluator.calibration_partitions must be at least 1.")
     if config.evaluator.scoring_partitions < 1:
@@ -320,6 +323,7 @@ def load_pipeline_config(config_path: str | Path) -> PipelineConfig:
             scoring_partitions=int(evaluator_section.get("scoring_partitions", 1)),
             bootstrap_iterations=int(evaluator_section.get("bootstrap_iterations", 200)),
             dataset_pairs=_parse_dataset_pairs(base_dir, evaluator_section),
+            num_folds=int(evaluator_section.get("num_folds", 2)),
         ),
         logging=LoggingSettings(level=str(logging_section.get("level", "INFO"))),
         priority_tools=PriorityToolsSettings(

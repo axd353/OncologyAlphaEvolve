@@ -14,7 +14,7 @@
     "main_output_dir": "/nfs/home/adas23/projects/AlphaEvolve/prio_func_disc_runs",
     "seed_priority_path": "./funsearch_priority_seed_example.py",
     "function_to_evolve": "priority",
-    "max_cycles": 10,
+    "max_cycles": 12,
     "stop_after_no_improvement_cycles": 3,
     "random_seed": 42
   },
@@ -28,7 +28,7 @@
       "simplicity_bonus_max": "Maximum absolute bonus added to the base mean score when computing the final combined ranking score. If this value is Y, the registration-time simplicity bonus is interpolated in the range [-Y, Y] from the candidate's simplicity rank relative to up to 100 baseline functions already in the destination island."
     },
     "functions_per_prompt": 2,
-    "num_islands": 6,
+    "num_islands": 4,
     "cluster_sampling_temperature_init": 0.1,
     "cluster_sampling_temperature_period": 30000,
     "simplicity_bonus_max": 0.008
@@ -46,8 +46,8 @@
     },
     "backend": "openai",
     "system_prompt_path": "./funsearch_system_prompt.example.txt",
-    "model": "gpt-5.4",
-    "candidates_per_island_per_cycle": 8,
+    "model": "gpt-5.5",
+    "candidates_per_island_per_cycle": 7,
     "parallel_workers": 8,
     "temperature": 1.0
   },
@@ -56,8 +56,9 @@
     "documentation": {
       "backend": "Evaluator backend. procedure2 is the oracle plus ridge calibration path; deterministic is only for orchestration smoke tests.",
       "metric": "Held-out scoring metric. roc_auc is recommended because it measures whether calibrated scores rank cases above controls without choosing a threshold.",
-      "oracle_train_fraction": "Fraction of combined training samples used as Oracle-Train. The remainder is the calibration set for ridge or logistic calibration.",
-      "preprocessed_dirname": "Subdirectory inside the experiment directory where preprocessed oracle-train, calibration, and scoring pickles are stored.",
+      "oracle_train_fraction": "Legacy field from the old prepare path. The current fold-based procedure2 workflow writes oracle_train.pkl from all training_pickles and derives calibration_i/scoring_i artifacts from testing_pickles instead.",
+      "preprocessed_dirname": "Subdirectory inside the experiment directory where preprocessed oracle-train and fold-specific calibration/scoring pickles are stored.",
+      "num_folds": "Number of folds created from the combined testing_pickles for each dataset pair. For fold i, scoring_i.pkl is fold i and calibration_i.pkl is the concatenation of all other folds.",
       "calibration_penalties": "Candidate ridge penalties to evaluate during calibration.",
       "calibration_partitions": "Number of calibration-set partitions evaluated in parallel for each candidate priority function. Use 1 to keep calibration single-process.",
       "scoring_partitions": "Number of scoring-set partitions evaluated in parallel for each candidate priority function. Use 1 to keep scoring single-process.",
@@ -68,6 +69,7 @@
     "metric": "roc_auc",
     "oracle_train_fraction": 0.8,
     "preprocessed_dirname": "preprocessed",
+    "num_folds": 2,
     "calibration_penalties": [0.1, 1.0, 10.0],
     "calibration_partitions": 6,
     "scoring_partitions": 6,
@@ -77,11 +79,11 @@
         "_description": "Training/testing pickle shards for the no-additional-covariates condition.",
         "documentation": {
           "name": "Pair name used in logs, preprocessed subdirectories, and database signatures.",
-          "training_pickles": "Training pickle shards that are concatenated before the 80/20 Oracle-Train/calibration split.",
-          "testing_pickles": "Testing pickle shards for the held-out scoring set for this condition.",
+          "training_pickles": "Training pickle shards that are concatenated into one oracle_train.pkl for this condition.",
+          "testing_pickles": "Testing pickle shards that are concatenated, randomly split into num_folds folds, and then materialized as scoring_i.pkl plus complementary calibration_i.pkl artifacts.",
           "oracle_train_pickle": "Optional alternative to training_pickles: a prebuilt Oracle-Train pickle path.",
-          "calibration_pickle": "Optional alternative to training_pickles: a prebuilt calibration pickle path.",
-          "scoring_pickle": "Optional alternative to testing_pickles: a prebuilt scoring pickle path.",
+          "calibration_pickle": "Optional base path for prepared calibration fold artifacts. The evaluator writes numbered files such as calibration_1.pkl, calibration_2.pkl, and so on.",
+          "scoring_pickle": "Optional base path for prepared scoring fold artifacts. The evaluator writes numbered files such as scoring_1.pkl, scoring_2.pkl, and so on.",
           "has_additional_covariates": "False means no extra covariate columns are expected for this pair."
         },
         "name": "no_covariates",
@@ -97,11 +99,11 @@
         "_description": "Training/testing pickle shards for the additional-covariates condition.",
         "documentation": {
           "name": "Pair name used in logs, preprocessed subdirectories, and database signatures.",
-          "training_pickles": "Training pickle shards that are concatenated before the 80/20 Oracle-Train/calibration split.",
-          "testing_pickles": "Testing pickle shards for the held-out scoring set for this condition.",
+          "training_pickles": "Training pickle shards that are concatenated into one oracle_train.pkl for this condition.",
+          "testing_pickles": "Testing pickle shards that are concatenated, randomly split into num_folds folds, and then materialized as scoring_i.pkl plus complementary calibration_i.pkl artifacts.",
           "oracle_train_pickle": "Optional alternative to training_pickles: a prebuilt Oracle-Train pickle path.",
-          "calibration_pickle": "Optional alternative to training_pickles: a prebuilt calibration pickle path.",
-          "scoring_pickle": "Optional alternative to testing_pickles: a prebuilt scoring pickle path.",
+          "calibration_pickle": "Optional base path for prepared calibration fold artifacts. The evaluator writes numbered files such as calibration_1.pkl, calibration_2.pkl, and so on.",
+          "scoring_pickle": "Optional base path for prepared scoring fold artifacts. The evaluator writes numbered files such as scoring_1.pkl, scoring_2.pkl, and so on.",
           "has_additional_covariates": "True means the adapter and evaluator should expect the configured covariate columns."
         },
         "name": "with_covariates",
