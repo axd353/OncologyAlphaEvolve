@@ -188,6 +188,25 @@ PYTHONPATH=$PWD python -m funsearch_pipeline --config Collaterals/RunSmoke/funse
 
 The runner creates a timestamped experiment directory under `prio_func_disc_runs/` and copies the resolved config there as `config.used.json`.
 
+### 4a. Resume an interrupted run
+
+If a run stops partway through a started cycle, resume it from the existing run directory:
+
+```bash
+PYTHONPATH=$PWD python -m funsearch_pipeline --resume --resume-run-dir prio_func_disc_runs/oracle_priority_YYYYMMDD_HHMMSS > "prio_func_disc_runs/logger_resume_$(date +%Y%m%d_%H%M%S).log" 2>&1
+```
+
+The resume flow is intentionally conservative:
+
+- completed cycles stay untouched
+- the latest started but incomplete cycle is rerun from its saved `program_db_start.pkl`
+- `sampler_logs/` and `sampler_outputs/` for that incomplete cycle are deleted before rerunning it, so stale partial sampler artifacts do not leak into the resumed cycle
+- the copied `config.used.json` inside the run directory is the config used for resume, so you do not need to pass `--config`
+
+This means the safe restart boundary is the beginning of a cycle, not the middle of sampler execution.
+
+One limitation is worth keeping in mind: if a run dies after a cycle fully completed but before the next cycle started, the run directory may not contain a safe start-of-next-cycle snapshot yet. In that case the new resume command will refuse to guess.
+
 ### 5. Post-process a completed run
 
 ```bash

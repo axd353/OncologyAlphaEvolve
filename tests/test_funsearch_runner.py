@@ -3,6 +3,9 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+
+from funsearch_pipeline.orchestration.runner import resume_experiment
 from funsearch_pipeline.orchestration.runner import run_experiment
 from funsearch_pipeline.evaluation.interfaces import EvaluatedCandidate
 from funsearch_pipeline.evaluation.interfaces import PairScore
@@ -200,3 +203,150 @@ def test_island_sampler_retries_failed_evaluation_before_registering(
     assert "sample_index=0 attempt=1 rejected=evaluation_failed" in island_log
     assert "sample_index=0 attempt=2 registered=true after_attempts=2" in island_log
     assert "no_priority_function_generated" not in island_log
+
+
+def test_resume_experiment_reruns_latest_incomplete_cycle_without_touching_completed_cycles(
+    tmp_path: Path,
+) -> None:
+    seed_path = _write_file(
+        tmp_path / "seed_priority.py",
+        "from __future__ import annotations\n"
+        "from collections.abc import Sequence\n"
+        "from typing import Any\n\n"
+        "def priority(training_data: Any, ancestry_coordinate: Sequence[float], target_variant: Any) -> float:\n"
+        "    return 0.5\n",
+    )
+    system_prompt_path = _write_file(
+        tmp_path / "system_prompt.txt",
+        "Return only a valid indented Python function body.\n",
+    )
+    output_root = tmp_path / "resume_runs"
+    config_path = _write_file(
+        tmp_path / "config.json",
+        json.dumps(
+            {
+                "experiment": {
+                    "name": "resume_test",
+                    "main_output_dir": str(output_root),
+                    "seed_priority_path": str(seed_path),
+                    "function_to_evolve": "priority",
+                    "max_cycles": 2,
+                    "stop_after_no_improvement_cycles": 2,
+                    "random_seed": 19,
+                },
+                "program_database": {
+                    "functions_per_prompt": 2,
+                    "num_islands": 2,
+                    "cluster_sampling_temperature_init": 0.1,
+                    "cluster_sampling_temperature_period": 100,
+                },
+                "sampler": {
+                    "backend": "deterministic",
+                    "system_prompt_path": str(system_prompt_path),
+                    "model": "deterministic-model",
+                    "candidates_per_island_per_cycle": 1,
+                    "parallel_workers": 1,
+                },
+                "evaluator": {
+                    "backend": "deterministic",
+                    "metric": "synthetic",
+                    "oracle_train_fraction": 0.8,
+                    "preprocessed_dirname": "preprocessed",
+                    "calibration_penalties": [1.0],
+                },
+                "logging": {"level": "INFO"},
+                "priority_tools": {"module_names": []},
+            },
+            indent=2,
+        ),
+    )
+
+    experiment_dir = run_experiment(config_path)
+    cycle_0001_summary_before = json.loads(
+        (experiment_dir / "cycle_0001" / "cycle_summary.json").read_text()
+    )
+    stale_marker = "stale resume marker"
+    (experiment_dir / "cycle_0002" / "sampler_logs" / "island_000.log").write_text(
+        stale_marker
+    )
+    _write_file(
+        experiment_dir / "cycle_0002" / "sampler_outputs" / "stale.txt",
+        stale_marker,
+    )
+    (experiment_dir / "cycle_0002" / "program_db_end.pkl").unlink()
+    (experiment_dir / "cycle_0002" / "program_db_end_summary.json").unlink()
+    (experiment_dir / "cycle_0002" / "cycle_summary.json").unlink()
+
+    resumed_dir = resume_experiment(experiment_dir)
+
+    assert resumed_dir == experiment_dir
+    assert json.loads((experiment_dir / "cycle_0001" / "cycle_summary.json").read_text()) == (
+        cycle_0001_summary_before
+    )
+    assert stale_marker not in (
+        experiment_dir / "cycle_0002" / "sampler_logs" / "island_000.log"
+    ).read_text()
+    assert not (experiment_dir / "cycle_0002" / "sampler_outputs" / "stale.txt").exists()
+    assert (experiment_dir / "cycle_0002" / "program_db_end.pkl").exists()
+    assert (experiment_dir / "cycle_0002" / "cycle_summary.json").exists()
+    assert "Resuming experiment directory" in (experiment_dir / "main.log").read_text()
+
+
+def test_resume_experiment_rejects_completed_run(tmp_path: Path) -> None:
+    seed_path = _write_file(
+        tmp_path / "seed_priority.py",
+        "from __future__ import annotations\n"
+        "from collections.abc import Sequence\n"
+        "from typing import Any\n\n"
+        "def priority(training_data: Any, ancestry_coordinate: Sequence[float], target_variant: Any) -> float:\n"
+        "    return 0.5\n",
+    )
+    system_prompt_path = _write_file(
+        tmp_path / "system_prompt.txt",
+        "Return only a valid indented Python function body.\n",
+    )
+    output_root = tmp_path / "completed_runs"
+    config_path = _write_file(
+        tmp_path / "config.json",
+        json.dumps(
+            {
+                "experiment": {
+                    "name": "completed_resume_test",
+                    "main_output_dir": str(output_root),
+                    "seed_priority_path": str(seed_path),
+                    "function_to_evolve": "priority",
+                    "max_cycles": 1,
+                    "stop_after_no_improvement_cycles": 1,
+                    "random_seed": 23,
+                },
+                "program_database": {
+                    "functions_per_prompt": 2,
+                    "num_islands": 2,
+                    "cluster_sampling_temperature_init": 0.1,
+                    "cluster_sampling_temperature_period": 100,
+                },
+                "sampler": {
+                    "backend": "deterministic",
+                    "system_prompt_path": str(system_prompt_path),
+                    "model": "deterministic-model",
+                    "candidates_per_island_per_cycle": 1,
+                    "parallel_workers": 1,
+                },
+                "evaluator": {
+                    "backend": "deterministic",
+                    "metric": "synthetic",
+                    "oracle_train_fraction": 0.8,
+                    "preprocessed_dirname": "preprocessed",
+                    "calibration_penalties": [1.0],
+                },
+                "logging": {"level": "INFO"},
+                "priority_tools": {"module_names": []},
+            },
+            indent=2,
+        ),
+    )
+
+    experiment_dir = run_experiment(config_path)
+
+    with pytest.raises(ValueError, match="already completed"):
+        resume_experiment(experiment_dir)
