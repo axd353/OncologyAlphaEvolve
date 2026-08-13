@@ -85,14 +85,14 @@ def _prompt_file(output_dir: Path, sample_index: int) -> Path:
         sample_index: Candidate interaction number in this cycle.
 
     Output:
-        Path where the exact prompt sent to the backend should be stored.
+        Path where the raw Python code prompt should be stored.
     """
 
     return output_dir / f"sample_{sample_index:03d}" / "prompt.py"
 
 
 def _write_prompt(output_dir: Path, prompt: IslandPrompt, sample_index: int) -> Path:
-    """Persist the exact island prompt used for one LLM interaction.
+    """Persist the raw Python code prompt used for one LLM interaction.
 
     Input:
         output_dir: Per-island sampler output directory.
@@ -110,7 +110,7 @@ def _write_prompt(output_dir: Path, prompt: IslandPrompt, sample_index: int) -> 
 
 
 def _log_prompt(log_path: Path, prompt: IslandPrompt, sample_index: int) -> None:
-    """Log the first full prompt for one island during a cycle.
+    """Log the first full sampler input for one island during a cycle.
 
     Input:
         log_path: Per-island sampler log file.
@@ -118,16 +118,16 @@ def _log_prompt(log_path: Path, prompt: IslandPrompt, sample_index: int) -> None
         sample_index: Candidate interaction number in this cycle.
 
     Output:
-        Appends the full first prompt for the island/cycle to the sampler log.
-        Only the first prompt of the cycle is logged verbatim to avoid bloating
-        the log with repeated prompt bodies.
+        Appends the exact first sampler input for the island/cycle to the
+        sampler log. Only the first prompt of the cycle is logged verbatim to
+        avoid bloating the log with repeated prompt bodies.
     """
 
     if sample_index != 0:
         return
 
     append_sampler_log(log_path, f"sample_index=0 full_prompt_begin island={prompt.island_id}")
-    append_sampler_log(log_path, prompt.code.rstrip("\n"))
+    append_sampler_log(log_path, _compose_sampler_input(prompt).rstrip("\n"))
     append_sampler_log(log_path, f"sample_index=0 full_prompt_end island={prompt.island_id}")
 
 

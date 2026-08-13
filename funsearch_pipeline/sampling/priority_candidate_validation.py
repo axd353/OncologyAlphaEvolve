@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import ast
 import math
+import re
 from typing import Callable
 
 from funsearch.implementation import code_manipulation
@@ -89,7 +90,7 @@ def _normalize_completion(
             raise ValueError("A full function definition is not valid for the seed candidate.")
         return _normalize_function_body_indentation(_extract_function_body_from_definition(
             stripped,
-            expected_function_name=f"{function_to_evolve}_v{version_generated}",
+            function_to_evolve=function_to_evolve,
         ))
     return _normalize_function_body_indentation(raw_completion)
 
@@ -97,20 +98,30 @@ def _normalize_completion(
 def _extract_function_body_from_definition(
     source: str,
     *,
-    expected_function_name: str,
+    function_to_evolve: str,
 ) -> str:
-    """Extract the body from a full generated function definition."""
+    """Extract the body from a full generated versioned function definition."""
 
     module = ast.parse(source)
-    for node in module.body:
-        if isinstance(node, ast.FunctionDef) and node.name == expected_function_name:
-            function_text = ast.get_source_segment(source, node)
-            if function_text is None:
-                break
-            parsed_function = code_manipulation.text_to_function(function_text)
-            return parsed_function.body + "\n"
+    name_pattern = re.compile(rf"^{re.escape(function_to_evolve)}_v\d+$")
+    matching_nodes = [
+        node
+        for node in module.body
+        if isinstance(node, ast.FunctionDef) and name_pattern.fullmatch(node.name)
+    ]
+    if len(matching_nodes) > 1:
+        raise ValueError(
+            "Expected completion to define exactly one versioned "
+            f"{function_to_evolve!r} function."
+        )
+    if len(matching_nodes) == 1:
+        function_text = ast.get_source_segment(source, matching_nodes[0])
+        if function_text is None:
+            raise ValueError("Could not recover generated function source text.")
+        parsed_function = code_manipulation.text_to_function(function_text)
+        return parsed_function.body + "\n"
     raise ValueError(
-        f"Expected completion to define {expected_function_name!r}."
+        f"Expected completion to define a versioned {function_to_evolve!r} function."
     )
 
 

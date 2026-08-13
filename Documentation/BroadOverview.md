@@ -6,7 +6,7 @@ This document ties together three things that are otherwise spread across the re
 - what additional preprocessing the evaluator does before a priority function is called
 - how to run a full priority-function discovery pipeline end to end
 
-For implementation detail, also see [Documentation/HowEvaluatorWorks.md](Documentation/HowEvaluatorWorks.md), [Documentation/PYTHON_ENV_SETUP.md](Documentation/PYTHON_ENV_SETUP.md), and [Documentation/FunsearchRunPostProcessing.md](Documentation/FunsearchRunPostProcessing.md).
+For implementation detail, also see [Documentation/HowEvaluatorWorks.md](Documentation/HowEvaluatorWorks.md), [Documentation/PYTHON_ENV_SETUP.md](Documentation/PYTHON_ENV_SETUP.md), [Documentation/FunsearchRunPostProcessing.md](Documentation/FunsearchRunPostProcessing.md), and [Documentation/PriorityFunctionEvaluation.md](Documentation/PriorityFunctionEvaluation.md).
 
 ## End-to-end flow
 

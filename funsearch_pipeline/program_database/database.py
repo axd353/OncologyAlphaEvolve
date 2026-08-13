@@ -11,6 +11,7 @@ import json
 import math
 import numpy as np
 import pickle
+import re
 import textwrap
 from typing import Any
 
@@ -63,6 +64,18 @@ def _stable_program_digest(program_source: str) -> bytes:
     """Return a deterministic digest used to subsample baseline programs."""
 
     return hashlib.sha256(program_source.encode("utf-8")).digest()
+
+
+def _expected_prompt_version(prompt_code: str, function_to_evolve: str) -> int:
+    """Return the version suffix of the final function header in `prompt_code`."""
+
+    pattern = re.compile(rf"^def {re.escape(function_to_evolve)}_v(\d+)\(", re.MULTILINE)
+    matches = list(pattern.finditer(prompt_code))
+    if not matches:
+        raise ValueError(
+            f"Prompt code does not contain a versioned {function_to_evolve!r} header."
+        )
+    return int(matches[-1].group(1))
 
 
 def _sample_baseline_simplicities(
@@ -256,10 +269,10 @@ class IslandShard:
             available, plus the header for the next generated version.
         """
 
-        code, version_generated = self.island.get_prompt()
+        code, _ = self.island.get_prompt()
         return IslandPrompt(
             island_id=self.island_id,
-            version_generated=version_generated,
+            version_generated=_expected_prompt_version(code, self.island._function_to_evolve),
             code=code,
         )
 
@@ -481,8 +494,12 @@ class CycleProgramsDatabase:
             `IslandShard.get_prompt()` so prompts reflect local registrations.
         """
 
-        code, version_generated = self._database._islands[island_id].get_prompt()
-        return IslandPrompt(island_id=island_id, version_generated=version_generated, code=code)
+        code, _ = self._database._islands[island_id].get_prompt()
+        return IslandPrompt(
+            island_id=island_id,
+            version_generated=_expected_prompt_version(code, self._function_to_evolve),
+            code=code,
+        )
 
     def materialize_candidate(
         self,

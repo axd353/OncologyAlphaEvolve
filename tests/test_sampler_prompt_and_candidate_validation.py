@@ -74,6 +74,36 @@ def test_build_candidate_program_accepts_full_function_definition() -> None:
     assert candidate_program.raw_completion.strip().startswith("return 0.75")
 
 
+def test_build_candidate_program_accepts_unexpected_versioned_function_name() -> None:
+    seed_text = Path("Collaterals/Run1/funsearch_priority_seed_example.py").read_text()
+    database = CycleProgramsDatabase.from_seed_program_text(
+        settings=ProgramDatabaseSettings(
+            functions_per_prompt=2,
+            num_islands=2,
+            cluster_sampling_temperature_init=0.1,
+            cluster_sampling_temperature_period=30000,
+        ),
+        seed_program_text=seed_text,
+        function_to_evolve="priority",
+    )
+
+    candidate_program = build_candidate_program(
+        template=database.template,
+        function_to_evolve="priority",
+        island_id=0,
+        version_generated=2,
+        raw_completion=(
+            "def priority_v7(training_data, ancestry_coordinate, target_variant) -> float:\n"
+            "    return 0.85\n"
+        ),
+        sample_index=0,
+    )
+
+    assert "def priority(" in candidate_program.program_source
+    assert "return 0.85" in candidate_program.program_source
+    assert candidate_program.raw_completion.strip().startswith("return 0.85")
+
+
 def test_island_prompt_generation_handles_four_space_candidate_bodies() -> None:
     seed_text = (
         "def priority(training_data, ancestry_coordinate, target_variant) -> float:\n"
@@ -111,10 +141,35 @@ def test_island_prompt_generation_handles_four_space_candidate_bodies() -> None:
     prompt = shard.get_prompt()
 
     assert improved is True
+    assert prompt.version_generated == 2
     assert "def priority_v0" in prompt.code
     assert "def priority_v1" in prompt.code
     assert '  """Improved version of `priority_v0`."""' in prompt.code
     assert "  try:" in prompt.code
+
+
+def test_seed_only_island_prompt_uses_header_version_suffix() -> None:
+    seed_text = (
+        "def priority(training_data, ancestry_coordinate, target_variant) -> float:\n"
+        "    return 0.5\n"
+    )
+    database = CycleProgramsDatabase.from_seed_program_text(
+        settings=ProgramDatabaseSettings(
+            functions_per_prompt=2,
+            num_islands=2,
+            cluster_sampling_temperature_init=0.1,
+            cluster_sampling_temperature_period=30000,
+        ),
+        seed_program_text=seed_text,
+        function_to_evolve="priority",
+    )
+    database.register_seed({"mean": 0.5})
+
+    prompt = database.export_island_shard(0).get_prompt()
+
+    assert prompt.version_generated == 1
+    assert "def priority_v0" in prompt.code
+    assert "def priority_v1" in prompt.code
 
 
 def test_registration_appends_combined_score_and_simplicity_bonus() -> None:
