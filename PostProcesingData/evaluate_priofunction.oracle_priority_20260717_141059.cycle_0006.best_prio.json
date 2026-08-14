@@ -1,8 +1,34 @@
 {
-  "prio_function_path": "../prio_func_disc_runs/oracle_priority_20260717_141059/cycle_0006/best_prio.py",
-  "training_pickle_path": "../Data/FunsearchEvaluatorData/no_covariates_train.pkl",
-  "calibrating_pickle_path": "../Data/FunsearchEvaluatorData/no_covariates_test.pkl",
-  "heldout_pickle_path": "../Data/FunsearchEvaluatorData/no_covariates_heldout.pkl",
+  "_description": "Evaluate a produced priority function on Procedure 2 heldout data and compare against optional baselines.",
+  "_field_docs": {
+    "prio_function_path": "Python file containing the priority function to evaluate.",
+    "training_pickle_path": "One .pkl path or a JSON array of .pkl paths. All listed DataFrames are concatenated to form the oracle-training dataset.",
+    "calibrating_pickle_path": "One .pkl path or a JSON array of .pkl paths. All listed DataFrames are concatenated to form the calibration dataset.",
+    "heldout_pickle_path": "One .pkl path or a JSON array of .pkl paths. All listed DataFrames are concatenated to form the heldout evaluation dataset.",
+    "output_row_tracking_path": "Path to output_row_tracking.pkl used to recover ancestry groups for heldout rows.",
+    "report_file_name": "File name for the saved clean JSON report. It is written in the same directory as prio_function_path.",
+    "supported_ancestry_groups": "Allowed ancestry codes when parsing source shard names from output_row_tracking.pkl.",
+    "should_overwrite": "If true, overwrite any existing report for this priority function. If false, reuse an existing report and compute only configured baselines that are missing from it.",
+    "function_name": "Function name to load from prio_function_path.",
+    "calibration_penalties": "Penalty values searched when fitting the final calibration model.",
+    "calibration_partitions": "Worker count for calibration feature building or auto.",
+    "scoring_partitions": "Worker count for heldout feature building or auto.",
+    "baselines": "Optional baseline models to evaluate on the same heldout dataset."
+  },
+  "prio_function_path": "/nfs/home/adas23/projects/AlphaEvolve/prio_func_disc_runs/oracle_priority_20260810_032011/cycle_0004/best_prio.py",
+  "training_pickle_path": [
+    "../Data/FunsearchEvaluatorData/no_covariates_train.pkl"
+  ],
+  "calibrating_pickle_path": [
+    "../Data/FunsearchEvaluatorData/no_covariates_test.pkl"
+  ],
+  "heldout_pickle_path": [
+    "../Data/FunsearchEvaluatorData/no_covariates_heldout.pkl"
+  ],
+  "output_row_tracking_path": "../Data/FunsearchEvaluatorData/output_row_tracking.pkl",
+  "report_file_name": "best_prio.evaluation_report.json",
+  "supported_ancestry_groups": ["AA", "JA", "LA"],
+  "should_overwrite": false,
   "function_name": "priority",
   "calibration_penalties": [0.1, 1.0, 10.0],
   "calibration_partitions": "auto",
@@ -12,6 +38,26 @@
       "name": "Mixture Learning",
       "enabled": true,
       "alpha": 1.0
+    },
+    {
+      "name": "Independent Learning Scheme",
+      "enabled": true,
+      "alpha": 1.0
+    },
+    {
+      "name": "TL-GDES",
+      "enabled": true,
+      "max_iter": 100,
+      "source_n_iter": 3000,
+      "min_target_n": 20
+    },
+    {
+      "name": "TL-PR",
+      "enabled": true,
+      "max_iter": 600,
+      "source_n_iter": 3000,
+      "n_lambdas": 30,
+      "cv_folds": 2
     }
   ]
 }

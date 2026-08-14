@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 import json
+import pickle
 
 import pandas as pd
 
@@ -18,6 +19,8 @@ from PostProcesingData.funsearch_run_postprocess import count_validation_passes_
 from PostProcesingData.funsearch_run_postprocess import extract_sampler_log_metrics
 from PostProcesingData.funsearch_run_postprocess import postprocess_funsearch_run
 from PostProcesingData.funsearch_run_postprocess import write_cycle_best_priority_files
+from funsearch_pipeline.config import ProgramDatabaseSettings
+from funsearch_pipeline.program_database import CycleProgramsDatabase
 from funsearch_pipeline.orchestration.runner import run_experiment
 
 
@@ -25,6 +28,37 @@ def _write_text(path: Path, contents: str) -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(contents)
     return path
+
+
+def _write_cycle_snapshot(
+    cycle_dir: Path,
+    *,
+    returned_score: float,
+    num_islands: int = 1,
+) -> Path:
+    seed_program_text = (
+        "from __future__ import annotations\n"
+        "from collections.abc import Sequence\n"
+        "from typing import Any\n\n"
+        "def priority(training_data: Any, ancestry_coordinate: Sequence[float], target_variant: Any) -> float:\n"
+        f"    return {returned_score:.6f}\n"
+    )
+    database = CycleProgramsDatabase.from_seed_program_text(
+        ProgramDatabaseSettings(
+            functions_per_prompt=2,
+            num_islands=num_islands,
+            cluster_sampling_temperature_init=0.1,
+            cluster_sampling_temperature_period=100,
+        ),
+        seed_program_text,
+        "priority",
+    )
+    database.register_seed({"mean": returned_score})
+    snapshot_path = cycle_dir / "program_db_end.pkl"
+    snapshot_path.parent.mkdir(parents=True, exist_ok=True)
+    with snapshot_path.open("wb") as handle:
+        pickle.dump(database, handle)
+    return snapshot_path
 
 
 def test_extract_sampler_log_metrics_counts_registered_attempt_once(tmp_path: Path) -> None:
@@ -65,6 +99,8 @@ def test_extract_sampler_log_metrics_counts_registered_attempt_once(tmp_path: Pa
 
 def test_postprocess_funsearch_run_moves_logger_and_writes_pickles(tmp_path: Path) -> None:
     run_dir = tmp_path / "prio_func_disc_runs" / "oracle_priority_20260716_050704"
+    _write_cycle_snapshot(run_dir / "cycle_0001", returned_score=11.01)
+    _write_cycle_snapshot(run_dir / "cycle_0002", returned_score=21.01)
     _write_text(
         run_dir / "config.used.json",
         "\n".join(
@@ -128,8 +164,20 @@ def test_postprocess_funsearch_run_moves_logger_and_writes_pickles(tmp_path: Pat
 
     moved_logger_path = run_dir / logger_path.name
     assert outputs.logger_path == moved_logger_path
+    assert outputs.best_priority_paths == (
+        run_dir / "cycle_0001" / "best_prio.py",
+        run_dir / "cycle_0002" / "best_prio.py",
+    )
     assert moved_logger_path.exists()
     assert not logger_path.exists()
+    assert "# Best priority function at end of cycle_0001." in (
+        run_dir / "cycle_0001" / "best_prio.py"
+    ).read_text()
+    assert "return 11.010000" in (run_dir / "cycle_0001" / "best_prio.py").read_text()
+    assert "# Best priority function at end of cycle_0002." in (
+        run_dir / "cycle_0002" / "best_prio.py"
+    ).read_text()
+    assert "return 21.010000" in (run_dir / "cycle_0002" / "best_prio.py").read_text()
 
     completed_counts = pd.read_pickle(run_dir / COMPLETED_PRIORITY_FUNCTION_COUNTS_PICKLE)
     validated_counts = pd.read_pickle(run_dir / VALIDATED_PRIORITY_FUNCTION_COUNTS_PICKLE)

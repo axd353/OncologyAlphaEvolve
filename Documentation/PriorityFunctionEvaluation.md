@@ -15,11 +15,12 @@ At a high level, the script does four things:
 3. Fit the best calibration model over a configured set of penalties.
 4. Score the heldout split and report heldout ROC AUC.
 
-Operationally, the script treats its three input datasets like this:
+Operationally, the script treats its input datasets like this:
 
-- `training_pickle_path`: oracle-training data.
-- `calibrating_pickle_path`: calibration data used to fit the final linear calibration model.
-- `heldout_pickle_path`: final evaluation data used only for the reported heldout ROC AUC.
+- `training_pickle_path`: oracle-training data. This may be one `.pkl` path or a JSON array of `.pkl` paths. If multiple paths are supplied, the DataFrames are concatenated to form the full training dataset.
+- `calibrating_pickle_path`: calibration data used to fit the final linear calibration model. This may be one `.pkl` path or a JSON array of `.pkl` paths. If multiple paths are supplied, the DataFrames are concatenated to form the full calibration dataset.
+- `heldout_pickle_path`: final evaluation data used only for the reported heldout ROC AUC. This may be one `.pkl` path or a JSON array of `.pkl` paths. If multiple paths are supplied, the DataFrames are concatenated to form the full heldout dataset.
+- `output_row_tracking_path`: path to `output_row_tracking.pkl`, used to map heldout rows back to their source shards so the final report can compute per-ancestry heldout ROC AUC values.
 
 The priority function itself is not directly compared on raw dosage values alone. Instead, the Procedure 2 evaluator builds oracle feature matrices from the priority function, calibrates those features on the calibration split, and then applies the fitted model to heldout subjects.
 
@@ -33,34 +34,19 @@ The reported number for the produced priority function is:
 
 If baselines are configured, the same heldout split is also evaluated with each configured baseline model, and their heldout ROC AUC values are printed alongside the priority-function result.
 
+The final summary report also breaks down the priority-function heldout ROC AUC by ancestry group. Those ancestry groups are inferred from the heldout rows' source shard names through `output_row_tracking.pkl`, for example `train_AA.pkl`, `test_JA.pkl`, or `train_LA_add_covs.pkl`.
+
 ## Available alternate baselines
 
-Baselines are registered in [PostProcesingData/prio_func_eval_baselines/__init__.py](/nfs/home/adas23/projects/AlphaEvolve/PostProcesingData/prio_func_eval_baselines/__init__.py).
+Baseline implementations are registered in [PostProcesingData/prio_func_eval_baselines/__init__.py](/nfs/home/adas23/projects/AlphaEvolve/PostProcesingData/prio_func_eval_baselines/__init__.py).
 
-At present, the only supported alternate baseline is:
+The baseline catalog and method-specific documentation live here:
 
-- `Mixture Learning`
-
-Accepted baseline names for the same implementation are:
-
-- `Mixture Learning`
-- `mixture_learning`
-
-The implementation lives in [PostProcesingData/prio_func_eval_baselines/mixture_learning.py](/nfs/home/adas23/projects/AlphaEvolve/PostProcesingData/prio_func_eval_baselines/mixture_learning.py).
-
-### What Mixture Learning does
-
-The current Mixture Learning baseline:
-
-- concatenates the training and calibration datasets,
-- extracts all dosage columns plus ancestry columns,
-- fits a ridge-regression model,
-- predicts scores for the heldout dataset,
-- reports heldout ROC AUC.
-
-The currently supported option is:
-
-- `alpha`: ridge penalty strength, default `1.0`
+- [Documentation/PriorityFunctionBaselines.md](/nfs/home/adas23/projects/AlphaEvolve/Documentation/PriorityFunctionBaselines.md)
+- [Documentation/PriorityBaselineMixtureLearning.md](/nfs/home/adas23/projects/AlphaEvolve/Documentation/PriorityBaselineMixtureLearning.md)
+- [Documentation/PriorityBaselineIndependentLearningScheme.md](/nfs/home/adas23/projects/AlphaEvolve/Documentation/PriorityBaselineIndependentLearningScheme.md)
+- [Documentation/PriorityBaselineTLGDES.md](/nfs/home/adas23/projects/AlphaEvolve/Documentation/PriorityBaselineTLGDES.md)
+- [Documentation/PriorityBaselineTLPR.md](/nfs/home/adas23/projects/AlphaEvolve/Documentation/PriorityBaselineTLPR.md)
 
 ## How to run the evaluation
 
@@ -76,7 +62,7 @@ Example:
 ```bash
 source /nfs/home/adas23/python_environments/OcologyAlphaEvolve/bin/activate
 PYTHONPATH=$PWD python -m PostProcesingData.evaluate_priofunction \
-  PostProcesingData/evaluate_priofunction.oracle_priority_20260717_141059.cycle_0006.best_prio.json
+  PostProcesingData/my_config.json
 ```
 
 An example config file already exists at [PostProcesingData/evaluate_priofunction.oracle_priority_20260717_141059.cycle_0006.best_prio.json](/nfs/home/adas23/projects/AlphaEvolve/PostProcesingData/evaluate_priofunction.oracle_priority_20260717_141059.cycle_0006.best_prio.json).
@@ -91,9 +77,15 @@ Required field:
 
 Common optional fields:
 
-- `training_pickle_path`: defaults to `Data/FunsearchEvaluatorData/no_covariates_train.pkl`
-- `calibrating_pickle_path`: defaults to `Data/FunsearchEvaluatorData/no_covariates_test.pkl`
-- `heldout_pickle_path`: defaults to `Data/FunsearchEvaluatorData/no_covariates_heldout.pkl`
+- `training_pickle_path`: defaults to `Data/FunsearchEvaluatorData/no_covariates_train.pkl`; may be a string path or a JSON array of string paths
+- `calibrating_pickle_path`: defaults to `Data/FunsearchEvaluatorData/no_covariates_test.pkl`; may be a string path or a JSON array of string paths
+- `heldout_pickle_path`: defaults to `Data/FunsearchEvaluatorData/no_covariates_heldout.pkl`; may be a string path or a JSON array of string paths
+- `output_row_tracking_path`: defaults to `Data/FunsearchEvaluatorData/output_row_tracking.pkl`; used to recover ancestry groups for the heldout rows
+- `report_file_name`: defaults to the priority-function file name with `.evaluation_report.json`, for example `best_prio.evaluation_report.json`; this file is written in the same directory as `prio_function_path`
+- `supported_ancestry_groups`: defaults to `[
+  "AA", "JA", "LA"
+]`; these are the ancestry codes accepted when parsing `source_pickle_name` values from `output_row_tracking.pkl`
+- `should_overwrite`: defaults to `true`; if the configured report file already exists, `true` forces a fresh overwrite and `false` reuses that file and computes only configured baselines that are still missing from it. If the configured report file does not exist, the full analysis runs fresh regardless.
 - `function_name`: defaults to `priority`
 - `calibration_penalties`: defaults to `[0.1, 1.0, 10.0]`
 - `calibration_partitions`: positive integer worker count or `"auto"`
@@ -113,10 +105,36 @@ Example config:
 
 ```json
 {
+  "_description": "Evaluate one produced priority function on concatenated train/calibration/heldout datasets and compare against optional baselines.",
+  "_field_docs": {
+    "prio_function_path": "Python file containing the produced priority function to evaluate.",
+    "training_pickle_path": "One .pkl path or a JSON array of .pkl paths. All listed DataFrames are concatenated to form the oracle-training dataset.",
+    "calibrating_pickle_path": "One .pkl path or a JSON array of .pkl paths. All listed DataFrames are concatenated to form the calibration dataset used to fit the final linear model.",
+    "heldout_pickle_path": "One .pkl path or a JSON array of .pkl paths. All listed DataFrames are concatenated to form the heldout evaluation dataset.",
+    "output_row_tracking_path": "Path to output_row_tracking.pkl. This links heldout rows back to source shard names so the report can compute per-ancestry heldout ROC AUC.",
+    "report_file_name": "File name for the saved clean JSON report. It is written in the same directory as prio_function_path.",
+    "supported_ancestry_groups": "Allowed ancestry codes when parsing source shard names from output_row_tracking.pkl.",
+    "should_overwrite": "If the configured report file already exists: true overwrites it with a fresh run; false reuses it and computes only configured baselines that are missing from it. If the configured report file does not exist, the full analysis runs fresh.",
+    "function_name": "Function name to load from prio_function_path. Usually priority.",
+    "calibration_penalties": "Penalty values searched when fitting the final calibration model.",
+    "calibration_partitions": "Worker count for calibration oracle feature construction. Use auto to detect visible CPUs.",
+    "scoring_partitions": "Worker count for heldout scoring oracle feature construction. Use auto to detect visible CPUs.",
+    "baselines": "Optional baseline models to run on the same heldout dataset."
+  },
   "prio_function_path": "../prio_func_disc_runs/oracle_priority_20260717_141059/cycle_0006/best_prio.py",
-  "training_pickle_path": "../Data/FunsearchEvaluatorData/no_covariates_train.pkl",
-  "calibrating_pickle_path": "../Data/FunsearchEvaluatorData/no_covariates_test.pkl",
-  "heldout_pickle_path": "../Data/FunsearchEvaluatorData/no_covariates_heldout.pkl",
+  "training_pickle_path": [
+    "../Data/FunsearchEvaluatorData/no_covariates_train.pkl"
+  ],
+  "calibrating_pickle_path": [
+    "../Data/FunsearchEvaluatorData/no_covariates_test.pkl"
+  ],
+  "heldout_pickle_path": [
+    "../Data/FunsearchEvaluatorData/no_covariates_heldout.pkl"
+  ],
+  "output_row_tracking_path": "../Data/FunsearchEvaluatorData/output_row_tracking.pkl",
+  "report_file_name": "best_prio.evaluation_report.json",
+  "supported_ancestry_groups": ["AA", "JA", "LA"],
+  "should_overwrite": false,
   "function_name": "priority",
   "calibration_penalties": [0.1, 1.0, 10.0],
   "calibration_partitions": "auto",
@@ -126,6 +144,26 @@ Example config:
       "name": "Mixture Learning",
       "enabled": true,
       "alpha": 1.0
+    },
+    {
+      "name": "Independent Learning Scheme",
+      "enabled": true,
+      "alpha": 1.0
+    },
+    {
+      "name": "TL-GDES",
+      "enabled": true,
+      "max_iter": 100,
+      "source_n_iter": 3000,
+      "min_target_n": 20
+    },
+    {
+      "name": "TL-PR",
+      "enabled": true,
+      "max_iter": 600,
+      "source_n_iter": 3000,
+      "n_lambdas": 30,
+      "cv_folds": 2
     }
   ]
 }
@@ -133,48 +171,69 @@ Example config:
 
 ## What the command produces
 
-The script produces terminal output, not a saved report file.
+The script produces both terminal output and a saved clean report file.
 
 There are two output layers:
 
 1. Progress logs with timestamps, for example dataset loading, feature-matrix construction, calibration fitting, and baseline execution.
 2. A final plain-text summary report.
+3. A clean JSON report file written in the same directory as the evaluated priority function.
 
 The final summary report has this shape:
 
 ```text
 prio_function_path=/absolute/path/to/best_prio.py
 heldout_auc_roc=0.912345
+heldout_subject_count[AA]=152
+heldout_auc_roc[AA]=0.901234
+heldout_subject_count[JA]=32
+heldout_auc_roc[JA]=0.934567
+heldout_subject_count[LA]=88
+heldout_auc_roc[LA]=0.889012
 baseline_auc_roc[Mixture Learning]=0.887654
+baseline_auc_roc[Mixture Learning][AA]=0.876543
+baseline_auc_roc[Mixture Learning][JA]=0.901234
+baseline_auc_roc[Mixture Learning][LA]=0.854321
 ```
 
-If no baselines are configured, only the first two lines are printed.
-
-The command does not currently write:
-
-- a JSON report,
-- a pickle output,
-- a plot,
-- or a new artifact directory.
-
-If you want a saved report, redirect stdout to a file at the shell level.
+The saved JSON report path is determined by two config values:
 
 Example:
 
-```bash
-PYTHONPATH=$PWD python -m PostProcesingData.evaluate_priofunction my_config.json \
-  > my_priority_function_eval.txt
-```
+- if the evaluated function is `cycle_0006/best_prio.py`
+- and `report_file_name` is `best_prio.evaluation_report.json`
+- then the clean report file is written as `cycle_0006/best_prio.evaluation_report.json`
+
+If you set `report_file_name` to some other file name, that new file name is used in the same directory as the priority function.
+
+- If the configured report file does not exist, the script runs the full evaluation fresh and writes a new report there.
+- If `should_overwrite` is `true` and the configured report file already exists, rerunning overwrites that file with a fresh evaluation.
+- If `should_overwrite` is `false` and the configured report file already exists, the script checks whether any configured baselines are missing from the existing report. Missing baselines are evaluated and appended into the report. If no configured baselines are missing, the existing report is reused.
+
+If no baselines are configured, only the first two lines are printed.
+
+The JSON report includes:
+
+- the resolved config values used for the evaluation,
+- the overall heldout ROC AUC,
+- the per-ancestry heldout ROC AUC breakdown,
+- the baseline results, including per-ancestry heldout ROC AUC when ancestry groups are available,
+- the final plain-text summary as `summary_text`.
+
+The command still does not write a pickle output, plot, or new artifact directory.
+
+If you also want a shell-captured text file containing the progress logs plus stdout summary, you can still redirect stdout manually.
 
 ## Data and model expectations
 
 The current baseline and main evaluation flow assume evaluator-ready pandas DataFrames.
 
-For the current Mixture Learning baseline in particular, the data must contain:
+For baseline-specific requirements, see:
 
-- at least one dosage column,
-- the default ancestry columns,
-- the default label column.
+- [Documentation/PriorityBaselineMixtureLearning.md](/nfs/home/adas23/projects/AlphaEvolve/Documentation/PriorityBaselineMixtureLearning.md)
+- [Documentation/PriorityBaselineIndependentLearningScheme.md](/nfs/home/adas23/projects/AlphaEvolve/Documentation/PriorityBaselineIndependentLearningScheme.md)
+- [Documentation/PriorityBaselineTLGDES.md](/nfs/home/adas23/projects/AlphaEvolve/Documentation/PriorityBaselineTLGDES.md)
+- [Documentation/PriorityBaselineTLPR.md](/nfs/home/adas23/projects/AlphaEvolve/Documentation/PriorityBaselineTLPR.md)
 
 The priority function is also validated before scoring. The script will fail early if:
 

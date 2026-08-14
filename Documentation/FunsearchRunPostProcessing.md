@@ -6,7 +6,9 @@ The post-processing entry point is [PostProcesingData/funsearch_run_postprocess.
 PYTHONPATH=$PWD python -m PostProcesingData.funsearch_run_postprocess prio_func_disc_runs/oracle_priority_20260716_050704
 ```
 
-The script first looks for a sibling `logger_*` shell-capture log whose contents mention the run directory and moves that file into the run directory. It then writes four pickle files into the same run directory.
+The script first looks for a sibling `logger_*` shell-capture log whose contents mention the run directory and moves that file into the run directory. It then writes four pickle files into the same run directory and also materializes one `best_prio.py` file inside each completed `cycle_XXXX/` directory.
+
+The `cycle_XXXX/best_prio.py` file is extracted from that cycle's `program_db_end.pkl` snapshot and represents the best priority function across islands at the end of that cycle.
 
 ## 1. `sampler_completed_priority_function_counts.pkl`
 

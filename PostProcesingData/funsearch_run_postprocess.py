@@ -63,6 +63,7 @@ class PostProcessingOutputs:
     """Paths written by run-level post-processing."""
 
     logger_path: Path | None
+    best_priority_paths: tuple[Path, ...]
     completed_priority_function_counts_path: Path
     validated_priority_function_counts_path: Path
     evaluation_completed_counts_path: Path
@@ -381,6 +382,7 @@ def postprocess_funsearch_run(run_dir: str | Path) -> PostProcessingOutputs:
 
     normalized_run_dir = _normalize_run_dir(run_dir)
     logger_path = move_corresponding_logger_file(normalized_run_dir)
+    best_priority_paths = write_cycle_best_priority_files(normalized_run_dir)
     metrics_frame = _build_sampler_metrics_dataframe(normalized_run_dir)
     configured_candidates_per_island_per_cycle = _configured_candidates_per_island_per_cycle(
         normalized_run_dir
@@ -416,6 +418,7 @@ def postprocess_funsearch_run(run_dir: str | Path) -> PostProcessingOutputs:
 
     return PostProcessingOutputs(
         logger_path=logger_path,
+        best_priority_paths=best_priority_paths,
         completed_priority_function_counts_path=completed_priority_function_counts_path,
         validated_priority_function_counts_path=validated_priority_function_counts_path,
         evaluation_completed_counts_path=evaluation_completed_counts_path,
@@ -448,6 +451,8 @@ def main(argv: list[str] | None = None) -> int:
 
     outputs = postprocess_funsearch_run(args.run_dir)
     print(f"logger_path={outputs.logger_path}")
+    for path in outputs.best_priority_paths:
+        print(f"best_priority_path={path}")
     print(
         f"completed_priority_function_counts_path={outputs.completed_priority_function_counts_path}"
     )

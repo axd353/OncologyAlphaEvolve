@@ -9,6 +9,7 @@ from sklearn.linear_model import Ridge
 from GenomicsHelpers.oracle_data_adapter import DEFAULT_ANCESTRY_FIELDS
 from GenomicsHelpers.oracle_data_adapter import DEFAULT_LABEL_FIELD
 from GenomicsHelpers.oracle_data_adapter import DOSAGE_COLUMN_PREFIX
+from PostProcesingData.prio_func_eval_baselines.types import BaselineResult
 from funsearch_pipeline.evaluation.procedure2 import _safe_roc_auc
 
 
@@ -49,11 +50,20 @@ def evaluate_mixture_learning(
     training_data: pd.DataFrame,
     calibration_data: pd.DataFrame,
     heldout_data: pd.DataFrame,
+    training_ancestry_groups: tuple[str, ...],
+    calibration_ancestry_groups: tuple[str, ...],
+    heldout_ancestry_groups: tuple[str, ...],
     options: dict[str, Any],
-) -> float:
+) -> BaselineResult:
+    del training_ancestry_groups
+    del calibration_ancestry_groups
+    del heldout_ancestry_groups
     combined_training = pd.concat([training_data, calibration_data], ignore_index=True)
     alpha = float(options.get("alpha", 1.0))
     model = Ridge(alpha=alpha)
     model.fit(_extract_features(combined_training), _extract_labels(combined_training))
     heldout_scores = model.predict(_extract_features(heldout_data))
-    return _safe_roc_auc(_extract_labels(heldout_data), heldout_scores)
+    return BaselineResult(
+        auc_roc=float(_safe_roc_auc(_extract_labels(heldout_data), heldout_scores)),
+        heldout_scores=tuple(float(value) for value in heldout_scores),
+    )
