@@ -592,6 +592,131 @@ def test_evaluate_from_config_path_uses_configured_supported_ancestry_groups(
     assert "heldout_subject_count[JA]=12" in report_text
 
 
+def test_evaluate_from_config_path_supports_multi_token_supported_ancestry_groups(
+    tmp_path: Path,
+) -> None:
+    _write_pickle(tmp_path / "train_a.pkl", _make_synthetic_oracle_frame(25))
+    _write_pickle(
+        tmp_path / "train_b.pkl",
+        _make_synthetic_oracle_frame(25, offset=25),
+    )
+    _write_pickle(
+        tmp_path / "calibration_a.pkl",
+        _make_synthetic_oracle_frame(20, offset=50),
+    )
+    _write_pickle(
+        tmp_path / "calibration_b.pkl",
+        _make_synthetic_oracle_frame(20, offset=70),
+    )
+    _write_pickle(
+        tmp_path / "heldout_a.pkl",
+        _make_synthetic_oracle_frame(12, offset=90),
+    )
+    _write_pickle(
+        tmp_path / "heldout_b.pkl",
+        _make_synthetic_oracle_frame(12, offset=102),
+    )
+    _write_tracking_pickle(
+        tmp_path / "output_row_tracking.pkl",
+        [
+            {
+                "output_pickle_name": "train_a.pkl",
+                "output_row_number": row_number,
+                "source_pickle_name": "train_African_Ancestry.pkl",
+                "source_pickle_path": "/tmp/train_African_Ancestry.pkl",
+                "source_row_number": row_number,
+            }
+            for row_number in range(25)
+        ]
+        + [
+            {
+                "output_pickle_name": "train_b.pkl",
+                "output_row_number": row_number,
+                "source_pickle_name": "train_Asian.pkl",
+                "source_pickle_path": "/tmp/train_Asian.pkl",
+                "source_row_number": row_number,
+            }
+            for row_number in range(25)
+        ]
+        + [
+            {
+                "output_pickle_name": "calibration_a.pkl",
+                "output_row_number": row_number,
+                "source_pickle_name": "train_African_Ancestry.pkl",
+                "source_pickle_path": "/tmp/train_African_Ancestry.pkl",
+                "source_row_number": row_number,
+            }
+            for row_number in range(20)
+        ]
+        + [
+            {
+                "output_pickle_name": "calibration_b.pkl",
+                "output_row_number": row_number,
+                "source_pickle_name": "train_Asian.pkl",
+                "source_pickle_path": "/tmp/train_Asian.pkl",
+                "source_row_number": row_number,
+            }
+            for row_number in range(20)
+        ]
+        + [
+            {
+                "output_pickle_name": "heldout_a.pkl",
+                "output_row_number": row_number,
+                "source_pickle_name": "test_African_Ancestry_add_covs.pkl",
+                "source_pickle_path": "/tmp/test_African_Ancestry_add_covs.pkl",
+                "source_row_number": row_number,
+            }
+            for row_number in range(12)
+        ]
+        + [
+            {
+                "output_pickle_name": "heldout_b.pkl",
+                "output_row_number": row_number,
+                "source_pickle_name": "test_Asian.pkl",
+                "source_pickle_path": "/tmp/test_Asian.pkl",
+                "source_row_number": row_number,
+            }
+            for row_number in range(12)
+        ],
+    )
+    priority_path = _write_text(
+        tmp_path / "priority.py",
+        "def priority(training_data, ancestry_coordinate, target_variant):\n"
+        "    return 10.0\n",
+    )
+    config_path = _write_text(
+        tmp_path / "config.json",
+        json.dumps(
+            {
+                "prio_function_path": "priority.py",
+                "training_pickle_path": ["train_a.pkl", "train_b.pkl"],
+                "calibrating_pickle_path": ["calibration_a.pkl", "calibration_b.pkl"],
+                "heldout_pickle_path": ["heldout_a.pkl", "heldout_b.pkl"],
+                "output_row_tracking_path": "output_row_tracking.pkl",
+                "supported_ancestry_groups": ["African_Ancestry", "Asian"],
+                "calibration_penalties": [0.1, 1.0],
+                "calibration_partitions": 1,
+                "scoring_partitions": 1,
+            },
+            indent=2,
+        ),
+    )
+
+    report = evaluate_from_config_path(config_path)
+
+    assert report.prio_function_path == priority_path
+    assert [item.ancestry_group for item in report.heldout_ancestry_evaluations] == [
+        "AFRICAN_ANCESTRY",
+        "ASIAN",
+    ]
+    assert all(item.subject_count == 12 for item in report.heldout_ancestry_evaluations)
+
+    report_text = format_report(report)
+    assert "heldout_subject_count[AFRICAN_ANCESTRY]=12" in report_text
+    assert "heldout_auc_roc[AFRICAN_ANCESTRY]=" in report_text
+    assert "heldout_subject_count[ASIAN]=12" in report_text
+
+
 def test_write_evaluation_report_file_writes_clean_json_next_to_priority_function(
     tmp_path: Path,
 ) -> None:

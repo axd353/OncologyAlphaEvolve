@@ -436,16 +436,26 @@ def _extract_ancestry_group(
     *,
     supported_ancestry_groups: tuple[str, ...],
 ) -> str:
-    match = re.search(r"_([^_./]+)(?:_add_covs)?\.pkl$", source_pickle_name, re.IGNORECASE)
-    if match is None:
-        raise ValueError(
-            "Could not infer ancestry group from source pickle name "
-            f"{source_pickle_name!r}. Expected a suffix such as train_AA.pkl or test_LA_add_covs.pkl."
-        )
-    ancestry_group = match.group(1).upper()
-    if ancestry_group not in supported_ancestry_groups:
-        raise ValueError(f"Unsupported ancestry group {ancestry_group!r} in {source_pickle_name!r}.")
-    return ancestry_group
+    normalized_source_name = Path(source_pickle_name).name
+    stem = re.sub(r"(?:_add_covs)?\.pkl$", "", normalized_source_name, flags=re.IGNORECASE)
+    normalized_stem = stem.upper()
+
+    # Match against configured ancestry names rather than assuming the ancestry
+    # is a single token after the final underscore. This keeps legacy AA/JA/LA
+    # names working and also supports names like African_Ancestry.
+    matching_groups = [
+        ancestry_group
+        for ancestry_group in supported_ancestry_groups
+        if normalized_stem == ancestry_group
+        or normalized_stem.endswith(f"_{ancestry_group}")
+    ]
+    if matching_groups:
+        return max(matching_groups, key=len)
+
+    raise ValueError(
+        "Could not infer a supported ancestry group from source pickle name "
+        f"{source_pickle_name!r}. Supported groups={list(supported_ancestry_groups)!r}."
+    )
 
 
 def _load_output_row_tracking(path: Path) -> pd.DataFrame:

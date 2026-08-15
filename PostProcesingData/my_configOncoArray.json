@@ -1,0 +1,41 @@
+{
+  "prio_function_path": "/nfs/home/adas23/projects/AlphaEvolve/prio_func_disc_runs/oracle_priority_20260810_032011/cycle_0004/best_prio.py",
+  "training_pickle_path": "../Data/FunsearchEvaluatorDataOncoArray/no_covariates_train.pkl",
+  "calibrating_pickle_path": "../Data/FunsearchEvaluatorDataOncoArray/no_covariates_test.pkl",
+  "heldout_pickle_path": "../Data/FunsearchEvaluatorDataOncoArray/no_covariates_heldout.pkl",
+  "output_row_tracking_path": "../Data/FunsearchEvaluatorDataOncoArray/output_row_tracking.pkl",
+  "report_file_name": "best_prio.oncoarray.evaluation_report.json",
+  "supported_ancestry_groups": ["AFRICAN_ANCESTRY", "ASIAN", "EUROPEAN"],
+  "should_overwrite": false,
+  "function_name": "priority",
+  "calibration_penalties": [0.1, 1.0, 10.0],
+  "calibration_partitions": "auto",
+  "scoring_partitions": "auto",
+  "baselines": [
+    {
+      "name": "Mixture Learning",
+      "enabled": true,
+      "alpha": 1.0
+    },
+    {
+      "name": "Independent Learning Scheme",
+      "enabled": true,
+      "alpha": 1.0
+    },
+    {
+      "name": "TL-GDES",
+      "enabled": true,
+      "max_iter": 100,
+      "source_n_iter": 3000,
+      "min_target_n": 20
+    },
+    {
+      "name": "TL-PR",
+      "enabled": true,
+      "max_iter": 600,
+      "source_n_iter": 3000,
+      "n_lambdas": 30,
+      "cv_folds": 2
+    }
+  ]
+}
