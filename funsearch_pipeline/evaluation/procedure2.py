@@ -15,6 +15,7 @@ import logging
 import math
 import os
 import pickle
+import time
 
 import numpy as np
 import pandas as pd
@@ -80,6 +81,36 @@ _EXPECTED_PRIORITY_PARAMETERS = (
 _DEFAULT_BOOTSTRAP_ITERATIONS = 200
 _DEFAULT_CALIBRATION_PARTITIONS = 1
 _DEFAULT_SCORING_PARTITIONS = 1
+
+
+def _write_progress_log(progress_log_path: str | Path | None, message: str) -> None:
+    if progress_log_path is None:
+        return
+
+    timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
+    try:
+        progress_path = Path(progress_log_path)
+        progress_path.parent.mkdir(parents=True, exist_ok=True)
+        with progress_path.open("a", encoding="utf-8") as handle:
+            handle.write(f"[{timestamp}] {message}\n")
+    except OSError:
+        return
+
+
+def _emit_progress(
+    message: str,
+    *,
+    progress_reporter: Callable[[str], None] | None = None,
+    progress_log_path: str | Path | None = None,
+) -> None:
+    if progress_reporter is not None:
+        progress_reporter(message)
+        return
+    _write_progress_log(progress_log_path, message)
+
+
+def _progress_row_interval(row_count: int) -> int:
+    return max(1, math.ceil(row_count / 10.0))
 
 
 @dataclass(frozen=True)
@@ -941,6 +972,9 @@ def _build_oracle_feature_matrix(
     priority_function: PriorityFunction,
     target_row_indices: Sequence[int] | None = None,
     opened_distance_cache: OpenedDistanceCache | None = None,
+    progress_reporter: Callable[[str], None] | None = None,
+    progress_log_path: str | Path | None = None,
+    progress_label: str | None = None,
 ) -> np.ndarray:
     records = list(iter_training_records(subject_data))
     resolved_target_row_indices = tuple(range(len(records))) if target_row_indices is None else tuple(
@@ -957,6 +991,17 @@ def _build_oracle_feature_matrix(
         variant_names,
     )
     priority_target_variants = _build_priority_target_variants(variant_names)
+    progress_interval = _progress_row_interval(len(records)) if progress_label is not None and records else None
+
+    if progress_label is not None:
+        _emit_progress(
+            (
+                f"{progress_label}: started pid={os.getpid()} subjects={len(records)} "
+                f"variants={len(variant_names)}"
+            ),
+            progress_reporter=progress_reporter,
+            progress_log_path=progress_log_path,
+        )
 
     for row_index, (record, target_row_index) in enumerate(zip(records, resolved_target_row_indices)):
         raw_ancestry_coordinate = read_ancestry_coordinate(record)
@@ -987,6 +1032,14 @@ def _build_oracle_feature_matrix(
                 if not math.isfinite(contribution):
                     raise ValueError("Oracle contribution must be finite.")
                 feature_matrix[row_index, column_index] = contribution
+            if progress_interval is not None:
+                processed_rows = row_index + 1
+                if processed_rows == len(records) or processed_rows % progress_interval == 0:
+                    _emit_progress(
+                        f"{progress_label}: processed_subjects={processed_rows}/{len(records)}",
+                        progress_reporter=progress_reporter,
+                        progress_log_path=progress_log_path,
+                    )
             continue
 
         with activate_distance_context(
@@ -1015,6 +1068,14 @@ def _build_oracle_feature_matrix(
                 if not math.isfinite(contribution):
                     raise ValueError("Oracle contribution must be finite.")
                 feature_matrix[row_index, column_index] = contribution
+        if progress_interval is not None:
+            processed_rows = row_index + 1
+            if processed_rows == len(records) or processed_rows % progress_interval == 0:
+                _emit_progress(
+                    f"{progress_label}: processed_subjects={processed_rows}/{len(records)}",
+                    progress_reporter=progress_reporter,
+                    progress_log_path=progress_log_path,
+                )
     return feature_matrix
 
 
@@ -1027,6 +1088,9 @@ def _build_calibration_oracle_feature_matrix(
     function_name: str,
     calibration_partitions: int,
     distance_cache_manifest_path: str | None = None,
+    progress_reporter: Callable[[str], None] | None = None,
+    progress_log_path: str | Path | None = None,
+    progress_label: str | None = None,
 ) -> np.ndarray:
     return _build_partitioned_oracle_feature_matrix(
         training_data=training_data,
@@ -1036,6 +1100,9 @@ def _build_calibration_oracle_feature_matrix(
         function_name=function_name,
         partitions=calibration_partitions,
         distance_cache_manifest_path=distance_cache_manifest_path,
+        progress_reporter=progress_reporter,
+        progress_log_path=progress_log_path,
+        progress_label=progress_label,
     )
 
 
@@ -1135,6 +1202,9 @@ def _build_partitioned_oracle_feature_matrix(
     function_name: str,
     partitions: int,
     distance_cache_manifest_path: str | None = None,
+    progress_reporter: Callable[[str], None] | None = None,
+    progress_log_path: str | Path | None = None,
+    progress_label: str | None = None,
 ) -> np.ndarray:
     partitions = max(1, partitions)
     if partitions == 1 or _dataset_length(subject_data) <= 1:
@@ -1148,11 +1218,26 @@ def _build_partitioned_oracle_feature_matrix(
             priority_function=priority_function,
             target_row_indices=tuple(range(_dataset_length(subject_data))),
             opened_distance_cache=opened_distance_cache,
+            progress_reporter=progress_reporter,
+            progress_log_path=progress_log_path,
+            progress_label=progress_label,
         )
 
     chunks = _split_data_into_chunks(subject_data, partitions)
+    chunk_sizes = [_dataset_length(chunk_data) for _, chunk_data in chunks]
+    total_subject_count = sum(chunk_sizes)
+    if progress_label is not None:
+        _emit_progress(
+            (
+                f"{progress_label}: launching_chunks={len(chunks)} total_subjects={total_subject_count} "
+                f"variants={len(variant_names)} min_chunk_subjects={min(chunk_sizes)} "
+                f"max_chunk_subjects={max(chunk_sizes)}"
+            ),
+            progress_reporter=progress_reporter,
+            progress_log_path=progress_log_path,
+        )
     with ProcessPoolExecutor(max_workers=len(chunks)) as executor:
-        futures = [
+        future_to_chunk_index = {
             executor.submit(
                 _build_partitioned_oracle_feature_matrix_worker,
                 candidate_source,
@@ -1162,10 +1247,33 @@ def _build_partitioned_oracle_feature_matrix(
                 tuple(int(index) for index in chunk_indices.tolist()),
                 tuple(variant_names),
                 distance_cache_manifest_path,
-            )
-            for chunk_indices, chunk_data in chunks
-        ]
-        return np.vstack([future.result() for future in futures])
+                progress_log_path,
+                (
+                    f"{progress_label} chunk={chunk_index + 1}/{len(chunks)}"
+                    if progress_label is not None
+                    else None
+                ),
+            ): chunk_index
+            for chunk_index, (chunk_indices, chunk_data) in enumerate(chunks)
+        }
+        ordered_results: list[np.ndarray | None] = [None] * len(chunks)
+        completed_chunks = 0
+        completed_subjects = 0
+        for future in as_completed(future_to_chunk_index):
+            chunk_index = future_to_chunk_index[future]
+            ordered_results[chunk_index] = future.result()
+            completed_chunks += 1
+            completed_subjects += chunk_sizes[chunk_index]
+            if progress_label is not None:
+                _emit_progress(
+                    (
+                        f"{progress_label}: completed_chunks={completed_chunks}/{len(chunks)} "
+                        f"completed_subjects={completed_subjects}/{total_subject_count}"
+                    ),
+                    progress_reporter=progress_reporter,
+                    progress_log_path=progress_log_path,
+                )
+        return np.vstack([result for result in ordered_results if result is not None])
 
 
 def _build_scoring_oracle_feature_matrix(
@@ -1177,6 +1285,9 @@ def _build_scoring_oracle_feature_matrix(
     function_name: str,
     scoring_partitions: int,
     distance_cache_manifest_path: str | None = None,
+    progress_reporter: Callable[[str], None] | None = None,
+    progress_log_path: str | Path | None = None,
+    progress_label: str | None = None,
 ) -> np.ndarray:
     return _build_partitioned_oracle_feature_matrix(
         training_data=training_data,
@@ -1186,6 +1297,9 @@ def _build_scoring_oracle_feature_matrix(
         function_name=function_name,
         partitions=scoring_partitions,
         distance_cache_manifest_path=distance_cache_manifest_path,
+        progress_reporter=progress_reporter,
+        progress_log_path=progress_log_path,
+        progress_label=progress_label,
     )
 
 
@@ -1197,6 +1311,8 @@ def _build_partitioned_oracle_feature_matrix_worker(
     target_row_indices: tuple[int, ...],
     variant_names: tuple[str, ...],
     distance_cache_manifest_path: str | None = None,
+    progress_log_path: str | Path | None = None,
+    progress_label: str | None = None,
 ) -> np.ndarray:
     priority_function = _load_priority_function(candidate_source, function_name)
     _validate_priority_signature(priority_function)
@@ -1208,6 +1324,8 @@ def _build_partitioned_oracle_feature_matrix_worker(
         priority_function=priority_function,
         target_row_indices=target_row_indices,
         opened_distance_cache=opened_distance_cache,
+        progress_log_path=progress_log_path,
+        progress_label=progress_label,
     )
 
 

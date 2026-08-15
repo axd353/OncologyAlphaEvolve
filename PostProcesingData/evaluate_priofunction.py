@@ -195,6 +195,33 @@ def _report_progress(message: str) -> None:
     print(f"[{timestamp}] {message}", flush=True)
 
 
+def _build_progress_reporter(progress_log_path: Path | None) -> Callable[[str], None]:
+    def _report(message: str) -> None:
+        timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
+        line = f"[{timestamp}] {message}"
+        print(line, flush=True)
+        if progress_log_path is None:
+            return
+        try:
+            progress_log_path.parent.mkdir(parents=True, exist_ok=True)
+            with progress_log_path.open("a", encoding="utf-8") as handle:
+                handle.write(line + "\n")
+        except OSError:
+            return
+
+    return _report
+
+
+def _initialize_progress_log(progress_log_path: Path | None) -> None:
+    if progress_log_path is None:
+        return
+    try:
+        progress_log_path.parent.mkdir(parents=True, exist_ok=True)
+        progress_log_path.write_text("", encoding="utf-8")
+    except OSError:
+        return
+
+
 def _visible_cpu_count() -> int:
     if hasattr(os, "sched_getaffinity"):
         try:
@@ -580,6 +607,7 @@ def evaluate_priority_function(
     *,
     baselines_to_run: tuple[BaselineSpec, ...] | None = None,
     progress_reporter: Callable[[str], None] | None = None,
+    progress_log_path: Path | None = None,
 ) -> EvaluationReport:
     report = progress_reporter or (lambda message: None)
     calibration_partitions = _resolve_partition_count(config.calibration_partitions)
@@ -665,6 +693,9 @@ def evaluate_priority_function(
         function_name=config.function_name,
         calibration_partitions=calibration_partitions,
         distance_cache_manifest_path=calibration_distance_cache_manifest,
+        progress_reporter=report,
+        progress_log_path=progress_log_path,
+        progress_label="calibration oracle features",
     )
     report(
         "Finished calibration oracle features with shape "
@@ -717,6 +748,9 @@ def evaluate_priority_function(
         function_name=config.function_name,
         scoring_partitions=scoring_partitions,
         distance_cache_manifest_path=heldout_distance_cache_manifest,
+        progress_reporter=report,
+        progress_log_path=progress_log_path,
+        progress_label="heldout oracle features",
     )
     report(
         "Finished heldout oracle features with shape "
@@ -801,11 +835,13 @@ def evaluate_from_config_path(
     *,
     baselines_to_run: tuple[BaselineSpec, ...] | None = None,
     progress_reporter: Callable[[str], None] | None = None,
+    progress_log_path: Path | None = None,
 ) -> EvaluationReport:
     return evaluate_priority_function(
         load_evaluation_config(config_path),
         baselines_to_run=baselines_to_run,
         progress_reporter=progress_reporter,
+        progress_log_path=progress_log_path,
     )
 
 
@@ -943,6 +979,16 @@ def _missing_baselines(
 def main(argv: Sequence[str] | None = None) -> int:
     args = parse_args(argv)
     config = load_evaluation_config(args.config_path)
+    cache_root = config.distance_cache_dir or _default_distance_cache_dir_for_priority_function(
+        config.prio_function_path
+    )
+    progress_log_path = cache_root / "evaluate_priofunction.progress.log"
+    _initialize_progress_log(progress_log_path)
+    progress_reporter = _build_progress_reporter(progress_log_path)
+    progress_reporter(
+        f"Starting evaluate_priofunction for config={Path(args.config_path).expanduser().resolve()}"
+    )
+    progress_reporter(f"Progress log path={progress_log_path}")
     report_path = report_output_path_for_priority_function(
         config.prio_function_path,
         config.report_file_name,
@@ -950,7 +996,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     if config.should_overwrite or not report_path.exists():
         report = evaluate_priority_function(
             config,
-            progress_reporter=_report_progress,
+            progress_reporter=progress_reporter,
+            progress_log_path=progress_log_path,
         )
     else:
         existing_report = load_existing_evaluation_report(report_path)
@@ -961,18 +1008,19 @@ def main(argv: Sequence[str] | None = None) -> int:
             )
         missing_baselines = _missing_baselines(config.baselines, existing_report)
         if missing_baselines:
-            _report_progress(
+            progress_reporter(
                 "Existing report found with missing baselines: "
                 + ", ".join(normalize_baseline_name(baseline.name) for baseline in missing_baselines)
             )
             additional_report = evaluate_priority_function(
                 config,
                 baselines_to_run=missing_baselines,
-                progress_reporter=_report_progress,
+                progress_reporter=progress_reporter,
+                progress_log_path=progress_log_path,
             )
             report = merge_evaluation_reports(existing_report, additional_report)
         else:
-            _report_progress(
+            progress_reporter(
                 f"Existing report already contains all configured baselines; reusing {report_path}"
             )
             report = existing_report
