@@ -26,6 +26,75 @@ The priority function itself is not directly compared on raw dosage values alone
 
 In code, this flow is driven by [PostProcesingData/evaluate_priofunction.py](/nfs/home/adas23/projects/AlphaEvolve/PostProcesingData/evaluate_priofunction.py) and the Procedure 2 helpers in [funsearch_pipeline/evaluation/procedure2.py](/nfs/home/adas23/projects/AlphaEvolve/funsearch_pipeline/evaluation/procedure2.py).
 
+## Proposed ancestry-distance cache
+
+This section describes the implemented ancestry-distance cache used by the heldout evaluator.
+
+Oracle feature construction now caches ancestry distances for each target subject. For one target subject, the priority-function radius may differ by variant, but the Euclidean distance from that subject to each reference subject is independent of the variant. The same distance vector can therefore be shared by all variants without changing the evaluator's mathematical definition.
+
+The postprocessing flow needs two separate reference/target combinations:
+
+1. Calibration distances: rows from `calibrating_pickle_path` are targets and rows from `training_pickle_path` are references.
+2. Heldout distances: rows from `heldout_pickle_path` are targets and the ordered concatenation `training_pickle_path + calibrating_pickle_path` is the reference data.
+
+The cache artifacts are two-dimensional arrays, not variant tensors:
+
+```text
+calibration_distances.shape = (number of calibration rows, number of training rows)
+heldout_distances.shape = (number of heldout rows, number of training + calibration rows)
+```
+
+An aligned matrix of sorted reference-row indices is also persisted. A priority helper can then reuse one sorted ancestry order for every variant of the target subject. Neighborhood membership remains variant-specific because each priority-function call can choose a different radius.
+
+### Cache location and opt-out
+
+Input pickle files do not need to be in the same directory. The heldout evaluator accepts these optional config fields:
+
+- `distance_cache_enabled`: defaults to `true`; set it to `false` to force the old uncached behavior
+- `distance_cache_dir`: optional path override; by default caches are written under `prio_function_path.parent / distance_cache`
+
+Cache placement therefore does not depend on finding a common parent directory among the input files.
+
+Each cache entry must be keyed by the ordered reference and target datasets, not just their file names. The cache manifest should record:
+
+- schema and implementation version
+- distance dtype and ancestry-column order
+- ordered, resolved source paths
+- source file sizes, modification times, and content fingerprints
+- ordered row counts and row-identity fingerprints after concatenation and imputation
+- reference composition, including the fact that heldout uses training rows followed by calibration rows
+
+In the current implementation, the file names themselves are keyed by hashes of the ordered reference and target ancestry matrices plus the phase name. If the rows or their order change, a different cache file name is produced and a fresh cache is built. This prevents silently applying distances to the wrong subjects when files are moved, replaced, reordered, or regenerated.
+
+### CPU and GPU construction
+
+The current implementation uses vectorized NumPy on CPU. The current datasets have only 16 ancestry dimensions, so the arithmetic per distance is small and transferring data to a GPU may cost more than the calculation itself. The persistent cache also means distance construction happens once while feature evaluation is repeated many times.
+
+An optional PyTorch CUDA builder may still be considered later, with all of these conditions:
+
+- select CUDA only when `torch.cuda.is_available()` is true
+- use chunked `torch.cdist` so device memory is bounded
+- copy the final array to the same CPU cache format used by the NumPy path
+- fall back to NumPy when CUDA is absent or initialization fails
+- demonstrate a wall-time improvement on the compute node before becoming the default
+
+Multiple partition workers must not independently construct the same cache on one GPU. Cache construction should happen once before partition workers start, with atomic publication of the completed artifact.
+
+### Verification
+
+The repository now includes cached-versus-uncached equivalence tests on smoke data, and a standalone verifier for larger compute-node checks. Verification compares:
+
+- calibration and heldout distance matrices against direct scalar distance calculations
+- neighborhood membership at radius boundaries
+- oracle feature matrices
+- selected calibration penalty
+- per-fold direct and bootstrap ROC AUC values
+- final fold-score ordering and mean score
+
+The same candidate source, random seeds, folds, row order, bootstrap seeds, and floating-point dtype must be used on both paths. Fold scores should be exactly equal when the cached distances are computed with equivalent operations; otherwise the test must use a documented tight tolerance and explicitly check boundary memberships.
+
+For larger runs, use [verify_distance_cache_equivalence.py](/nfs/home/adas23/projects/AlphaEvolve/verify_distance_cache_equivalence.py). It compares cached and uncached outputs for the Procedure 2 evaluator slice and for the standalone heldout evaluator.
+
 ## What counts as the comparison target
 
 The reported number for the produced priority function is:
@@ -90,6 +159,8 @@ Common optional fields:
 - `calibration_penalties`: defaults to `[0.1, 1.0, 10.0]`
 - `calibration_partitions`: positive integer worker count or `"auto"`
 - `scoring_partitions`: positive integer worker count or `"auto"`
+- `distance_cache_enabled`: defaults to `true`; set to `false` to disable persistent ancestry-distance caches
+- `distance_cache_dir`: optional path override for the cache root directory
 - `baselines`: list of baseline entries to run in addition to the produced priority function
 
 Each baseline entry may be either:
@@ -139,6 +210,7 @@ Example config:
   "calibration_penalties": [0.1, 1.0, 10.0],
   "calibration_partitions": "auto",
   "scoring_partitions": "auto",
+  "distance_cache_enabled": true,
   "baselines": [
     {
       "name": "Mixture Learning",

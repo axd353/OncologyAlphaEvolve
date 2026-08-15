@@ -160,6 +160,60 @@ When that evaluated candidate is registered into an island, the program database
 
 When the evaluator moves from calibration to scoring, it uses the combined `oracle_train.pkl + calibration_i.pkl` data to estimate marginal effect sizes for the scoring subjects. The scoring split itself is only used for the final personalized-risk scoring and AUC calculation.
 
+## Repeated ancestry-distance work and proposed caching
+
+This section documents a verified performance opportunity and a proposed implementation. The cache is not implemented yet.
+
+For every target row, `_build_oracle_feature_matrix(...)` iterates over every dosage variant. For each variant it calls the candidate priority function and then `effect_size_calculator(...)`. The current effect-size path scans every reference record and recomputes the Euclidean ancestry distance to the target row. Consequently, the same target-to-reference distances are recomputed once per variant even though only the chosen radius and dosage column are variant-specific.
+
+Candidate priority functions can add further repeated work. Priority helper functions that form ancestry intervals, cumulative balls, or novelty scores independently scan and sort the same target-to-reference distances. A reusable sorted order is therefore useful to both the final effect-size calculation and the supported priority helpers.
+
+### Exact reference data by phase
+
+Distance caches must preserve the evaluator's current ordered data composition:
+
+1. Calibration for pair `p`, fold `i`: targets are `calibration_i.pkl`; references are `oracle_train.pkl`.
+2. Scoring for pair `p`, fold `i`: targets are `scoring_i.pkl`; references are `oracle_train.pkl` followed by `calibration_i.pkl` in that exact order.
+
+Preparation concatenates source pickle shards in config order using `pandas.concat(..., ignore_index=True)`. It creates folds from a deterministic seeded permutation. Each selected fold resets its DataFrame index but preserves the order of the selected row indices. Evaluation later reads those persisted artifacts without reordering them. Therefore row order is stable across candidate evaluations within a run, but it differs by pair and fold and must be part of cache identity.
+
+The prepared artifacts are reused for every priority-function candidate in the experiment. Distances can therefore be computed once per `(pair, fold, phase)` and reused across all islands, cycles, candidates, and variants. A fold cache must never be reused for another fold solely because its arrays have the same shape.
+
+### Implemented artifact layout
+
+The pipeline stores cache artifacts under the prepared pair directory by default, adjacent to the corresponding `oracle_train.pkl`, `calibration_i.pkl`, and `scoring_i.pkl` files. You can override the root with `evaluator.distance_cache_dir`, or disable the feature with `evaluator.distance_cache_enabled = false`. For each fold, it persists files of the form:
+
+```text
+calibration_i.distances.npy
+calibration_i.sorted_indices.npy
+scoring_i.distances.npy
+scoring_i.sorted_indices.npy
+distance_cache_manifest.json
+```
+
+The distance arrays are two-dimensional because ancestry distance does not have a variant axis. `float64` preserves the current scalar-distance precision. Sorted indices use `int32` today. Partition workers memory-map these read-only arrays rather than pickle and copy them into every process.
+
+The manifest records hashes of the ordered target and reference ancestry matrices, ancestry dimension, cache schema version, and the novelty baseline median needed by `ancestry_novelty_score`. Calibration references are distinct from scoring references because scoring uses the ordered concatenation `oracle_train.pkl + calibration_i.pkl`.
+
+### CPU versus GPU
+
+Vectorized NumPy is the current implementation. For the smoke and current production dimensions, ancestry has only 16 columns; CPU vectorization avoids Python record loops and is fast enough to justify the extra artifact write once per fold. It also avoids adding PyTorch as a required evaluator dependency.
+
+GPU construction should be optional rather than automatic based only on installation. A CUDA path can use chunked `torch.cdist` when `torch.cuda.is_available()` is true, but it must write the same CPU `.npy` format and produce equivalent neighborhood membership. GPU transfer, initialization, shared-cluster policy, and contention from multiple pair workers can outweigh the small amount of arithmetic. Only a compute-node benchmark should decide whether CUDA is beneficial.
+
+### Compatibility and validation requirements
+
+The optimized path retains an uncached fallback. When `distance_cache_enabled` is `false`, the evaluator behaves as before. The test suite runs cached and uncached comparisons on smoke data and checks:
+
+- fold construction and ordered row identities
+- direct distances and sorted indices
+- radius-boundary neighborhood membership
+- calibration and scoring oracle feature matrices
+- selected ridge penalty
+- direct AUC, bootstrap median AUC, every fold score, and mean score
+
+For larger verification on real compute nodes, use [verify_distance_cache_equivalence.py](/nfs/home/adas23/projects/AlphaEvolve/verify_distance_cache_equivalence.py). It compares cached and uncached fold scores for the Procedure 2 evaluator slice, and cached and uncached heldout AUC values for the standalone heldout evaluator.
+
 ## Where each score comes from
 
 ### Fold score

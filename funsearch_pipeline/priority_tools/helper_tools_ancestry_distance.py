@@ -5,6 +5,8 @@ import math
 from numbers import Integral
 from numbers import Real
 
+from GenomicsHelpers.ancestry_distance_cache import get_active_priority_distance_context
+
 from .contracts import PriorityAncestryCoordinate
 from .contracts import PriorityTrainingData
 
@@ -92,6 +94,10 @@ def _sorted_ancestry_distances(
 
     _validated_sample_count(training_data)
     _validate_ancestry_shapes(training_data, ancestry_coordinate)
+    active_context = get_active_priority_distance_context(training_data, ancestry_coordinate)
+    if active_context is not None:
+        return tuple(float(value) for value in active_context.target_distance_view.sorted_distances())
+
     target_values = ancestry_coordinate.values
     distances: list[float] = []
     for record_index, record in enumerate(training_data.records):

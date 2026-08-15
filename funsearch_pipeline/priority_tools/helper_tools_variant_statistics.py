@@ -13,6 +13,7 @@ from GenomicsHelpers.effect_size_calculator import estimate_marginal_logistic_ef
 from GenomicsHelpers.effect_size_calculator import fit_logistic_regression_newton
 from GenomicsHelpers.effect_size_calculator import impute_missing_genotype_values
 from GenomicsHelpers.effect_size_calculator import sigmoid
+from GenomicsHelpers.ancestry_distance_cache import get_active_priority_distance_context
 
 from .contracts import PriorityAncestryCoordinate
 from .contracts import PriorityTargetVariant
@@ -87,6 +88,16 @@ def _sorted_records_with_distances(
 
     _validated_sample_count(training_data)
     _validate_ancestry_shapes(training_data, ancestry_coordinate)
+    active_context = get_active_priority_distance_context(training_data, ancestry_coordinate)
+    if active_context is not None:
+        return tuple(
+            (
+                float(active_context.target_distance_view.distances[int(record_index)]),
+                training_data.records[int(record_index)],
+            )
+            for record_index in active_context.target_distance_view.sorted_reference_indices
+        )
+
     target_values = ancestry_coordinate.values
     record_distances: list[tuple[float, PriorityTrainingRecord]] = []
     for record_index, record in enumerate(training_data.records):
@@ -115,6 +126,11 @@ def _sorted_distances_to_values(
         raise ValueError(
             "training_data.ancestry_dimension must match the target ancestry dimension."
         )
+
+    if skip_record_index is None:
+        active_context = get_active_priority_distance_context(training_data, target_values)
+        if active_context is not None:
+            return tuple(float(value) for value in active_context.target_distance_view.sorted_distances())
 
     distances: list[float] = []
     for record_index, record in enumerate(training_data.records):
@@ -591,6 +607,18 @@ def _ancestry_novelty_score(
         ancestry_coordinate.values,
         percentage=percentage,
     )
+
+    active_context = get_active_priority_distance_context(training_data, ancestry_coordinate)
+    if (
+        active_context is not None
+        and percentage == _DEFAULT_NOVELTY_PERCENTAGE
+        and baseline_sample_size == _DEFAULT_NOVELTY_BASELINE_SAMPLE_SIZE
+        and active_context.novelty_baseline_median is not None
+    ):
+        baseline_median = float(active_context.novelty_baseline_median)
+        if baseline_median <= 0.0:
+            return 1.0 if target_radius <= 0.0 else float(target_radius)
+        return float(target_radius / baseline_median)
 
     sample_count = len(training_data.records)
     sampled_indices = list(range(sample_count))

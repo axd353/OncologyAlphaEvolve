@@ -69,7 +69,7 @@
     "metric": "roc_auc",
     "oracle_train_fraction": 0.8,
     "preprocessed_dirname": "preprocessed",
-    "num_folds": 5,
+    "num_folds": 2,
     "calibration_penalties": [0.1, 1.0, 10.0],
     "calibration_partitions": 5,
     "scoring_partitions": 5,

@@ -23,6 +23,7 @@ from funsearch_pipeline.evaluation.procedure2 import _load_priority_function
 from funsearch_pipeline.evaluation.procedure2 import _predict_linear_score
 from funsearch_pipeline.evaluation.procedure2 import _safe_roc_auc
 from funsearch_pipeline.evaluation.procedure2 import _validate_priority_signature
+from GenomicsHelpers.ancestry_distance_cache import ensure_distance_cache
 
 from PostProcesingData.prio_func_eval_baselines import evaluate_baseline
 from PostProcesingData.prio_func_eval_baselines import BaselineResult
@@ -67,6 +68,8 @@ class EvaluationConfig:
     calibration_penalties: tuple[float, ...]
     calibration_partitions: int | None
     scoring_partitions: int | None
+    distance_cache_enabled: bool
+    distance_cache_dir: Path | None
     baselines: tuple[BaselineSpec, ...]
 
 
@@ -106,6 +109,8 @@ def _config_to_payload(config: EvaluationConfig) -> dict[str, Any]:
         "calibration_penalties": list(config.calibration_penalties),
         "calibration_partitions": config.calibration_partitions,
         "scoring_partitions": config.scoring_partitions,
+        "distance_cache_enabled": config.distance_cache_enabled,
+        "distance_cache_dir": str(config.distance_cache_dir) if config.distance_cache_dir is not None else None,
         "baselines": [
             {
                 "name": baseline.name,
@@ -160,6 +165,10 @@ def report_output_path_for_priority_function(
         prio_function_path
     )
     return prio_function_path.parent / resolved_report_file_name
+
+
+def _default_distance_cache_dir_for_priority_function(prio_function_path: Path) -> Path:
+    return prio_function_path.parent / "distance_cache"
 
 
 def write_evaluation_report_file(
@@ -405,6 +414,12 @@ def load_evaluation_config(config_path: str | Path) -> EvaluationConfig:
             raw_config.get("scoring_partitions", "auto"),
             field_name="scoring_partitions",
         ),
+        distance_cache_enabled=bool(raw_config.get("distance_cache_enabled", True)),
+        distance_cache_dir=(
+            _resolve_path(base_dir, str(raw_config["distance_cache_dir"]))
+            if raw_config.get("distance_cache_dir")
+            else None
+        ),
         baselines=baselines,
     )
 
@@ -576,6 +591,9 @@ def evaluate_priority_function(
         f"visible_cpus={visible_cpu_count} calibration_workers={calibration_partitions} "
         f"scoring_workers={scoring_partitions}"
     )
+    cache_root = config.distance_cache_dir or _default_distance_cache_dir_for_priority_function(
+        config.prio_function_path
+    )
     program_source = config.prio_function_path.read_text()
     priority_function = _load_priority_function(program_source, config.function_name)
     _validate_priority_signature(priority_function)
@@ -622,6 +640,20 @@ def evaluate_priority_function(
     report(f"Found {len(variant_names)} dosage variants in training data")
 
     calibration_labels = _extract_labels(calibration_data)
+    calibration_distance_cache_manifest = None
+    if config.distance_cache_enabled:
+        report(f"Preparing calibration distance cache under {cache_root}")
+        calibration_cache = ensure_distance_cache(
+            reference_data=training_data,
+            target_data=calibration_data,
+            cache_root=cache_root,
+            cache_name="postprocessing.calibration",
+            reference_source_paths=tuple(str(path) for path in config.training_pickle_paths),
+            target_source_paths=tuple(str(path) for path in config.calibrating_pickle_paths),
+        )
+        calibration_distance_cache_manifest = (
+            calibration_cache.manifest_path if calibration_cache is not None else None
+        )
     report(
         "Building calibration oracle features; this is often the first long-running step"
     )
@@ -632,6 +664,7 @@ def evaluate_priority_function(
         candidate_source=program_source,
         function_name=config.function_name,
         calibration_partitions=calibration_partitions,
+        distance_cache_manifest_path=calibration_distance_cache_manifest,
     )
     report(
         "Finished calibration oracle features with shape "
@@ -658,6 +691,20 @@ def evaluate_priority_function(
 
     oracle_training_for_heldout = _combine_data_objects([training_data, calibration_data])
     heldout_labels = _extract_labels(heldout_data)
+    heldout_distance_cache_manifest = None
+    if config.distance_cache_enabled:
+        report(f"Preparing heldout distance cache under {cache_root}")
+        heldout_cache = ensure_distance_cache(
+            reference_data=oracle_training_for_heldout,
+            target_data=heldout_data,
+            cache_root=cache_root,
+            cache_name="postprocessing.heldout",
+            reference_source_paths=tuple(
+                str(path) for path in config.training_pickle_paths + config.calibrating_pickle_paths
+            ),
+            target_source_paths=tuple(str(path) for path in config.heldout_pickle_paths),
+        )
+        heldout_distance_cache_manifest = heldout_cache.manifest_path if heldout_cache is not None else None
     report(
         "Building heldout oracle features using training + calibration data; "
         "this is often the slowest step"
@@ -669,6 +716,7 @@ def evaluate_priority_function(
         candidate_source=program_source,
         function_name=config.function_name,
         scoring_partitions=scoring_partitions,
+        distance_cache_manifest_path=heldout_distance_cache_manifest,
     )
     report(
         "Finished heldout oracle features with shape "

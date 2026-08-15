@@ -96,6 +96,8 @@ class EvaluatorSettings:
     bootstrap_iterations: int
     dataset_pairs: tuple[DatasetPairConfig, ...]
     num_folds: int = 2
+    distance_cache_enabled: bool = True
+    distance_cache_dir: Path | None = None
 
 
 @dataclass(frozen=True)
@@ -324,6 +326,12 @@ def load_pipeline_config(config_path: str | Path) -> PipelineConfig:
             bootstrap_iterations=int(evaluator_section.get("bootstrap_iterations", 200)),
             dataset_pairs=_parse_dataset_pairs(base_dir, evaluator_section),
             num_folds=int(evaluator_section.get("num_folds", 2)),
+            distance_cache_enabled=bool(evaluator_section.get("distance_cache_enabled", True)),
+            distance_cache_dir=(
+                _resolve_path(base_dir, str(evaluator_section["distance_cache_dir"]))
+                if evaluator_section.get("distance_cache_dir")
+                else None
+            ),
         ),
         logging=LoggingSettings(level=str(logging_section.get("level", "INFO"))),
         priority_tools=PriorityToolsSettings(

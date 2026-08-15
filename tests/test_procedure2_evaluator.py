@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from pathlib import Path
 
 import numpy as np
@@ -31,6 +32,16 @@ def _write_pickle(path: Path, data_frame: pd.DataFrame) -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
     data_frame.to_pickle(path)
     return path
+
+
+def _helper_based_priority_source() -> str:
+    return (
+        "def priority(training_data, ancestry_coordinate, target_variant):\n"
+        "    near_radius = radius_for_percentage(training_data, ancestry_coordinate, 50.0)\n"
+        "    far_radius = radius_for_percentage(training_data, ancestry_coordinate, 75.0)\n"
+        "    novelty = ancestry_novelty_score(training_data, ancestry_coordinate)\n"
+        "    return far_radius if novelty > 1.5 else near_radius\n"
+    )
 
 
 def test_procedure2_evaluator_scores_seed_priority_function(tmp_path: Path) -> None:
@@ -335,3 +346,85 @@ def test_impute_missing_feature_columns_handles_nullable_covariates() -> None:
     # categorical covariates use the mode of the observed codes.
     assert imputed.loc[2, "bmi_cat"] == 1.0
     assert imputed.loc[0, "current_smoking"] == 0.0
+
+
+def test_procedure2_distance_cache_matches_uncached_scores(tmp_path: Path) -> None:
+    train_path = _write_pickle(tmp_path / "train.pkl", _make_synthetic_oracle_frame(80))
+    test_path = _write_pickle(
+        tmp_path / "test.pkl",
+        _make_synthetic_oracle_frame(40, offset=80),
+    )
+    database = CycleProgramsDatabase.from_seed_program_text(
+        settings=ProgramDatabaseSettings(
+            functions_per_prompt=2,
+            num_islands=2,
+            cluster_sampling_temperature_init=0.1,
+            cluster_sampling_temperature_period=100,
+        ),
+        seed_program_text=_helper_based_priority_source(),
+        function_to_evolve="priority",
+    )
+    candidate = database.build_seed_candidate()
+    base_settings = EvaluatorSettings(
+        backend="procedure2",
+        metric="roc_auc",
+        oracle_train_fraction=0.8,
+        preprocessed_dirname="preprocessed",
+        calibration_penalties=(0.1, 1.0),
+        calibration_partitions=2,
+        scoring_partitions=2,
+        bootstrap_iterations=10,
+        dataset_pairs=(
+            DatasetPairConfig(
+                name="no_covariates",
+                has_additional_covariates=False,
+                training_pickles=(train_path,),
+                testing_pickles=(test_path,),
+            ),
+        ),
+        distance_cache_enabled=False,
+    )
+
+    uncached_evaluator = Procedure2PriorityEvaluator(
+        settings=base_settings,
+        function_name="priority",
+    )
+    uncached_evaluator.prepare(tmp_path / "uncached")
+    uncached_result = uncached_evaluator.evaluate_candidate(candidate)
+
+    cached_evaluator = Procedure2PriorityEvaluator(
+        settings=replace(
+            base_settings,
+            distance_cache_enabled=True,
+            distance_cache_dir=tmp_path / "distance_cache",
+        ),
+        function_name="priority",
+    )
+    cached_evaluator.prepare(tmp_path / "cached")
+    cached_result = cached_evaluator.evaluate_candidate(candidate)
+
+    assert uncached_result is not None
+    assert cached_result is not None
+
+    uncached_scores = uncached_result.scores_per_test()
+    cached_scores = cached_result.scores_per_test()
+    assert list(cached_scores) == list(uncached_scores)
+    for score_name in uncached_scores:
+        assert np.isclose(cached_scores[score_name], uncached_scores[score_name])
+
+    uncached_fold_metadata = uncached_result.metadata["procedure2_pairs"]["no_covariates"]["folds"]
+    cached_fold_metadata = cached_result.metadata["procedure2_pairs"]["no_covariates"]["folds"]
+    for fold_name, uncached_metadata in uncached_fold_metadata.items():
+        cached_metadata = cached_fold_metadata[fold_name]
+        assert cached_metadata["selected_calibration_penalty"] == uncached_metadata["selected_calibration_penalty"]
+        assert np.isclose(cached_metadata["direct_auc"], uncached_metadata["direct_auc"])
+        assert np.isclose(
+            cached_metadata["bootstrap_auc_median"],
+            uncached_metadata["bootstrap_auc_median"],
+        )
+
+    cached_fold = cached_evaluator.prepared_pairs[0].fold_artifacts[0]
+    assert cached_fold.calibration_distance_cache_manifest is not None
+    assert cached_fold.scoring_distance_cache_manifest is not None
+    assert Path(cached_fold.calibration_distance_cache_manifest).exists()
+    assert Path(cached_fold.scoring_distance_cache_manifest).exists()

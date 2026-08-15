@@ -4,6 +4,7 @@ from concurrent.futures import ProcessPoolExecutor
 from concurrent.futures import as_completed
 from dataclasses import asdict
 from dataclasses import dataclass
+from dataclasses import replace
 from pathlib import Path
 from typing import Any, Callable, Sequence
 import ast
@@ -39,6 +40,10 @@ from funsearch_pipeline.priority_tools.contracts import PriorityTargetVariant
 from funsearch_pipeline.priority_tools.contracts import PriorityTrainingData
 from funsearch_pipeline.priority_tools.contracts import PriorityTrainingRecord
 from funsearch_pipeline.program_database.database import CandidateProgram
+from GenomicsHelpers.ancestry_distance_cache import activate_distance_context
+from GenomicsHelpers.ancestry_distance_cache import ensure_distance_cache
+from GenomicsHelpers.ancestry_distance_cache import load_distance_cache
+from GenomicsHelpers.ancestry_distance_cache import OpenedDistanceCache
 
 
 PriorityFunction = Callable[
@@ -82,6 +87,8 @@ class PreparedFoldArtifacts:
     fold_index: int
     calibration_pickle: str
     scoring_pickle: str
+    calibration_distance_cache_manifest: str | None = None
+    scoring_distance_cache_manifest: str | None = None
 
 
 @dataclass(frozen=True)
@@ -171,8 +178,9 @@ class Procedure2PriorityEvaluator:
         preprocessed_root = experiment_dir / self._settings.preprocessed_dirname
         preprocessed_root.mkdir(parents=True, exist_ok=True)
         manifest_path = preprocessed_root / "procedure2_layout.json"
+        loaded_from_manifest = manifest_path.exists()
 
-        if manifest_path.exists():
+        if loaded_from_manifest:
             manifest_num_folds, prepared_pairs = _load_prepared_pairs_manifest(manifest_path)
             if manifest_num_folds != self._settings.num_folds:
                 raise ValueError(
@@ -180,13 +188,22 @@ class Procedure2PriorityEvaluator:
                     f"manifest={manifest_num_folds} config={self._settings.num_folds}."
                 )
             self._prepared_pairs = prepared_pairs
-            return
+        else:
+            prepared_pairs: list[PreparedDatasetPair] = []
+            for dataset_pair in self._settings.dataset_pairs:
+                prepared_pairs.append(self._prepare_pair(preprocessed_root, dataset_pair))
+            self._prepared_pairs = tuple(prepared_pairs)
 
-        prepared_pairs: list[PreparedDatasetPair] = []
-        for dataset_pair in self._settings.dataset_pairs:
-            prepared_pairs.append(self._prepare_pair(preprocessed_root, dataset_pair))
+        if getattr(self._settings, "distance_cache_enabled", True):
+            self._prepared_pairs = tuple(
+                self._prepare_distance_caches_for_prepared_pair(prepared_pair)
+                for prepared_pair in self._prepared_pairs
+            )
 
-        self._prepared_pairs = tuple(prepared_pairs)
+        if not loaded_from_manifest or getattr(self._settings, "distance_cache_enabled", True):
+            self._write_prepared_pairs_manifest(manifest_path)
+
+    def _write_prepared_pairs_manifest(self, manifest_path: Path) -> None:
         manifest_path.write_text(
             json.dumps(
                 {
@@ -322,6 +339,40 @@ class Procedure2PriorityEvaluator:
                 )
         return prepared_pair
 
+    def _prepare_distance_caches_for_prepared_pair(
+        self,
+        prepared_pair: PreparedDatasetPair,
+    ) -> PreparedDatasetPair:
+        if not getattr(self._settings, "distance_cache_enabled", True):
+            return prepared_pair
+
+        oracle_train = _read_pickle(prepared_pair.oracle_train_pickle)
+        if not isinstance(oracle_train, pd.DataFrame):
+            return prepared_pair
+
+        updated_folds: list[PreparedFoldArtifacts] = []
+        for fold_artifact in prepared_pair.fold_artifacts:
+            calibration = _read_pickle(fold_artifact.calibration_pickle)
+            scoring = _read_pickle(fold_artifact.scoring_pickle)
+            scoring_reference = _combine_data_objects([oracle_train, calibration])
+            calibration_manifest, scoring_manifest = _ensure_prepared_fold_distance_caches(
+                settings=self._settings,
+                prepared_pair=prepared_pair,
+                fold_artifact=fold_artifact,
+                oracle_train=oracle_train,
+                calibration=calibration,
+                scoring=scoring,
+                scoring_reference=scoring_reference,
+            )
+            updated_folds.append(
+                replace(
+                    fold_artifact,
+                    calibration_distance_cache_manifest=calibration_manifest,
+                    scoring_distance_cache_manifest=scoring_manifest,
+                )
+            )
+        return replace(prepared_pair, fold_artifacts=tuple(updated_folds))
+
     def evaluate_candidate(self, candidate: CandidateProgram) -> EvaluatedCandidate | None:
         """Evaluate one candidate with Procedure 2 oracle calibration.
 
@@ -448,6 +499,19 @@ def _evaluate_prepared_pair(
     for fold_artifact in prepared_pair.fold_artifacts:
         calibration = _read_pickle(fold_artifact.calibration_pickle)
         scoring = _read_pickle(fold_artifact.scoring_pickle)
+        oracle_training_for_scoring = _combine_data_objects([oracle_train, calibration])
+        calibration_distance_cache_manifest = fold_artifact.calibration_distance_cache_manifest
+        scoring_distance_cache_manifest = fold_artifact.scoring_distance_cache_manifest
+        if getattr(settings, "distance_cache_enabled", True):
+            calibration_distance_cache_manifest, scoring_distance_cache_manifest = _ensure_prepared_fold_distance_caches(
+                settings=settings,
+                prepared_pair=prepared_pair,
+                fold_artifact=fold_artifact,
+                oracle_train=oracle_train,
+                calibration=calibration,
+                scoring=scoring,
+                scoring_reference=oracle_training_for_scoring,
+            )
 
         calibration_labels = _extract_labels(calibration)
         calibration_oracle_features = _build_calibration_oracle_feature_matrix(
@@ -459,6 +523,7 @@ def _evaluate_prepared_pair(
             calibration_partitions=int(
                 getattr(settings, "calibration_partitions", _DEFAULT_CALIBRATION_PARTITIONS)
             ),
+            distance_cache_manifest_path=calibration_distance_cache_manifest,
         )
         calibration_covariates = _extract_covariates(
             calibration,
@@ -470,8 +535,6 @@ def _evaluate_prepared_pair(
             labels=calibration_labels,
             penalties=settings.calibration_penalties,
         )
-
-        oracle_training_for_scoring = _combine_data_objects([oracle_train, calibration])
         scoring_labels = _extract_labels(scoring)
         scoring_oracle_features = _build_scoring_oracle_feature_matrix(
             training_data=oracle_training_for_scoring,
@@ -482,6 +545,7 @@ def _evaluate_prepared_pair(
             scoring_partitions=int(
                 getattr(settings, "scoring_partitions", _DEFAULT_SCORING_PARTITIONS)
             ),
+            distance_cache_manifest_path=scoring_distance_cache_manifest,
         )
         scoring_covariates = _extract_covariates(
             scoring,
@@ -525,6 +589,8 @@ def _evaluate_prepared_pair(
                     "used_additional_covariates": prepared_pair.has_additional_covariates,
                     "calibration_pickle": fold_artifact.calibration_pickle,
                     "scoring_pickle": fold_artifact.scoring_pickle,
+                    "calibration_distance_cache_manifest": calibration_distance_cache_manifest,
+                    "scoring_distance_cache_manifest": scoring_distance_cache_manifest,
                 },
             )
         )
@@ -556,6 +622,16 @@ def _load_prepared_pairs_manifest(manifest_path: Path) -> tuple[int, tuple[Prepa
                     fold_index=int(raw_fold["fold_index"]),
                     calibration_pickle=str(raw_fold["calibration_pickle"]),
                     scoring_pickle=str(raw_fold["scoring_pickle"]),
+                    calibration_distance_cache_manifest=(
+                        str(raw_fold["calibration_distance_cache_manifest"])
+                        if raw_fold.get("calibration_distance_cache_manifest")
+                        else None
+                    ),
+                    scoring_distance_cache_manifest=(
+                        str(raw_fold["scoring_distance_cache_manifest"])
+                        if raw_fold.get("scoring_distance_cache_manifest")
+                        else None
+                    ),
                 )
                 for raw_fold in (
                     raw_pair["fold_artifacts"]
@@ -863,8 +939,18 @@ def _build_oracle_feature_matrix(
     subject_data: Any,
     variant_names: Sequence[str],
     priority_function: PriorityFunction,
+    target_row_indices: Sequence[int] | None = None,
+    opened_distance_cache: OpenedDistanceCache | None = None,
 ) -> np.ndarray:
     records = list(iter_training_records(subject_data))
+    resolved_target_row_indices = tuple(range(len(records))) if target_row_indices is None else tuple(
+        int(index) for index in target_row_indices
+    )
+    if len(resolved_target_row_indices) != len(records):
+        raise ValueError(
+            "The number of target row indices must match the subject-record count. "
+            f"Got indices={len(resolved_target_row_indices)} records={len(records)}."
+        )
     feature_matrix = np.zeros((len(records), len(variant_names)), dtype=float)
     priority_training_data = _build_priority_training_data_contract(
         training_data,
@@ -872,29 +958,63 @@ def _build_oracle_feature_matrix(
     )
     priority_target_variants = _build_priority_target_variants(variant_names)
 
-    for row_index, record in enumerate(records):
+    for row_index, (record, target_row_index) in enumerate(zip(records, resolved_target_row_indices)):
         raw_ancestry_coordinate = read_ancestry_coordinate(record)
         priority_ancestry_coordinate = _build_priority_ancestry_coordinate(
             raw_ancestry_coordinate,
         )
-        for column_index, variant_name in enumerate(variant_names):
-            radius = _call_priority_function(
-                priority_function,
-                priority_training_data,
-                priority_ancestry_coordinate,
-                priority_target_variants[column_index],
-            )
-            effect_size = effect_size_calculator(
-                training_data,
-                raw_ancestry_coordinate,
-                variant_name,
-                radius,
-            )
-            dosage = read_variant_dosage(record, variant_name)
-            contribution = float(dosage) * float(effect_size)
-            if not math.isfinite(contribution):
-                raise ValueError("Oracle contribution must be finite.")
-            feature_matrix[row_index, column_index] = contribution
+        distance_view = (
+            opened_distance_cache.row_view(target_row_index)
+            if opened_distance_cache is not None
+            else None
+        )
+        if distance_view is None:
+            for column_index, variant_name in enumerate(variant_names):
+                radius = _call_priority_function(
+                    priority_function,
+                    priority_training_data,
+                    priority_ancestry_coordinate,
+                    priority_target_variants[column_index],
+                )
+                effect_size = effect_size_calculator(
+                    training_data,
+                    raw_ancestry_coordinate,
+                    variant_name,
+                    radius,
+                )
+                dosage = read_variant_dosage(record, variant_name)
+                contribution = float(dosage) * float(effect_size)
+                if not math.isfinite(contribution):
+                    raise ValueError("Oracle contribution must be finite.")
+                feature_matrix[row_index, column_index] = contribution
+            continue
+
+        with activate_distance_context(
+            raw_training_data=training_data,
+            priority_training_data=priority_training_data,
+            target_ancestry_values=raw_ancestry_coordinate,
+            target_distance_view=distance_view,
+            novelty_baseline_median=opened_distance_cache.artifacts.novelty_baseline_median,
+        ):
+            for column_index, variant_name in enumerate(variant_names):
+                radius = _call_priority_function(
+                    priority_function,
+                    priority_training_data,
+                    priority_ancestry_coordinate,
+                    priority_target_variants[column_index],
+                )
+                effect_size = effect_size_calculator(
+                    training_data,
+                    raw_ancestry_coordinate,
+                    variant_name,
+                    radius,
+                    distance_view=distance_view,
+                )
+                dosage = read_variant_dosage(record, variant_name)
+                contribution = float(dosage) * float(effect_size)
+                if not math.isfinite(contribution):
+                    raise ValueError("Oracle contribution must be finite.")
+                feature_matrix[row_index, column_index] = contribution
     return feature_matrix
 
 
@@ -906,6 +1026,7 @@ def _build_calibration_oracle_feature_matrix(
     candidate_source: str,
     function_name: str,
     calibration_partitions: int,
+    distance_cache_manifest_path: str | None = None,
 ) -> np.ndarray:
     return _build_partitioned_oracle_feature_matrix(
         training_data=training_data,
@@ -914,6 +1035,7 @@ def _build_calibration_oracle_feature_matrix(
         candidate_source=candidate_source,
         function_name=function_name,
         partitions=calibration_partitions,
+        distance_cache_manifest_path=distance_cache_manifest_path,
     )
 
 
@@ -1012,16 +1134,20 @@ def _build_partitioned_oracle_feature_matrix(
     candidate_source: str,
     function_name: str,
     partitions: int,
+    distance_cache_manifest_path: str | None = None,
 ) -> np.ndarray:
     partitions = max(1, partitions)
     if partitions == 1 or _dataset_length(subject_data) <= 1:
         priority_function = _load_priority_function(candidate_source, function_name)
         _validate_priority_signature(priority_function)
+        opened_distance_cache = load_distance_cache(distance_cache_manifest_path)
         return _build_oracle_feature_matrix(
             training_data=training_data,
             subject_data=subject_data,
             variant_names=variant_names,
             priority_function=priority_function,
+            target_row_indices=tuple(range(_dataset_length(subject_data))),
+            opened_distance_cache=opened_distance_cache,
         )
 
     chunks = _split_data_into_chunks(subject_data, partitions)
@@ -1032,10 +1158,12 @@ def _build_partitioned_oracle_feature_matrix(
                 candidate_source,
                 function_name,
                 training_data,
-                chunk,
+                chunk_data,
+                tuple(int(index) for index in chunk_indices.tolist()),
                 tuple(variant_names),
+                distance_cache_manifest_path,
             )
-            for chunk in chunks
+            for chunk_indices, chunk_data in chunks
         ]
         return np.vstack([future.result() for future in futures])
 
@@ -1048,6 +1176,7 @@ def _build_scoring_oracle_feature_matrix(
     candidate_source: str,
     function_name: str,
     scoring_partitions: int,
+    distance_cache_manifest_path: str | None = None,
 ) -> np.ndarray:
     return _build_partitioned_oracle_feature_matrix(
         training_data=training_data,
@@ -1056,6 +1185,7 @@ def _build_scoring_oracle_feature_matrix(
         candidate_source=candidate_source,
         function_name=function_name,
         partitions=scoring_partitions,
+        distance_cache_manifest_path=distance_cache_manifest_path,
     )
 
 
@@ -1064,23 +1194,74 @@ def _build_partitioned_oracle_feature_matrix_worker(
     function_name: str,
     training_data: Any,
     subject_chunk: Any,
+    target_row_indices: tuple[int, ...],
     variant_names: tuple[str, ...],
+    distance_cache_manifest_path: str | None = None,
 ) -> np.ndarray:
     priority_function = _load_priority_function(candidate_source, function_name)
     _validate_priority_signature(priority_function)
+    opened_distance_cache = load_distance_cache(distance_cache_manifest_path)
     return _build_oracle_feature_matrix(
         training_data=training_data,
         subject_data=subject_chunk,
         variant_names=variant_names,
         priority_function=priority_function,
+        target_row_indices=target_row_indices,
+        opened_distance_cache=opened_distance_cache,
     )
 
 
-def _split_data_into_chunks(data: Any, requested_chunks: int) -> list[Any]:
+def _split_data_into_chunks(data: Any, requested_chunks: int) -> list[tuple[np.ndarray, Any]]:
     sample_count = _dataset_length(data)
     chunk_count = min(max(1, requested_chunks), sample_count)
     index_chunks = [chunk for chunk in np.array_split(np.arange(sample_count), chunk_count) if chunk.size]
-    return [_select_rows(data, chunk) for chunk in index_chunks]
+    return [(chunk.astype(int), _select_rows(data, chunk)) for chunk in index_chunks]
+
+
+def _distance_cache_root_for_prepared_pair(
+    settings: EvaluatorSettings,
+    prepared_pair: PreparedDatasetPair,
+) -> Path:
+    configured_root = getattr(settings, "distance_cache_dir", None)
+    if configured_root is not None:
+        return Path(configured_root) / prepared_pair.name
+    return Path(prepared_pair.oracle_train_pickle).resolve().parent / "distance_cache"
+
+
+def _ensure_prepared_fold_distance_caches(
+    *,
+    settings: EvaluatorSettings,
+    prepared_pair: PreparedDatasetPair,
+    fold_artifact: PreparedFoldArtifacts,
+    oracle_train: Any,
+    calibration: Any,
+    scoring: Any,
+    scoring_reference: Any,
+) -> tuple[str | None, str | None]:
+    if not getattr(settings, "distance_cache_enabled", True):
+        return (None, None)
+
+    cache_root = _distance_cache_root_for_prepared_pair(settings, prepared_pair)
+    calibration_artifacts = ensure_distance_cache(
+        reference_data=oracle_train,
+        target_data=calibration,
+        cache_root=cache_root,
+        cache_name=f"{prepared_pair.name}.fold_{fold_artifact.fold_index}.calibration",
+        reference_source_paths=(prepared_pair.oracle_train_pickle,),
+        target_source_paths=(fold_artifact.calibration_pickle,),
+    )
+    scoring_artifacts = ensure_distance_cache(
+        reference_data=scoring_reference,
+        target_data=scoring,
+        cache_root=cache_root,
+        cache_name=f"{prepared_pair.name}.fold_{fold_artifact.fold_index}.scoring",
+        reference_source_paths=(prepared_pair.oracle_train_pickle, fold_artifact.calibration_pickle),
+        target_source_paths=(fold_artifact.scoring_pickle,),
+    )
+    return (
+        calibration_artifacts.manifest_path if calibration_artifacts is not None else None,
+        scoring_artifacts.manifest_path if scoring_artifacts is not None else None,
+    )
 
 
 def _current_cpu_index() -> int | None:

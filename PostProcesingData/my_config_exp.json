@@ -1,0 +1,17 @@
+{
+  "prio_function_path": "/nfs/home/adas23/projects/AlphaEvolve/prio_func_disc_runs/oracle_priority_20260810_032011/cycle_0004/best_prio.py",
+  "training_pickle_path": "../Data/FunsearchEvaluatorData/no_covariates_train.pkl",
+  "calibrating_pickle_path": "../Data/FunsearchEvaluatorData/no_covariates_test.pkl",
+  "heldout_pickle_path": "../Data/FunsearchEvaluatorData/no_covariates_heldout.pkl",
+  "output_row_tracking_path": "../Data/FunsearchEvaluatorData/output_row_tracking.pkl",
+  "report_file_name": "best_prio.evaluation_report_testver.json",
+  "supported_ancestry_groups": ["AA", "JA", "LA"],
+  "should_overwrite": true,
+  "function_name": "priority",
+  "calibration_penalties": [0.1, 1.0, 10.0],
+  "calibration_partitions": "auto",
+  "scoring_partitions": "auto",
+  "distance_cache_enabled": true,
+  "distance_cache_dir": "/nfs/home/adas23/projects/AlphaEvolve/prio_func_disc_runs/oracle_priority_20260810_032011/cycle_0004/distance_cache_testver",
+  "baselines": []
+}

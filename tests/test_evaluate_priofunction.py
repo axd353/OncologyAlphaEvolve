@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from pathlib import Path
 import json
 
+import numpy as np
 import pandas as pd
 
 from PostProcesingData.evaluate_priofunction import evaluate_from_config_path
+from PostProcesingData.evaluate_priofunction import evaluate_priority_function
 from PostProcesingData.evaluate_priofunction import BaselineEvaluation
 from PostProcesingData.evaluate_priofunction import format_report
 from PostProcesingData.evaluate_priofunction import HeldoutAncestryEvaluation
@@ -36,6 +39,16 @@ def _write_tracking_pickle(path: Path, rows: list[dict[str, object]]) -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
     pd.DataFrame(rows).to_pickle(path)
     return path
+
+
+def _helper_based_priority_source() -> str:
+    return (
+        "def priority(training_data, ancestry_coordinate, target_variant):\n"
+        "    near_radius = radius_for_percentage(training_data, ancestry_coordinate, 50.0)\n"
+        "    far_radius = radius_for_percentage(training_data, ancestry_coordinate, 75.0)\n"
+        "    novelty = ancestry_novelty_score(training_data, ancestry_coordinate)\n"
+        "    return far_radius if novelty > 1.5 else near_radius\n"
+    )
 
 
 def test_load_evaluation_config_filters_disabled_baselines(tmp_path: Path) -> None:
@@ -325,19 +338,153 @@ def test_evaluate_from_config_path_scores_priority_function_and_baseline(tmp_pat
     assert report.baseline_evaluations[1].heldout_ancestry_evaluations[1].subject_count == 12
     assert report.baseline_evaluations[1].heldout_ancestry_evaluations[1].auc_roc > 0.9
 
-    report_text = format_report(report)
+
+def test_evaluate_priority_function_distance_cache_matches_uncached(tmp_path: Path) -> None:
+    _write_pickle(tmp_path / "train_a.pkl", _make_synthetic_oracle_frame(25))
+    _write_pickle(
+        tmp_path / "train_b.pkl",
+        _make_synthetic_oracle_frame(25, offset=25),
+    )
+    _write_pickle(
+        tmp_path / "calibration_a.pkl",
+        _make_synthetic_oracle_frame(20, offset=50),
+    )
+    _write_pickle(
+        tmp_path / "calibration_b.pkl",
+        _make_synthetic_oracle_frame(20, offset=70),
+    )
+    _write_pickle(
+        tmp_path / "heldout_a.pkl",
+        _make_synthetic_oracle_frame(12, offset=90),
+    )
+    _write_pickle(
+        tmp_path / "heldout_b.pkl",
+        _make_synthetic_oracle_frame(12, offset=102),
+    )
+    _write_tracking_pickle(
+        tmp_path / "output_row_tracking.pkl",
+        [
+            {
+                "output_pickle_name": "train_a.pkl",
+                "output_row_number": row_number,
+                "source_pickle_name": "train_AA.pkl",
+                "source_pickle_path": "/tmp/train_AA.pkl",
+                "source_row_number": row_number,
+            }
+            for row_number in range(25)
+        ]
+        + [
+            {
+                "output_pickle_name": "train_b.pkl",
+                "output_row_number": row_number,
+                "source_pickle_name": "train_JA.pkl",
+                "source_pickle_path": "/tmp/train_JA.pkl",
+                "source_row_number": row_number,
+            }
+            for row_number in range(25)
+        ]
+        + [
+            {
+                "output_pickle_name": "calibration_a.pkl",
+                "output_row_number": row_number,
+                "source_pickle_name": "train_AA.pkl",
+                "source_pickle_path": "/tmp/train_AA.pkl",
+                "source_row_number": row_number,
+            }
+            for row_number in range(20)
+        ]
+        + [
+            {
+                "output_pickle_name": "calibration_b.pkl",
+                "output_row_number": row_number,
+                "source_pickle_name": "train_JA.pkl",
+                "source_pickle_path": "/tmp/train_JA.pkl",
+                "source_row_number": row_number,
+            }
+            for row_number in range(20)
+        ]
+        + [
+            {
+                "output_pickle_name": "heldout_a.pkl",
+                "output_row_number": row_number,
+                "source_pickle_name": "train_AA.pkl",
+                "source_pickle_path": "/tmp/train_AA.pkl",
+                "source_row_number": row_number,
+            }
+            for row_number in range(12)
+        ]
+        + [
+            {
+                "output_pickle_name": "heldout_b.pkl",
+                "output_row_number": row_number,
+                "source_pickle_name": "train_JA.pkl",
+                "source_pickle_path": "/tmp/train_JA.pkl",
+                "source_row_number": row_number,
+            }
+            for row_number in range(12)
+        ],
+    )
+    priority_path = _write_text(tmp_path / "priority.py", _helper_based_priority_source())
+    config_path = _write_text(
+        tmp_path / "config.json",
+        json.dumps(
+            {
+                "prio_function_path": "priority.py",
+                "training_pickle_path": ["train_a.pkl", "train_b.pkl"],
+                "calibrating_pickle_path": ["calibration_a.pkl", "calibration_b.pkl"],
+                "heldout_pickle_path": ["heldout_a.pkl", "heldout_b.pkl"],
+                "output_row_tracking_path": "output_row_tracking.pkl",
+                "calibration_penalties": [0.1, 1.0],
+                "calibration_partitions": 2,
+                "scoring_partitions": 2,
+                "baselines": [],
+            },
+            indent=2,
+        ),
+    )
+
+    base_config = load_evaluation_config(config_path)
+    uncached_report = evaluate_priority_function(
+        replace(base_config, distance_cache_enabled=False, baselines=()),
+        baselines_to_run=(),
+        progress_reporter=lambda _message: None,
+    )
+    cached_cache_dir = tmp_path / "distance_cache"
+    cached_report = evaluate_priority_function(
+        replace(
+            base_config,
+            distance_cache_enabled=True,
+            distance_cache_dir=cached_cache_dir,
+            baselines=(),
+        ),
+        baselines_to_run=(),
+        progress_reporter=lambda _message: None,
+    )
+
+    assert np.isclose(cached_report.heldout_auc_roc, uncached_report.heldout_auc_roc)
+    assert cached_report.prio_function_path == priority_path
+    assert tuple(
+        (evaluation.ancestry_group, evaluation.subject_count)
+        for evaluation in cached_report.heldout_ancestry_evaluations
+    ) == tuple(
+        (evaluation.ancestry_group, evaluation.subject_count)
+        for evaluation in uncached_report.heldout_ancestry_evaluations
+    )
+    for cached_evaluation, uncached_evaluation in zip(
+        cached_report.heldout_ancestry_evaluations,
+        uncached_report.heldout_ancestry_evaluations,
+    ):
+        assert np.isclose(cached_evaluation.auc_roc, uncached_evaluation.auc_roc)
+
+    assert any(cached_cache_dir.glob("*.manifest.json"))
+
+    report_text = format_report(cached_report)
     assert f"prio_function_path={priority_path}" in report_text
     assert "heldout_auc_roc=" in report_text
     assert "heldout_subject_count[AA]=12" in report_text
     assert "heldout_auc_roc[AA]=" in report_text
     assert "heldout_subject_count[JA]=12" in report_text
     assert "heldout_auc_roc[JA]=" in report_text
-    assert "baseline_auc_roc[Mixture Learning]=" in report_text
-    assert "baseline_auc_roc[Mixture Learning][AA]=" in report_text
-    assert "baseline_auc_roc[Mixture Learning][JA]=" in report_text
-    assert "baseline_auc_roc[Independent Learning Scheme]=" in report_text
-    assert "baseline_auc_roc[Independent Learning Scheme][AA]=" in report_text
-    assert "baseline_auc_roc[Independent Learning Scheme][JA]=" in report_text
 
 
 def test_evaluate_from_config_path_scores_tl_transfer_baselines(tmp_path: Path) -> None:

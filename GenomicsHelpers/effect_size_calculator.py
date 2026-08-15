@@ -15,7 +15,13 @@ import logging
 from typing import Any, Sequence
 
 import numpy as np
+import pandas as pd
 
+from GenomicsHelpers.ancestry_distance_cache import TargetDistanceView
+from GenomicsHelpers.ancestry_distance_cache import get_active_raw_distance_context
+from GenomicsHelpers.oracle_data_adapter import candidate_variant_field_names
+from GenomicsHelpers.oracle_data_adapter import DEFAULT_COVARIATE_FIELDS
+from GenomicsHelpers.oracle_data_adapter import DEFAULT_LABEL_FIELD
 from GenomicsHelpers.oracle_data_adapter import iter_training_records
 from GenomicsHelpers.oracle_data_adapter import read_ancestry_coordinate
 from GenomicsHelpers.oracle_data_adapter import read_label
@@ -45,6 +51,7 @@ def effect_size_calculator(
     max_iter: int = 50,
     tolerance: float = 1e-8,
     logger: logging.Logger | None = None,
+    distance_view: TargetDistanceView | None = None,
 ) -> float:
     """Estimate ``\hat b_j(a)`` from the closed ancestry ball around ``a``.
 
@@ -75,6 +82,7 @@ def effect_size_calculator(
         ancestry_coordinate=ancestry_coordinate,
         target_variant=target_variant,
         radius=radius,
+        distance_view=distance_view,
     )
     failure_reason = get_nonidentifiable_local_effect_reason(
         local_data,
@@ -106,12 +114,27 @@ def prepare_local_variant_data(
     ancestry_coordinate: Sequence[float],
     target_variant: Any,
     radius: float,
+    distance_view: TargetDistanceView | None = None,
 ) -> LocalVariantData:
     """Extract labels, genotype dosage, and covariates inside the closed ball.
 
     Missing target dosages are mean-imputed within the local neighborhood so the
     downstream logistic fit never sees NaNs from sparse genotype gaps.
     """
+
+    resolved_distance_view = distance_view
+    if resolved_distance_view is None:
+        active_context = get_active_raw_distance_context(training_data, ancestry_coordinate)
+        if active_context is not None:
+            resolved_distance_view = active_context.target_distance_view
+
+    if resolved_distance_view is not None:
+        return _prepare_local_variant_data_from_cached_distances(
+            training_data=training_data,
+            target_variant=target_variant,
+            radius=radius,
+            distance_view=resolved_distance_view,
+        )
 
     center = np.asarray(ancestry_coordinate, dtype=float)
     labels: list[float] = []
@@ -141,6 +164,96 @@ def prepare_local_variant_data(
         covariates=covariate_matrix,
         sample_count=len(labels),
     )
+
+
+def _prepare_local_variant_data_from_cached_distances(
+    *,
+    training_data: Any,
+    target_variant: Any,
+    radius: float,
+    distance_view: TargetDistanceView,
+) -> LocalVariantData:
+    within_indices = np.flatnonzero(np.asarray(distance_view.distances, dtype=float) <= float(radius))
+    if isinstance(training_data, pd.DataFrame):
+        return _prepare_local_variant_data_from_dataframe(
+            training_data=training_data,
+            row_indices=within_indices,
+            target_variant=target_variant,
+        )
+    return _prepare_local_variant_data_from_records(
+        training_data=training_data,
+        row_indices=within_indices,
+        target_variant=target_variant,
+    )
+
+
+def _prepare_local_variant_data_from_dataframe(
+    *,
+    training_data: pd.DataFrame,
+    row_indices: np.ndarray,
+    target_variant: Any,
+) -> LocalVariantData:
+    local_frame = training_data.iloc[row_indices]
+    labels = local_frame[DEFAULT_LABEL_FIELD].to_numpy(dtype=float)
+    genotype_array = local_frame[_resolve_target_variant_column(local_frame, target_variant)].to_numpy(dtype=float)
+    genotype_array = impute_missing_genotype_values(genotype_array)
+
+    covariate_matrix = None
+    present_covariates = [field_name for field_name in DEFAULT_COVARIATE_FIELDS if field_name in local_frame.columns]
+    if present_covariates:
+        if len(present_covariates) != len(DEFAULT_COVARIATE_FIELDS):
+            missing_fields = [
+                field_name for field_name in DEFAULT_COVARIATE_FIELDS if field_name not in local_frame.columns
+            ]
+            raise ValueError(
+                "Record has only a partial covariate layout. Missing fields: "
+                f"{missing_fields}."
+            )
+        covariate_matrix = local_frame.loc[:, DEFAULT_COVARIATE_FIELDS].to_numpy(dtype=float)
+
+    return LocalVariantData(
+        labels=labels,
+        genotype=genotype_array,
+        covariates=covariate_matrix,
+        sample_count=int(local_frame.shape[0]),
+    )
+
+
+def _prepare_local_variant_data_from_records(
+    *,
+    training_data: Any,
+    row_indices: np.ndarray,
+    target_variant: Any,
+) -> LocalVariantData:
+    records = list(iter_training_records(training_data))
+    labels: list[float] = []
+    genotype: list[float] = []
+    covariates: list[np.ndarray | None] = []
+    for row_index in row_indices:
+        record = records[int(row_index)]
+        labels.append(read_label(record))
+        genotype.append(read_variant_dosage(record, target_variant))
+        covariates.append(read_optional_covariates(record))
+
+    covariate_matrix = None
+    if any(row is not None for row in covariates):
+        covariate_matrix = align_covariate_rows(covariates, sample_count=len(labels))
+
+    genotype_array = np.asarray(genotype, dtype=float)
+    genotype_array = impute_missing_genotype_values(genotype_array)
+    return LocalVariantData(
+        labels=np.asarray(labels, dtype=float),
+        genotype=genotype_array,
+        covariates=covariate_matrix,
+        sample_count=len(labels),
+    )
+
+
+def _resolve_target_variant_column(training_data: pd.DataFrame, target_variant: Any) -> str:
+    for field_name in candidate_variant_field_names(target_variant):
+        if field_name in training_data.columns:
+            return str(field_name)
+    raise KeyError(f"Could not find dosage column for variant {target_variant!r}.")
 
 
 def is_inside_closed_ball(
