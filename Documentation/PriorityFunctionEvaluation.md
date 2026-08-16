@@ -290,9 +290,47 @@ The JSON report includes:
 - the overall heldout ROC AUC,
 - the per-ancestry heldout ROC AUC breakdown,
 - the baseline results, including per-ancestry heldout ROC AUC when ancestry groups are available,
+- the resolved `heldout_model_predictions_path` pointing at the subject-level heldout prediction pickle,
 - the final plain-text summary as `summary_text`.
 
-The command still does not write a pickle output, plot, or new artifact directory.
+### Heldout subject-level prediction file
+
+In addition to the JSON report, the evaluator now writes a pandas pickle at:
+
+- `distance_cache_dir/heldout_model_predictions.pkl`, when `distance_cache_dir` is configured
+- `prio_function_path.parent / distance_cache / heldout_model_predictions.pkl`, otherwise
+
+This file is written under the same cache root that stores ancestry-distance artifacts. It is still written even when `distance_cache_enabled` is `false`, because the per-subject predictions are useful independently of whether ancestry distances themselves were reused from cache.
+
+The pickle is a long-format DataFrame with one row per `(heldout subject, model)` pair. It includes the main priority-function-assisted model plus one row block for every configured baseline. The current columns are:
+
+- `heldout_subject_index`: 0-based row index in the concatenated heldout dataset
+- `heldout_output_pickle_name`: heldout shard file name, for example `heldout_a.pkl`
+- `heldout_output_pickle_path`: resolved path of that heldout shard
+- `heldout_output_row_number`: 0-based row number inside that heldout shard
+- `source_pickle_name`: original shard name from `output_row_tracking.pkl`
+- `source_pickle_path`: original source shard path when available in `output_row_tracking.pkl`
+- `source_row_number`: original source row number when available in `output_row_tracking.pkl`
+- `ancestry_group`: parsed ancestry label for that subject
+- `label`: heldout disease label used in evaluation
+- `model_name`: display name such as `Priority Function`, `Mixture Learning`, or `TL-PR`
+- `model_slug`: machine-friendly version of `model_name`
+- `risk_score`: the exact scalar score that the current evaluator uses as ROC-AUC input
+- `risk_probability`: `sigmoid(risk_score)` for a bounded risk-like value in `[0, 1]`
+
+For later bootstrap confidence intervals, use `risk_score`, because that is the exact quantity whose ordering determines the reported ROC AUC. The `risk_probability` column is mainly for inspection and downstream exports that prefer bounded values.
+
+For the main priority-function model and the transfer-learning baselines, `risk_probability` matches the model's logistic link applied to the final linear predictor. For the ridge baselines, `risk_probability` is only a monotone sigmoid transform of the ridge score, so it should be treated as a bounded convenience value rather than a calibrated absolute probability.
+
+Because every row carries both `ancestry_group` and the heldout/source row identifiers, this file is enough to:
+
+- compute bootstrap ROC-AUC confidence intervals for each model,
+- recompute those intervals within one ancestry only,
+- trace a prediction back to the heldout shard row and then to the original source shard row.
+
+If `should_overwrite` is `false` and a JSON report already exists, the script still recomputes the evaluation whenever this pickle is missing, so the subject-level prediction artifact is restored automatically.
+
+The command still does not create plots automatically.
 
 If you also want a shell-captured text file containing the progress logs plus stdout summary, you can still redirect stdout manually.
 

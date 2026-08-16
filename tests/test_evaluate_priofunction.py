@@ -6,15 +6,19 @@ import json
 
 import numpy as np
 import pandas as pd
+import pytest
 
+import PostProcesingData.evaluate_priofunction as evaluate_priofunction_module
 from PostProcesingData.evaluate_priofunction import evaluate_from_config_path
 from PostProcesingData.evaluate_priofunction import evaluate_priority_function
 from PostProcesingData.evaluate_priofunction import BaselineEvaluation
 from PostProcesingData.evaluate_priofunction import format_report
 from PostProcesingData.evaluate_priofunction import HeldoutAncestryEvaluation
 from PostProcesingData.evaluate_priofunction import EvaluationReport
+from PostProcesingData.evaluate_priofunction import heldout_model_predictions_output_path_for_model
 from PostProcesingData.evaluate_priofunction import load_existing_evaluation_report
 from PostProcesingData.evaluate_priofunction import load_evaluation_config
+from PostProcesingData.evaluate_priofunction import main
 from PostProcesingData.evaluate_priofunction import merge_evaluation_reports
 from PostProcesingData.evaluate_priofunction import report_output_path_for_priority_function
 from PostProcesingData.evaluate_priofunction import write_evaluation_report_file
@@ -337,6 +341,50 @@ def test_evaluate_from_config_path_scores_priority_function_and_baseline(tmp_pat
     assert report.baseline_evaluations[1].heldout_ancestry_evaluations[1].ancestry_group == "JA"
     assert report.baseline_evaluations[1].heldout_ancestry_evaluations[1].subject_count == 12
     assert report.baseline_evaluations[1].heldout_ancestry_evaluations[1].auc_roc > 0.9
+
+    predictions_path = tmp_path / "distance_cache" / "heldout_model_predictions.pkl"
+    assert predictions_path.exists()
+    predictions_frame = pd.read_pickle(predictions_path)
+    assert list(predictions_frame.columns) == [
+        "heldout_subject_index",
+        "heldout_output_pickle_name",
+        "heldout_output_pickle_path",
+        "heldout_output_row_number",
+        "source_pickle_name",
+        "source_pickle_path",
+        "source_row_number",
+        "ancestry_group",
+        "label",
+        "model_name",
+        "model_slug",
+        "risk_score",
+        "risk_probability",
+    ]
+    assert len(predictions_frame) == 24 * 3
+    assert predictions_frame["heldout_subject_index"].nunique() == 24
+    assert set(predictions_frame["model_name"].tolist()) == {
+        "Priority Function",
+        "Mixture Learning",
+        "Independent Learning Scheme",
+    }
+    assert predictions_frame.groupby("model_name").size().to_dict() == {
+        "Priority Function": 24,
+        "Mixture Learning": 24,
+        "Independent Learning Scheme": 24,
+    }
+    assert predictions_frame["risk_probability"].between(0.0, 1.0).all()
+
+    priority_rows = predictions_frame.loc[
+        predictions_frame["model_name"] == "Priority Function"
+    ].reset_index(drop=True)
+    assert priority_rows["ancestry_group"].tolist().count("AA") == 12
+    assert priority_rows["ancestry_group"].tolist().count("JA") == 12
+    assert priority_rows["heldout_output_pickle_name"].tolist()[:12] == ["heldout_a.pkl"] * 12
+    assert priority_rows["heldout_output_pickle_name"].tolist()[12:] == ["heldout_b.pkl"] * 12
+    assert priority_rows["source_pickle_name"].tolist()[:12] == ["train_AA.pkl"] * 12
+    assert priority_rows["source_pickle_name"].tolist()[12:] == ["train_JA.pkl"] * 12
+    assert priority_rows["source_row_number"].tolist()[:12] == list(range(12))
+    assert priority_rows["source_row_number"].tolist()[12:] == list(range(12))
 
 
 def test_evaluate_priority_function_distance_cache_matches_uncached(tmp_path: Path) -> None:
@@ -941,8 +989,308 @@ def test_write_evaluation_report_file_writes_clean_json_next_to_priority_functio
     assert payload["config"]["report_file_name"] == "custom_report.json"
     assert payload["results"]["prio_function_path"] == str(priority_path)
     assert payload["results"]["heldout_auc_roc"] == 0.5
+    assert payload["results"]["heldout_model_predictions_path"] == str(
+        priority_dir / "distance_cache" / "heldout_model_predictions.pkl"
+    )
+    assert payload["results"]["heldout_model_prediction_paths"] == {}
     assert payload["results"]["baseline_evaluations"] == []
     assert payload["results"]["summary_text"] == "prio_function_path=" + str(priority_path) + "\nheldout_auc_roc=0.500000"
+
+
+def test_evaluate_priority_function_persists_partial_report_and_predictions_after_each_model(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    _write_pickle(tmp_path / "train_a.pkl", _make_synthetic_oracle_frame(25))
+    _write_pickle(
+        tmp_path / "train_b.pkl",
+        _make_synthetic_oracle_frame(25, offset=25),
+    )
+    _write_pickle(
+        tmp_path / "calibration_a.pkl",
+        _make_synthetic_oracle_frame(20, offset=50),
+    )
+    _write_pickle(
+        tmp_path / "calibration_b.pkl",
+        _make_synthetic_oracle_frame(20, offset=70),
+    )
+    _write_pickle(
+        tmp_path / "heldout_a.pkl",
+        _make_synthetic_oracle_frame(12, offset=90),
+    )
+    _write_pickle(
+        tmp_path / "heldout_b.pkl",
+        _make_synthetic_oracle_frame(12, offset=102),
+    )
+    _write_tracking_pickle(
+        tmp_path / "output_row_tracking.pkl",
+        [
+            {
+                "output_pickle_name": "train_a.pkl",
+                "output_row_number": row_number,
+                "source_pickle_name": "train_AA.pkl",
+                "source_pickle_path": "/tmp/train_AA.pkl",
+                "source_row_number": row_number,
+            }
+            for row_number in range(25)
+        ]
+        + [
+            {
+                "output_pickle_name": "train_b.pkl",
+                "output_row_number": row_number,
+                "source_pickle_name": "train_JA.pkl",
+                "source_pickle_path": "/tmp/train_JA.pkl",
+                "source_row_number": row_number,
+            }
+            for row_number in range(25)
+        ]
+        + [
+            {
+                "output_pickle_name": "calibration_a.pkl",
+                "output_row_number": row_number,
+                "source_pickle_name": "train_AA.pkl",
+                "source_pickle_path": "/tmp/train_AA.pkl",
+                "source_row_number": row_number,
+            }
+            for row_number in range(20)
+        ]
+        + [
+            {
+                "output_pickle_name": "calibration_b.pkl",
+                "output_row_number": row_number,
+                "source_pickle_name": "train_JA.pkl",
+                "source_pickle_path": "/tmp/train_JA.pkl",
+                "source_row_number": row_number,
+            }
+            for row_number in range(20)
+        ]
+        + [
+            {
+                "output_pickle_name": "heldout_a.pkl",
+                "output_row_number": row_number,
+                "source_pickle_name": "train_AA.pkl",
+                "source_pickle_path": "/tmp/train_AA.pkl",
+                "source_row_number": row_number,
+            }
+            for row_number in range(12)
+        ]
+        + [
+            {
+                "output_pickle_name": "heldout_b.pkl",
+                "output_row_number": row_number,
+                "source_pickle_name": "train_JA.pkl",
+                "source_pickle_path": "/tmp/train_JA.pkl",
+                "source_row_number": row_number,
+            }
+            for row_number in range(12)
+        ],
+    )
+    priority_path = _write_text(
+        tmp_path / "priority.py",
+        "def priority(training_data, ancestry_coordinate, target_variant):\n"
+        "    return 10.0\n",
+    )
+    config_path = _write_text(
+        tmp_path / "config.json",
+        json.dumps(
+            {
+                "prio_function_path": "priority.py",
+                "training_pickle_path": ["train_a.pkl", "train_b.pkl"],
+                "calibrating_pickle_path": ["calibration_a.pkl", "calibration_b.pkl"],
+                "heldout_pickle_path": ["heldout_a.pkl", "heldout_b.pkl"],
+                "output_row_tracking_path": "output_row_tracking.pkl",
+                "calibration_penalties": [0.1, 1.0],
+                "calibration_partitions": 1,
+                "scoring_partitions": 1,
+                "distance_cache_dir": str(tmp_path / "distance_cache"),
+                "should_overwrite": True,
+                "baselines": [
+                    {"name": "Mixture Learning", "alpha": 1.0},
+                    {"name": "Independent Learning Scheme", "alpha": 1.0},
+                ],
+            },
+            indent=2,
+        ),
+    )
+
+    original_evaluate_baseline = evaluate_priofunction_module.evaluate_baseline
+
+    def _failing_evaluate_baseline(name: str, **kwargs):
+        baseline_name = evaluate_priofunction_module.normalize_baseline_name(name)
+        if baseline_name == "Independent Learning Scheme":
+            raise RuntimeError("forced baseline failure")
+        return original_evaluate_baseline(name, **kwargs)
+
+    monkeypatch.setattr(evaluate_priofunction_module, "evaluate_baseline", _failing_evaluate_baseline)
+
+    with pytest.raises(RuntimeError, match="forced baseline failure"):
+        evaluate_from_config_path(config_path)
+
+    cache_root = tmp_path / "distance_cache"
+    aggregate_predictions_path = cache_root / "heldout_model_predictions.pkl"
+    assert aggregate_predictions_path.exists()
+    aggregate_predictions = pd.read_pickle(aggregate_predictions_path)
+    assert set(aggregate_predictions["model_name"].tolist()) == {
+        "Priority Function",
+        "Mixture Learning",
+    }
+
+    priority_predictions_path = heldout_model_predictions_output_path_for_model(
+        cache_root,
+        "Priority Function",
+    )
+    mixture_predictions_path = heldout_model_predictions_output_path_for_model(
+        cache_root,
+        "Mixture Learning",
+    )
+    missing_predictions_path = heldout_model_predictions_output_path_for_model(
+        cache_root,
+        "Independent Learning Scheme",
+    )
+    assert priority_predictions_path.exists()
+    assert mixture_predictions_path.exists()
+    assert not missing_predictions_path.exists()
+
+    report_path = report_output_path_for_priority_function(priority_path)
+    assert report_path.exists()
+    payload = json.loads(report_path.read_text())
+    assert [baseline["name"] for baseline in payload["results"]["baseline_evaluations"]] == [
+        "Mixture Learning",
+    ]
+    assert payload["results"]["heldout_model_prediction_paths"] == {
+        "Mixture Learning": str(mixture_predictions_path),
+        "Priority Function": str(priority_predictions_path),
+    }
+
+
+def test_main_rebuilds_heldout_model_predictions_when_report_exists(tmp_path: Path) -> None:
+    _write_pickle(tmp_path / "train_a.pkl", _make_synthetic_oracle_frame(25))
+    _write_pickle(
+        tmp_path / "train_b.pkl",
+        _make_synthetic_oracle_frame(25, offset=25),
+    )
+    _write_pickle(
+        tmp_path / "calibration_a.pkl",
+        _make_synthetic_oracle_frame(20, offset=50),
+    )
+    _write_pickle(
+        tmp_path / "calibration_b.pkl",
+        _make_synthetic_oracle_frame(20, offset=70),
+    )
+    _write_pickle(
+        tmp_path / "heldout_a.pkl",
+        _make_synthetic_oracle_frame(12, offset=90),
+    )
+    _write_pickle(
+        tmp_path / "heldout_b.pkl",
+        _make_synthetic_oracle_frame(12, offset=102),
+    )
+    _write_tracking_pickle(
+        tmp_path / "output_row_tracking.pkl",
+        [
+            {
+                "output_pickle_name": "train_a.pkl",
+                "output_row_number": row_number,
+                "source_pickle_name": "train_AA.pkl",
+                "source_pickle_path": "/tmp/train_AA.pkl",
+                "source_row_number": row_number,
+            }
+            for row_number in range(25)
+        ]
+        + [
+            {
+                "output_pickle_name": "train_b.pkl",
+                "output_row_number": row_number,
+                "source_pickle_name": "train_JA.pkl",
+                "source_pickle_path": "/tmp/train_JA.pkl",
+                "source_row_number": row_number,
+            }
+            for row_number in range(25)
+        ]
+        + [
+            {
+                "output_pickle_name": "calibration_a.pkl",
+                "output_row_number": row_number,
+                "source_pickle_name": "train_AA.pkl",
+                "source_pickle_path": "/tmp/train_AA.pkl",
+                "source_row_number": row_number,
+            }
+            for row_number in range(20)
+        ]
+        + [
+            {
+                "output_pickle_name": "calibration_b.pkl",
+                "output_row_number": row_number,
+                "source_pickle_name": "train_JA.pkl",
+                "source_pickle_path": "/tmp/train_JA.pkl",
+                "source_row_number": row_number,
+            }
+            for row_number in range(20)
+        ]
+        + [
+            {
+                "output_pickle_name": "heldout_a.pkl",
+                "output_row_number": row_number,
+                "source_pickle_name": "train_AA.pkl",
+                "source_pickle_path": "/tmp/train_AA.pkl",
+                "source_row_number": row_number,
+            }
+            for row_number in range(12)
+        ]
+        + [
+            {
+                "output_pickle_name": "heldout_b.pkl",
+                "output_row_number": row_number,
+                "source_pickle_name": "train_JA.pkl",
+                "source_pickle_path": "/tmp/train_JA.pkl",
+                "source_row_number": row_number,
+            }
+            for row_number in range(12)
+        ],
+    )
+    priority_path = _write_text(
+        tmp_path / "priority.py",
+        "def priority(training_data, ancestry_coordinate, target_variant):\n"
+        "    return 10.0\n",
+    )
+    config_path = _write_text(
+        tmp_path / "config.json",
+        json.dumps(
+            {
+                "prio_function_path": "priority.py",
+                "training_pickle_path": ["train_a.pkl", "train_b.pkl"],
+                "calibrating_pickle_path": ["calibration_a.pkl", "calibration_b.pkl"],
+                "heldout_pickle_path": ["heldout_a.pkl", "heldout_b.pkl"],
+                "output_row_tracking_path": "output_row_tracking.pkl",
+                "calibration_penalties": [0.1, 1.0],
+                "calibration_partitions": 1,
+                "scoring_partitions": 1,
+                "should_overwrite": False,
+                "baselines": [],
+            },
+            indent=2,
+        ),
+    )
+
+    config = load_evaluation_config(config_path)
+    report = evaluate_from_config_path(config_path)
+    report_path = write_evaluation_report_file(
+        config_path=config_path,
+        config=config,
+        report=report,
+    )
+    predictions_path = tmp_path / "distance_cache" / "heldout_model_predictions.pkl"
+    assert predictions_path.exists()
+    predictions_path.unlink()
+
+    exit_code = main([str(config_path)])
+
+    assert exit_code == 0
+    assert report_path.exists()
+    assert predictions_path.exists()
+    rebuilt_predictions = pd.read_pickle(predictions_path)
+    assert set(rebuilt_predictions["model_name"].tolist()) == {"Priority Function"}
+    assert rebuilt_predictions["heldout_subject_index"].nunique() == 24
 
 
 def test_missing_baselines_only_returns_unreported_configured_baselines(tmp_path: Path) -> None:

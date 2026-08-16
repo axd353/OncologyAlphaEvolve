@@ -1,0 +1,1189 @@
+[2026-08-15 04:11:11] Starting evaluate_priofunction for config=/nfs/home/adas23/projects/AlphaEvolve/PostProcesingData/my_configOncoArray.json
+[2026-08-15 04:11:11] Progress log path=/nfs/home/adas23/projects/AlphaEvolve/prio_func_disc_runs/oracle_priority_20260810_032011/cycle_0004/distance_cache_oncoarray/evaluate_priofunction.progress.log
+[2026-08-15 04:11:11] Loading priority function from /nfs/home/adas23/projects/AlphaEvolve/prio_func_disc_runs/oracle_priority_20260810_032011/cycle_0004/best_prio.py
+[2026-08-15 04:11:11] Runtime CPU detection: visible_cpus=48 calibration_workers=48 scoring_workers=48
+[2026-08-15 04:11:11] Loading datasets: training=[/nfs/home/adas23/projects/AlphaEvolve/Data/FunsearchEvaluatorDataOncoArray/no_covariates_train.pkl] calibration=[/nfs/home/adas23/projects/AlphaEvolve/Data/FunsearchEvaluatorDataOncoArray/no_covariates_test.pkl] heldout=[/nfs/home/adas23/projects/AlphaEvolve/Data/FunsearchEvaluatorDataOncoArray/no_covariates_heldout.pkl] tracking=/nfs/home/adas23/projects/AlphaEvolve/Data/FunsearchEvaluatorDataOncoArray/output_row_tracking.pkl
+[2026-08-15 04:11:12] Loaded datasets with rows: training=23030 from [23030] calibration=5756 from [5756] heldout=3200 from [3200]
+[2026-08-15 04:11:12] Found 73 dosage variants in training data
+[2026-08-15 04:11:12] Preparing calibration distance cache under /nfs/home/adas23/projects/AlphaEvolve/prio_func_disc_runs/oracle_priority_20260810_032011/cycle_0004/distance_cache_oncoarray
+[2026-08-15 04:11:12] Building calibration oracle features; this is often the first long-running step
+[2026-08-15 04:11:12] calibration oracle features: launching_chunks=48 total_subjects=5756 variants=73 min_chunk_subjects=119 max_chunk_subjects=120
+[2026-08-15 04:11:23] calibration oracle features chunk=3/48: started pid=835951 subjects=120 variants=73
+[2026-08-15 04:11:23] calibration oracle features chunk=4/48: started pid=835952 subjects=120 variants=73
+[2026-08-15 04:11:23] calibration oracle features chunk=6/48: started pid=835954 subjects=120 variants=73
+[2026-08-15 04:11:23] calibration oracle features chunk=1/48: started pid=835947 subjects=120 variants=73
+[2026-08-15 04:11:23] calibration oracle features chunk=5/48: started pid=835953 subjects=120 variants=73
+[2026-08-15 04:11:23] calibration oracle features chunk=8/48: started pid=835956 subjects=120 variants=73
+[2026-08-15 04:11:23] calibration oracle features chunk=7/48: started pid=835955 subjects=120 variants=73
+[2026-08-15 04:11:23] calibration oracle features chunk=11/48: started pid=835959 subjects=120 variants=73
+[2026-08-15 04:11:23] calibration oracle features chunk=2/48: started pid=835950 subjects=120 variants=73
+[2026-08-15 04:11:23] calibration oracle features chunk=10/48: started pid=835958 subjects=120 variants=73
+[2026-08-15 04:11:23] calibration oracle features chunk=12/48: started pid=835960 subjects=120 variants=73
+[2026-08-15 04:11:23] calibration oracle features chunk=14/48: started pid=835962 subjects=120 variants=73
+[2026-08-15 04:11:23] calibration oracle features chunk=15/48: started pid=835963 subjects=120 variants=73
+[2026-08-15 04:11:23] calibration oracle features chunk=13/48: started pid=835961 subjects=120 variants=73
+[2026-08-15 04:11:23] calibration oracle features chunk=16/48: started pid=835964 subjects=120 variants=73
+[2026-08-15 04:11:23] calibration oracle features chunk=17/48: started pid=835965 subjects=120 variants=73
+[2026-08-15 04:11:23] calibration oracle features chunk=9/48: started pid=835957 subjects=120 variants=73
+[2026-08-15 04:11:23] calibration oracle features chunk=18/48: started pid=835966 subjects=120 variants=73
+[2026-08-15 04:11:23] calibration oracle features chunk=20/48: started pid=835968 subjects=120 variants=73
+[2026-08-15 04:11:23] calibration oracle features chunk=19/48: started pid=835967 subjects=120 variants=73
+[2026-08-15 04:11:24] calibration oracle features chunk=21/48: started pid=835969 subjects=120 variants=73
+[2026-08-15 04:11:24] calibration oracle features chunk=22/48: started pid=835970 subjects=120 variants=73
+[2026-08-15 04:11:24] calibration oracle features chunk=24/48: started pid=835972 subjects=120 variants=73
+[2026-08-15 04:11:24] calibration oracle features chunk=23/48: started pid=835971 subjects=120 variants=73
+[2026-08-15 04:11:24] calibration oracle features chunk=27/48: started pid=835982 subjects=120 variants=73
+[2026-08-15 04:11:24] calibration oracle features chunk=26/48: started pid=835980 subjects=120 variants=73
+[2026-08-15 04:11:24] calibration oracle features chunk=25/48: started pid=835973 subjects=120 variants=73
+[2026-08-15 04:11:24] calibration oracle features chunk=30/48: started pid=835985 subjects=120 variants=73
+[2026-08-15 04:11:24] calibration oracle features chunk=28/48: started pid=835983 subjects=120 variants=73
+[2026-08-15 04:11:24] calibration oracle features chunk=29/48: started pid=835984 subjects=120 variants=73
+[2026-08-15 04:11:24] calibration oracle features chunk=33/48: started pid=835988 subjects=120 variants=73
+[2026-08-15 04:11:24] calibration oracle features chunk=36/48: started pid=835991 subjects=120 variants=73
+[2026-08-15 04:11:24] calibration oracle features chunk=35/48: started pid=835990 subjects=120 variants=73
+[2026-08-15 04:11:24] calibration oracle features chunk=37/48: started pid=835992 subjects=120 variants=73
+[2026-08-15 04:11:24] calibration oracle features chunk=38/48: started pid=835993 subjects=120 variants=73
+[2026-08-15 04:11:24] calibration oracle features chunk=40/48: started pid=835995 subjects=120 variants=73
+[2026-08-15 04:11:24] calibration oracle features chunk=41/48: started pid=835996 subjects=120 variants=73
+[2026-08-15 04:11:24] calibration oracle features chunk=39/48: started pid=835994 subjects=120 variants=73
+[2026-08-15 04:11:24] calibration oracle features chunk=34/48: started pid=835989 subjects=120 variants=73
+[2026-08-15 04:11:24] calibration oracle features chunk=43/48: started pid=835998 subjects=120 variants=73
+[2026-08-15 04:11:24] calibration oracle features chunk=42/48: started pid=835997 subjects=120 variants=73
+[2026-08-15 04:11:24] calibration oracle features chunk=45/48: started pid=836000 subjects=119 variants=73
+[2026-08-15 04:11:24] calibration oracle features chunk=47/48: started pid=836002 subjects=119 variants=73
+[2026-08-15 04:11:24] calibration oracle features chunk=31/48: started pid=835986 subjects=120 variants=73
+[2026-08-15 04:11:24] calibration oracle features chunk=46/48: started pid=836001 subjects=119 variants=73
+[2026-08-15 04:11:24] calibration oracle features chunk=48/48: started pid=836003 subjects=119 variants=73
+[2026-08-15 04:11:24] calibration oracle features chunk=44/48: started pid=835999 subjects=120 variants=73
+[2026-08-15 04:11:24] calibration oracle features chunk=32/48: started pid=835987 subjects=120 variants=73
+[2026-08-15 04:22:28] calibration oracle features chunk=37/48: processed_subjects=12/120
+[2026-08-15 04:22:30] calibration oracle features chunk=42/48: processed_subjects=12/120
+[2026-08-15 04:22:30] calibration oracle features chunk=21/48: processed_subjects=12/120
+[2026-08-15 04:22:31] calibration oracle features chunk=7/48: processed_subjects=12/120
+[2026-08-15 04:22:31] calibration oracle features chunk=41/48: processed_subjects=12/120
+[2026-08-15 04:22:31] calibration oracle features chunk=35/48: processed_subjects=12/120
+[2026-08-15 04:22:32] calibration oracle features chunk=11/48: processed_subjects=12/120
+[2026-08-15 04:22:33] calibration oracle features chunk=33/48: processed_subjects=12/120
+[2026-08-15 04:22:33] calibration oracle features chunk=40/48: processed_subjects=12/120
+[2026-08-15 04:22:33] calibration oracle features chunk=12/48: processed_subjects=12/120
+[2026-08-15 04:22:33] calibration oracle features chunk=20/48: processed_subjects=12/120
+[2026-08-15 04:22:34] calibration oracle features chunk=48/48: processed_subjects=12/119
+[2026-08-15 04:22:34] calibration oracle features chunk=36/48: processed_subjects=12/120
+[2026-08-15 04:22:35] calibration oracle features chunk=14/48: processed_subjects=12/120
+[2026-08-15 04:22:35] calibration oracle features chunk=46/48: processed_subjects=12/119
+[2026-08-15 04:22:35] calibration oracle features chunk=9/48: processed_subjects=12/120
+[2026-08-15 04:22:36] calibration oracle features chunk=22/48: processed_subjects=12/120
+[2026-08-15 04:22:37] calibration oracle features chunk=28/48: processed_subjects=12/120
+[2026-08-15 04:22:37] calibration oracle features chunk=19/48: processed_subjects=12/120
+[2026-08-15 04:22:37] calibration oracle features chunk=4/48: processed_subjects=12/120
+[2026-08-15 04:22:39] calibration oracle features chunk=44/48: processed_subjects=12/120
+[2026-08-15 04:22:40] calibration oracle features chunk=31/48: processed_subjects=12/120
+[2026-08-15 04:22:40] calibration oracle features chunk=17/48: processed_subjects=12/120
+[2026-08-15 04:22:40] calibration oracle features chunk=18/48: processed_subjects=12/120
+[2026-08-15 04:22:41] calibration oracle features chunk=47/48: processed_subjects=12/119
+[2026-08-15 04:22:41] calibration oracle features chunk=15/48: processed_subjects=12/120
+[2026-08-15 04:22:42] calibration oracle features chunk=10/48: processed_subjects=12/120
+[2026-08-15 04:22:42] calibration oracle features chunk=30/48: processed_subjects=12/120
+[2026-08-15 04:22:43] calibration oracle features chunk=45/48: processed_subjects=12/119
+[2026-08-15 04:22:43] calibration oracle features chunk=43/48: processed_subjects=12/120
+[2026-08-15 04:22:43] calibration oracle features chunk=27/48: processed_subjects=12/120
+[2026-08-15 04:22:44] calibration oracle features chunk=16/48: processed_subjects=12/120
+[2026-08-15 04:22:44] calibration oracle features chunk=26/48: processed_subjects=12/120
+[2026-08-15 04:22:45] calibration oracle features chunk=29/48: processed_subjects=12/120
+[2026-08-15 04:22:45] calibration oracle features chunk=6/48: processed_subjects=12/120
+[2026-08-15 04:22:45] calibration oracle features chunk=3/48: processed_subjects=12/120
+[2026-08-15 04:22:47] calibration oracle features chunk=32/48: processed_subjects=12/120
+[2026-08-15 04:22:48] calibration oracle features chunk=8/48: processed_subjects=12/120
+[2026-08-15 04:22:49] calibration oracle features chunk=39/48: processed_subjects=12/120
+[2026-08-15 04:22:49] calibration oracle features chunk=13/48: processed_subjects=12/120
+[2026-08-15 04:22:49] calibration oracle features chunk=24/48: processed_subjects=12/120
+[2026-08-15 04:22:51] calibration oracle features chunk=23/48: processed_subjects=12/120
+[2026-08-15 04:22:51] calibration oracle features chunk=38/48: processed_subjects=12/120
+[2026-08-15 04:22:51] calibration oracle features chunk=2/48: processed_subjects=12/120
+[2026-08-15 04:22:52] calibration oracle features chunk=5/48: processed_subjects=12/120
+[2026-08-15 04:22:54] calibration oracle features chunk=25/48: processed_subjects=12/120
+[2026-08-15 04:23:02] calibration oracle features chunk=1/48: processed_subjects=12/120
+[2026-08-15 04:23:04] calibration oracle features chunk=34/48: processed_subjects=12/120
+[2026-08-15 04:33:36] calibration oracle features chunk=35/48: processed_subjects=24/120
+[2026-08-15 04:33:37] calibration oracle features chunk=21/48: processed_subjects=24/120
+[2026-08-15 04:33:37] calibration oracle features chunk=20/48: processed_subjects=24/120
+[2026-08-15 04:33:38] calibration oracle features chunk=28/48: processed_subjects=24/120
+[2026-08-15 04:33:39] calibration oracle features chunk=37/48: processed_subjects=24/120
+[2026-08-15 04:33:40] calibration oracle features chunk=7/48: processed_subjects=24/120
+[2026-08-15 04:33:41] calibration oracle features chunk=19/48: processed_subjects=24/120
+[2026-08-15 04:33:42] calibration oracle features chunk=31/48: processed_subjects=24/120
+[2026-08-15 04:33:42] calibration oracle features chunk=36/48: processed_subjects=24/120
+[2026-08-15 04:33:43] calibration oracle features chunk=40/48: processed_subjects=24/120
+[2026-08-15 04:33:44] calibration oracle features chunk=22/48: processed_subjects=24/120
+[2026-08-15 04:33:44] calibration oracle features chunk=41/48: processed_subjects=24/120
+[2026-08-15 04:33:45] calibration oracle features chunk=33/48: processed_subjects=24/120
+[2026-08-15 04:33:46] calibration oracle features chunk=4/48: processed_subjects=24/120
+[2026-08-15 04:33:46] calibration oracle features chunk=11/48: processed_subjects=24/120
+[2026-08-15 04:33:46] calibration oracle features chunk=14/48: processed_subjects=24/120
+[2026-08-15 04:33:46] calibration oracle features chunk=47/48: processed_subjects=24/119
+[2026-08-15 04:33:48] calibration oracle features chunk=9/48: processed_subjects=24/120
+[2026-08-15 04:33:48] calibration oracle features chunk=42/48: processed_subjects=24/120
+[2026-08-15 04:33:51] calibration oracle features chunk=43/48: processed_subjects=24/120
+[2026-08-15 04:33:51] calibration oracle features chunk=8/48: processed_subjects=24/120
+[2026-08-15 04:33:53] calibration oracle features chunk=44/48: processed_subjects=24/120
+[2026-08-15 04:33:54] calibration oracle features chunk=26/48: processed_subjects=24/120
+[2026-08-15 04:33:54] calibration oracle features chunk=17/48: processed_subjects=24/120
+[2026-08-15 04:33:56] calibration oracle features chunk=27/48: processed_subjects=24/120
+[2026-08-15 04:33:56] calibration oracle features chunk=30/48: processed_subjects=24/120
+[2026-08-15 04:33:56] calibration oracle features chunk=12/48: processed_subjects=24/120
+[2026-08-15 04:33:56] calibration oracle features chunk=45/48: processed_subjects=24/119
+[2026-08-15 04:33:56] calibration oracle features chunk=3/48: processed_subjects=24/120
+[2026-08-15 04:33:57] calibration oracle features chunk=46/48: processed_subjects=24/119
+[2026-08-15 04:33:58] calibration oracle features chunk=15/48: processed_subjects=24/120
+[2026-08-15 04:33:59] calibration oracle features chunk=10/48: processed_subjects=24/120
+[2026-08-15 04:33:59] calibration oracle features chunk=16/48: processed_subjects=24/120
+[2026-08-15 04:34:00] calibration oracle features chunk=48/48: processed_subjects=24/119
+[2026-08-15 04:34:01] calibration oracle features chunk=29/48: processed_subjects=24/120
+[2026-08-15 04:34:02] calibration oracle features chunk=32/48: processed_subjects=24/120
+[2026-08-15 04:34:03] calibration oracle features chunk=38/48: processed_subjects=24/120
+[2026-08-15 04:34:03] calibration oracle features chunk=23/48: processed_subjects=24/120
+[2026-08-15 04:34:04] calibration oracle features chunk=18/48: processed_subjects=24/120
+[2026-08-15 04:34:06] calibration oracle features chunk=2/48: processed_subjects=24/120
+[2026-08-15 04:34:09] calibration oracle features chunk=6/48: processed_subjects=24/120
+[2026-08-15 04:34:14] calibration oracle features chunk=24/48: processed_subjects=24/120
+[2026-08-15 04:34:16] calibration oracle features chunk=5/48: processed_subjects=24/120
+[2026-08-15 04:34:16] calibration oracle features chunk=39/48: processed_subjects=24/120
+[2026-08-15 04:34:20] calibration oracle features chunk=13/48: processed_subjects=24/120
+[2026-08-15 04:34:22] calibration oracle features chunk=25/48: processed_subjects=24/120
+[2026-08-15 04:34:28] calibration oracle features chunk=34/48: processed_subjects=24/120
+[2026-08-15 04:34:39] calibration oracle features chunk=1/48: processed_subjects=24/120
+[2026-08-15 04:44:35] calibration oracle features chunk=37/48: processed_subjects=36/120
+[2026-08-15 04:44:35] calibration oracle features chunk=28/48: processed_subjects=36/120
+[2026-08-15 04:44:45] calibration oracle features chunk=35/48: processed_subjects=36/120
+[2026-08-15 04:44:49] calibration oracle features chunk=33/48: processed_subjects=36/120
+[2026-08-15 04:44:50] calibration oracle features chunk=9/48: processed_subjects=36/120
+[2026-08-15 04:44:50] calibration oracle features chunk=22/48: processed_subjects=36/120
+[2026-08-15 04:44:50] calibration oracle features chunk=20/48: processed_subjects=36/120
+[2026-08-15 04:44:50] calibration oracle features chunk=19/48: processed_subjects=36/120
+[2026-08-15 04:44:51] calibration oracle features chunk=31/48: processed_subjects=36/120
+[2026-08-15 04:44:51] calibration oracle features chunk=21/48: processed_subjects=36/120
+[2026-08-15 04:44:53] calibration oracle features chunk=36/48: processed_subjects=36/120
+[2026-08-15 04:44:53] calibration oracle features chunk=42/48: processed_subjects=36/120
+[2026-08-15 04:44:54] calibration oracle features chunk=40/48: processed_subjects=36/120
+[2026-08-15 04:44:56] calibration oracle features chunk=41/48: processed_subjects=36/120
+[2026-08-15 04:44:57] calibration oracle features chunk=43/48: processed_subjects=36/120
+[2026-08-15 04:44:57] calibration oracle features chunk=26/48: processed_subjects=36/120
+[2026-08-15 04:44:57] calibration oracle features chunk=8/48: processed_subjects=36/120
+[2026-08-15 04:44:58] calibration oracle features chunk=14/48: processed_subjects=36/120
+[2026-08-15 04:45:00] calibration oracle features chunk=47/48: processed_subjects=36/119
+[2026-08-15 04:45:03] calibration oracle features chunk=3/48: processed_subjects=36/120
+[2026-08-15 04:45:04] calibration oracle features chunk=17/48: processed_subjects=36/120
+[2026-08-15 04:45:07] calibration oracle features chunk=11/48: processed_subjects=36/120
+[2026-08-15 04:45:08] calibration oracle features chunk=7/48: processed_subjects=36/120
+[2026-08-15 04:45:09] calibration oracle features chunk=30/48: processed_subjects=36/120
+[2026-08-15 04:45:10] calibration oracle features chunk=15/48: processed_subjects=36/120
+[2026-08-15 04:45:10] calibration oracle features chunk=4/48: processed_subjects=36/120
+[2026-08-15 04:45:11] calibration oracle features chunk=48/48: processed_subjects=36/119
+[2026-08-15 04:45:14] calibration oracle features chunk=2/48: processed_subjects=36/120
+[2026-08-15 04:45:15] calibration oracle features chunk=38/48: processed_subjects=36/120
+[2026-08-15 04:45:15] calibration oracle features chunk=12/48: processed_subjects=36/120
+[2026-08-15 04:45:16] calibration oracle features chunk=27/48: processed_subjects=36/120
+[2026-08-15 04:45:16] calibration oracle features chunk=32/48: processed_subjects=36/120
+[2026-08-15 04:45:17] calibration oracle features chunk=46/48: processed_subjects=36/119
+[2026-08-15 04:45:18] calibration oracle features chunk=18/48: processed_subjects=36/120
+[2026-08-15 04:45:19] calibration oracle features chunk=45/48: processed_subjects=36/119
+[2026-08-15 04:45:19] calibration oracle features chunk=23/48: processed_subjects=36/120
+[2026-08-15 04:45:21] calibration oracle features chunk=16/48: processed_subjects=36/120
+[2026-08-15 04:45:21] calibration oracle features chunk=44/48: processed_subjects=36/120
+[2026-08-15 04:45:24] calibration oracle features chunk=10/48: processed_subjects=36/120
+[2026-08-15 04:45:25] calibration oracle features chunk=6/48: processed_subjects=36/120
+[2026-08-15 04:45:26] calibration oracle features chunk=39/48: processed_subjects=36/120
+[2026-08-15 04:45:29] calibration oracle features chunk=29/48: processed_subjects=36/120
+[2026-08-15 04:45:31] calibration oracle features chunk=24/48: processed_subjects=36/120
+[2026-08-15 04:45:36] calibration oracle features chunk=13/48: processed_subjects=36/120
+[2026-08-15 04:45:42] calibration oracle features chunk=1/48: processed_subjects=36/120
+[2026-08-15 04:45:42] calibration oracle features chunk=5/48: processed_subjects=36/120
+[2026-08-15 04:45:43] calibration oracle features chunk=25/48: processed_subjects=36/120
+[2026-08-15 04:45:51] calibration oracle features chunk=34/48: processed_subjects=36/120
+[2026-08-15 04:55:39] calibration oracle features chunk=37/48: processed_subjects=48/120
+[2026-08-15 04:55:41] calibration oracle features chunk=28/48: processed_subjects=48/120
+[2026-08-15 04:55:41] calibration oracle features chunk=3/48: processed_subjects=48/120
+[2026-08-15 04:55:54] calibration oracle features chunk=35/48: processed_subjects=48/120
+[2026-08-15 04:55:57] calibration oracle features chunk=9/48: processed_subjects=48/120
+[2026-08-15 04:55:57] calibration oracle features chunk=19/48: processed_subjects=48/120
+[2026-08-15 04:55:59] calibration oracle features chunk=33/48: processed_subjects=48/120
+[2026-08-15 04:55:59] calibration oracle features chunk=20/48: processed_subjects=48/120
+[2026-08-15 04:56:00] calibration oracle features chunk=8/48: processed_subjects=48/120
+[2026-08-15 04:56:00] calibration oracle features chunk=26/48: processed_subjects=48/120
+[2026-08-15 04:56:01] calibration oracle features chunk=21/48: processed_subjects=48/120
+[2026-08-15 04:56:02] calibration oracle features chunk=36/48: processed_subjects=48/120
+[2026-08-15 04:56:03] calibration oracle features chunk=47/48: processed_subjects=48/119
+[2026-08-15 04:56:04] calibration oracle features chunk=41/48: processed_subjects=48/120
+[2026-08-15 04:56:05] calibration oracle features chunk=43/48: processed_subjects=48/120
+[2026-08-15 04:56:06] calibration oracle features chunk=40/48: processed_subjects=48/120
+[2026-08-15 04:56:07] calibration oracle features chunk=4/48: processed_subjects=48/120
+[2026-08-15 04:56:09] calibration oracle features chunk=2/48: processed_subjects=48/120
+[2026-08-15 04:56:09] calibration oracle features chunk=22/48: processed_subjects=48/120
+[2026-08-15 04:56:10] calibration oracle features chunk=14/48: processed_subjects=48/120
+[2026-08-15 04:56:11] calibration oracle features chunk=17/48: processed_subjects=48/120
+[2026-08-15 04:56:12] calibration oracle features chunk=42/48: processed_subjects=48/120
+[2026-08-15 04:56:14] calibration oracle features chunk=31/48: processed_subjects=48/120
+[2026-08-15 04:56:18] calibration oracle features chunk=7/48: processed_subjects=48/120
+[2026-08-15 04:56:22] calibration oracle features chunk=38/48: processed_subjects=48/120
+[2026-08-15 04:56:23] calibration oracle features chunk=32/48: processed_subjects=48/120
+[2026-08-15 04:56:23] calibration oracle features chunk=48/48: processed_subjects=48/119
+[2026-08-15 04:56:28] calibration oracle features chunk=30/48: processed_subjects=48/120
+[2026-08-15 04:56:29] calibration oracle features chunk=46/48: processed_subjects=48/119
+[2026-08-15 04:56:31] calibration oracle features chunk=15/48: processed_subjects=48/120
+[2026-08-15 04:56:32] calibration oracle features chunk=27/48: processed_subjects=48/120
+[2026-08-15 04:56:32] calibration oracle features chunk=18/48: processed_subjects=48/120
+[2026-08-15 04:56:34] calibration oracle features chunk=23/48: processed_subjects=48/120
+[2026-08-15 04:56:35] calibration oracle features chunk=44/48: processed_subjects=48/120
+[2026-08-15 04:56:35] calibration oracle features chunk=39/48: processed_subjects=48/120
+[2026-08-15 04:56:36] calibration oracle features chunk=45/48: processed_subjects=48/119
+[2026-08-15 04:56:36] calibration oracle features chunk=12/48: processed_subjects=48/120
+[2026-08-15 04:56:37] calibration oracle features chunk=1/48: processed_subjects=48/120
+[2026-08-15 04:56:38] calibration oracle features chunk=11/48: processed_subjects=48/120
+[2026-08-15 04:56:39] calibration oracle features chunk=10/48: processed_subjects=48/120
+[2026-08-15 04:56:44] calibration oracle features chunk=16/48: processed_subjects=48/120
+[2026-08-15 04:56:46] calibration oracle features chunk=5/48: processed_subjects=48/120
+[2026-08-15 04:56:51] calibration oracle features chunk=24/48: processed_subjects=48/120
+[2026-08-15 04:56:53] calibration oracle features chunk=29/48: processed_subjects=48/120
+[2026-08-15 04:56:54] calibration oracle features chunk=25/48: processed_subjects=48/120
+[2026-08-15 04:56:56] calibration oracle features chunk=6/48: processed_subjects=48/120
+[2026-08-15 04:56:59] calibration oracle features chunk=13/48: processed_subjects=48/120
+[2026-08-15 04:57:23] calibration oracle features chunk=34/48: processed_subjects=48/120
+[2026-08-15 05:06:17] calibration oracle features chunk=3/48: processed_subjects=60/120
+[2026-08-15 05:06:40] calibration oracle features chunk=37/48: processed_subjects=60/120
+[2026-08-15 05:06:47] calibration oracle features chunk=4/48: processed_subjects=60/120
+[2026-08-15 05:06:53] calibration oracle features chunk=28/48: processed_subjects=60/120
+[2026-08-15 05:07:01] calibration oracle features chunk=35/48: processed_subjects=60/120
+[2026-08-15 05:07:02] calibration oracle features chunk=26/48: processed_subjects=60/120
+[2026-08-15 05:07:02] calibration oracle features chunk=2/48: processed_subjects=60/120
+[2026-08-15 05:07:05] calibration oracle features chunk=19/48: processed_subjects=60/120
+[2026-08-15 05:07:06] calibration oracle features chunk=33/48: processed_subjects=60/120
+[2026-08-15 05:07:07] calibration oracle features chunk=47/48: processed_subjects=60/119
+[2026-08-15 05:07:09] calibration oracle features chunk=36/48: processed_subjects=60/120
+[2026-08-15 05:07:14] calibration oracle features chunk=9/48: processed_subjects=60/120
+[2026-08-15 05:07:14] calibration oracle features chunk=40/48: processed_subjects=60/120
+[2026-08-15 05:07:14] calibration oracle features chunk=41/48: processed_subjects=60/120
+[2026-08-15 05:07:15] calibration oracle features chunk=20/48: processed_subjects=60/120
+[2026-08-15 05:07:16] calibration oracle features chunk=21/48: processed_subjects=60/120
+[2026-08-15 05:07:17] calibration oracle features chunk=42/48: processed_subjects=60/120
+[2026-08-15 05:07:17] calibration oracle features chunk=22/48: processed_subjects=60/120
+[2026-08-15 05:07:20] calibration oracle features chunk=5/48: processed_subjects=60/120
+[2026-08-15 05:07:21] calibration oracle features chunk=43/48: processed_subjects=60/120
+[2026-08-15 05:07:21] calibration oracle features chunk=8/48: processed_subjects=60/120
+[2026-08-15 05:07:21] calibration oracle features chunk=17/48: processed_subjects=60/120
+[2026-08-15 05:07:26] calibration oracle features chunk=14/48: processed_subjects=60/120
+[2026-08-15 05:07:26] calibration oracle features chunk=7/48: processed_subjects=60/120
+[2026-08-15 05:07:26] calibration oracle features chunk=1/48: processed_subjects=60/120
+[2026-08-15 05:07:27] calibration oracle features chunk=31/48: processed_subjects=60/120
+[2026-08-15 05:07:28] calibration oracle features chunk=48/48: processed_subjects=60/119
+[2026-08-15 05:07:41] calibration oracle features chunk=6/48: processed_subjects=60/120
+[2026-08-15 05:07:43] calibration oracle features chunk=32/48: processed_subjects=60/120
+[2026-08-15 05:07:43] calibration oracle features chunk=44/48: processed_subjects=60/120
+[2026-08-15 05:07:44] calibration oracle features chunk=27/48: processed_subjects=60/120
+[2026-08-15 05:07:45] calibration oracle features chunk=45/48: processed_subjects=60/119
+[2026-08-15 05:07:45] calibration oracle features chunk=18/48: processed_subjects=60/120
+[2026-08-15 05:07:46] calibration oracle features chunk=38/48: processed_subjects=60/120
+[2026-08-15 05:07:46] calibration oracle features chunk=30/48: processed_subjects=60/120
+[2026-08-15 05:07:49] calibration oracle features chunk=15/48: processed_subjects=60/120
+[2026-08-15 05:07:50] calibration oracle features chunk=23/48: processed_subjects=60/120
+[2026-08-15 05:07:52] calibration oracle features chunk=39/48: processed_subjects=60/120
+[2026-08-15 05:07:53] calibration oracle features chunk=46/48: processed_subjects=60/119
+[2026-08-15 05:07:54] calibration oracle features chunk=12/48: processed_subjects=60/120
+[2026-08-15 05:07:55] calibration oracle features chunk=16/48: processed_subjects=60/120
+[2026-08-15 05:08:02] calibration oracle features chunk=10/48: processed_subjects=60/120
+[2026-08-15 05:08:11] calibration oracle features chunk=13/48: processed_subjects=60/120
+[2026-08-15 05:08:13] calibration oracle features chunk=11/48: processed_subjects=60/120
+[2026-08-15 05:08:13] calibration oracle features chunk=25/48: processed_subjects=60/120
+[2026-08-15 05:08:14] calibration oracle features chunk=29/48: processed_subjects=60/120
+[2026-08-15 05:08:14] calibration oracle features chunk=24/48: processed_subjects=60/120
+[2026-08-15 05:08:45] calibration oracle features chunk=34/48: processed_subjects=60/120
+[2026-08-15 05:16:54] calibration oracle features chunk=3/48: processed_subjects=72/120
+[2026-08-15 05:17:27] calibration oracle features chunk=4/48: processed_subjects=72/120
+[2026-08-15 05:17:47] calibration oracle features chunk=37/48: processed_subjects=72/120
+[2026-08-15 05:17:54] calibration oracle features chunk=8/48: processed_subjects=72/120
+[2026-08-15 05:17:57] calibration oracle features chunk=28/48: processed_subjects=72/120
+[2026-08-15 05:17:58] calibration oracle features chunk=2/48: processed_subjects=72/120
+[2026-08-15 05:18:03] calibration oracle features chunk=9/48: processed_subjects=72/120
+[2026-08-15 05:18:04] calibration oracle features chunk=26/48: processed_subjects=72/120
+[2026-08-15 05:18:06] calibration oracle features chunk=35/48: processed_subjects=72/120
+[2026-08-15 05:18:09] calibration oracle features chunk=7/48: processed_subjects=72/120
+[2026-08-15 05:18:10] calibration oracle features chunk=5/48: processed_subjects=72/120
+[2026-08-15 05:18:17] calibration oracle features chunk=33/48: processed_subjects=72/120
+[2026-08-15 05:18:19] calibration oracle features chunk=36/48: processed_subjects=72/120
+[2026-08-15 05:18:19] calibration oracle features chunk=19/48: processed_subjects=72/120
+[2026-08-15 05:18:22] calibration oracle features chunk=40/48: processed_subjects=72/120
+[2026-08-15 05:18:23] calibration oracle features chunk=1/48: processed_subjects=72/120
+[2026-08-15 05:18:25] calibration oracle features chunk=6/48: processed_subjects=72/120
+[2026-08-15 05:18:28] calibration oracle features chunk=22/48: processed_subjects=72/120
+[2026-08-15 05:18:29] calibration oracle features chunk=20/48: processed_subjects=72/120
+[2026-08-15 05:18:30] calibration oracle features chunk=43/48: processed_subjects=72/120
+[2026-08-15 05:18:31] calibration oracle features chunk=47/48: processed_subjects=72/119
+[2026-08-15 05:18:32] calibration oracle features chunk=21/48: processed_subjects=72/120
+[2026-08-15 05:18:32] calibration oracle features chunk=31/48: processed_subjects=72/120
+[2026-08-15 05:18:36] calibration oracle features chunk=14/48: processed_subjects=72/120
+[2026-08-15 05:18:38] calibration oracle features chunk=17/48: processed_subjects=72/120
+[2026-08-15 05:18:38] calibration oracle features chunk=48/48: processed_subjects=72/119
+[2026-08-15 05:18:38] calibration oracle features chunk=42/48: processed_subjects=72/120
+[2026-08-15 05:18:41] calibration oracle features chunk=41/48: processed_subjects=72/120
+[2026-08-15 05:18:52] calibration oracle features chunk=27/48: processed_subjects=72/120
+[2026-08-15 05:18:54] calibration oracle features chunk=45/48: processed_subjects=72/119
+[2026-08-15 05:18:54] calibration oracle features chunk=10/48: processed_subjects=72/120
+[2026-08-15 05:18:55] calibration oracle features chunk=32/48: processed_subjects=72/120
+[2026-08-15 05:18:55] calibration oracle features chunk=44/48: processed_subjects=72/120
+[2026-08-15 05:18:56] calibration oracle features chunk=15/48: processed_subjects=72/120
+[2026-08-15 05:19:00] calibration oracle features chunk=18/48: processed_subjects=72/120
+[2026-08-15 05:19:03] calibration oracle features chunk=12/48: processed_subjects=72/120
+[2026-08-15 05:19:07] calibration oracle features chunk=39/48: processed_subjects=72/120
+[2026-08-15 05:19:08] calibration oracle features chunk=23/48: processed_subjects=72/120
+[2026-08-15 05:19:09] calibration oracle features chunk=30/48: processed_subjects=72/120
+[2026-08-15 05:19:09] calibration oracle features chunk=46/48: processed_subjects=72/119
+[2026-08-15 05:19:16] calibration oracle features chunk=16/48: processed_subjects=72/120
+[2026-08-15 05:19:19] calibration oracle features chunk=38/48: processed_subjects=72/120
+[2026-08-15 05:19:23] calibration oracle features chunk=25/48: processed_subjects=72/120
+[2026-08-15 05:19:26] calibration oracle features chunk=24/48: processed_subjects=72/120
+[2026-08-15 05:19:36] calibration oracle features chunk=13/48: processed_subjects=72/120
+[2026-08-15 05:19:39] calibration oracle features chunk=29/48: processed_subjects=72/120
+[2026-08-15 05:19:40] calibration oracle features chunk=11/48: processed_subjects=72/120
+[2026-08-15 05:20:08] calibration oracle features chunk=34/48: processed_subjects=72/120
+[2026-08-15 05:27:29] calibration oracle features chunk=3/48: processed_subjects=84/120
+[2026-08-15 05:28:16] calibration oracle features chunk=4/48: processed_subjects=84/120
+[2026-08-15 05:28:26] calibration oracle features chunk=8/48: processed_subjects=84/120
+[2026-08-15 05:28:39] calibration oracle features chunk=9/48: processed_subjects=84/120
+[2026-08-15 05:28:50] calibration oracle features chunk=2/48: processed_subjects=84/120
+[2026-08-15 05:28:55] calibration oracle features chunk=5/48: processed_subjects=84/120
+[2026-08-15 05:28:55] calibration oracle features chunk=37/48: processed_subjects=84/120
+[2026-08-15 05:28:59] calibration oracle features chunk=7/48: processed_subjects=84/120
+[2026-08-15 05:29:00] calibration oracle features chunk=28/48: processed_subjects=84/120
+[2026-08-15 05:29:08] calibration oracle features chunk=1/48: processed_subjects=84/120
+[2026-08-15 05:29:09] calibration oracle features chunk=6/48: processed_subjects=84/120
+[2026-08-15 05:29:10] calibration oracle features chunk=26/48: processed_subjects=84/120
+[2026-08-15 05:29:11] calibration oracle features chunk=35/48: processed_subjects=84/120
+[2026-08-15 05:29:22] calibration oracle features chunk=33/48: processed_subjects=84/120
+[2026-08-15 05:29:30] calibration oracle features chunk=19/48: processed_subjects=84/120
+[2026-08-15 05:29:33] calibration oracle features chunk=40/48: processed_subjects=84/120
+[2026-08-15 05:29:35] calibration oracle features chunk=31/48: processed_subjects=84/120
+[2026-08-15 05:29:36] calibration oracle features chunk=43/48: processed_subjects=84/120
+[2026-08-15 05:29:39] calibration oracle features chunk=22/48: processed_subjects=84/120
+[2026-08-15 05:29:40] calibration oracle features chunk=36/48: processed_subjects=84/120
+[2026-08-15 05:29:41] calibration oracle features chunk=42/48: processed_subjects=84/120
+[2026-08-15 05:29:44] calibration oracle features chunk=14/48: processed_subjects=84/120
+[2026-08-15 05:29:48] calibration oracle features chunk=20/48: processed_subjects=84/120
+[2026-08-15 05:29:49] calibration oracle features chunk=10/48: processed_subjects=84/120
+[2026-08-15 05:29:49] calibration oracle features chunk=48/48: processed_subjects=84/119
+[2026-08-15 05:29:51] calibration oracle features chunk=17/48: processed_subjects=84/120
+[2026-08-15 05:29:54] calibration oracle features chunk=47/48: processed_subjects=84/119
+[2026-08-15 05:29:56] calibration oracle features chunk=21/48: processed_subjects=84/120
+[2026-08-15 05:29:57] calibration oracle features chunk=41/48: processed_subjects=84/120
+[2026-08-15 05:29:59] calibration oracle features chunk=27/48: processed_subjects=84/120
+[2026-08-15 05:30:04] calibration oracle features chunk=45/48: processed_subjects=84/119
+[2026-08-15 05:30:06] calibration oracle features chunk=12/48: processed_subjects=84/120
+[2026-08-15 05:30:08] calibration oracle features chunk=32/48: processed_subjects=84/120
+[2026-08-15 05:30:13] calibration oracle features chunk=15/48: processed_subjects=84/120
+[2026-08-15 05:30:18] calibration oracle features chunk=23/48: processed_subjects=84/120
+[2026-08-15 05:30:21] calibration oracle features chunk=44/48: processed_subjects=84/120
+[2026-08-15 05:30:21] calibration oracle features chunk=18/48: processed_subjects=84/120
+[2026-08-15 05:30:25] calibration oracle features chunk=39/48: processed_subjects=84/120
+[2026-08-15 05:30:29] calibration oracle features chunk=11/48: processed_subjects=84/120
+[2026-08-15 05:30:31] calibration oracle features chunk=30/48: processed_subjects=84/120
+[2026-08-15 05:30:32] calibration oracle features chunk=24/48: processed_subjects=84/120
+[2026-08-15 05:30:34] calibration oracle features chunk=25/48: processed_subjects=84/120
+[2026-08-15 05:30:35] calibration oracle features chunk=46/48: processed_subjects=84/119
+[2026-08-15 05:30:35] calibration oracle features chunk=16/48: processed_subjects=84/120
+[2026-08-15 05:30:47] calibration oracle features chunk=29/48: processed_subjects=84/120
+[2026-08-15 05:30:49] calibration oracle features chunk=38/48: processed_subjects=84/120
+[2026-08-15 05:30:54] calibration oracle features chunk=13/48: processed_subjects=84/120
+[2026-08-15 05:31:21] calibration oracle features chunk=34/48: processed_subjects=84/120
+[2026-08-15 05:38:14] calibration oracle features chunk=3/48: processed_subjects=96/120
+[2026-08-15 05:39:02] calibration oracle features chunk=8/48: processed_subjects=96/120
+[2026-08-15 05:39:08] calibration oracle features chunk=4/48: processed_subjects=96/120
+[2026-08-15 05:39:18] calibration oracle features chunk=9/48: processed_subjects=96/120
+[2026-08-15 05:39:26] calibration oracle features chunk=5/48: processed_subjects=96/120
+[2026-08-15 05:39:28] calibration oracle features chunk=2/48: processed_subjects=96/120
+[2026-08-15 05:39:47] calibration oracle features chunk=6/48: processed_subjects=96/120
+[2026-08-15 05:40:00] calibration oracle features chunk=7/48: processed_subjects=96/120
+[2026-08-15 05:40:02] calibration oracle features chunk=37/48: processed_subjects=96/120
+[2026-08-15 05:40:06] calibration oracle features chunk=1/48: processed_subjects=96/120
+[2026-08-15 05:40:08] calibration oracle features chunk=28/48: processed_subjects=96/120
+[2026-08-15 05:40:13] calibration oracle features chunk=35/48: processed_subjects=96/120
+[2026-08-15 05:40:25] calibration oracle features chunk=10/48: processed_subjects=96/120
+[2026-08-15 05:40:27] calibration oracle features chunk=33/48: processed_subjects=96/120
+[2026-08-15 05:40:29] calibration oracle features chunk=26/48: processed_subjects=96/120
+[2026-08-15 05:40:33] calibration oracle features chunk=14/48: processed_subjects=96/120
+[2026-08-15 05:40:36] calibration oracle features chunk=31/48: processed_subjects=96/120
+[2026-08-15 05:40:38] calibration oracle features chunk=19/48: processed_subjects=96/120
+[2026-08-15 05:40:45] calibration oracle features chunk=22/48: processed_subjects=96/120
+[2026-08-15 05:40:50] calibration oracle features chunk=40/48: processed_subjects=96/120
+[2026-08-15 05:40:51] calibration oracle features chunk=36/48: processed_subjects=96/120
+[2026-08-15 05:41:01] calibration oracle features chunk=43/48: processed_subjects=96/120
+[2026-08-15 05:41:01] calibration oracle features chunk=42/48: processed_subjects=96/120
+[2026-08-15 05:41:01] calibration oracle features chunk=48/48: processed_subjects=96/119
+[2026-08-15 05:41:02] calibration oracle features chunk=12/48: processed_subjects=96/120
+[2026-08-15 05:41:05] calibration oracle features chunk=20/48: processed_subjects=96/120
+[2026-08-15 05:41:05] calibration oracle features chunk=41/48: processed_subjects=96/120
+[2026-08-15 05:41:05] calibration oracle features chunk=15/48: processed_subjects=96/120
+[2026-08-15 05:41:06] calibration oracle features chunk=17/48: processed_subjects=96/120
+[2026-08-15 05:41:12] calibration oracle features chunk=47/48: processed_subjects=96/119
+[2026-08-15 05:41:13] calibration oracle features chunk=27/48: processed_subjects=96/120
+[2026-08-15 05:41:16] calibration oracle features chunk=21/48: processed_subjects=96/120
+[2026-08-15 05:41:16] calibration oracle features chunk=11/48: processed_subjects=96/120
+[2026-08-15 05:41:17] calibration oracle features chunk=45/48: processed_subjects=96/119
+[2026-08-15 05:41:31] calibration oracle features chunk=32/48: processed_subjects=96/120
+[2026-08-15 05:41:32] calibration oracle features chunk=23/48: processed_subjects=96/120
+[2026-08-15 05:41:38] calibration oracle features chunk=16/48: processed_subjects=96/120
+[2026-08-15 05:41:38] calibration oracle features chunk=44/48: processed_subjects=96/120
+[2026-08-15 05:41:39] calibration oracle features chunk=18/48: processed_subjects=96/120
+[2026-08-15 05:41:42] calibration oracle features chunk=46/48: processed_subjects=96/119
+[2026-08-15 05:41:44] calibration oracle features chunk=39/48: processed_subjects=96/120
+[2026-08-15 05:41:45] calibration oracle features chunk=24/48: processed_subjects=96/120
+[2026-08-15 05:41:46] calibration oracle features chunk=25/48: processed_subjects=96/120
+[2026-08-15 05:41:47] calibration oracle features chunk=13/48: processed_subjects=96/120
+[2026-08-15 05:41:49] calibration oracle features chunk=29/48: processed_subjects=96/120
+[2026-08-15 05:41:56] calibration oracle features chunk=30/48: processed_subjects=96/120
+[2026-08-15 05:42:22] calibration oracle features chunk=38/48: processed_subjects=96/120
+[2026-08-15 05:42:32] calibration oracle features chunk=34/48: processed_subjects=96/120
+[2026-08-15 05:48:47] calibration oracle features chunk=3/48: processed_subjects=108/120
+[2026-08-15 05:49:37] calibration oracle features chunk=4/48: processed_subjects=108/120
+[2026-08-15 05:49:39] calibration oracle features chunk=8/48: processed_subjects=108/120
+[2026-08-15 05:50:02] calibration oracle features chunk=9/48: processed_subjects=108/120
+[2026-08-15 05:50:11] calibration oracle features chunk=5/48: processed_subjects=108/120
+[2026-08-15 05:50:23] calibration oracle features chunk=2/48: processed_subjects=108/120
+[2026-08-15 05:50:37] calibration oracle features chunk=7/48: processed_subjects=108/120
+[2026-08-15 05:50:42] calibration oracle features chunk=6/48: processed_subjects=108/120
+[2026-08-15 05:50:56] calibration oracle features chunk=1/48: processed_subjects=108/120
+[2026-08-15 05:51:06] calibration oracle features chunk=37/48: processed_subjects=108/120
+[2026-08-15 05:51:15] calibration oracle features chunk=28/48: processed_subjects=108/120
+[2026-08-15 05:51:17] calibration oracle features chunk=10/48: processed_subjects=108/120
+[2026-08-15 05:51:17] calibration oracle features chunk=14/48: processed_subjects=108/120
+[2026-08-15 05:51:18] calibration oracle features chunk=35/48: processed_subjects=108/120
+[2026-08-15 05:51:30] calibration oracle features chunk=33/48: processed_subjects=108/120
+[2026-08-15 05:51:36] calibration oracle features chunk=26/48: processed_subjects=108/120
+[2026-08-15 05:51:45] calibration oracle features chunk=31/48: processed_subjects=108/120
+[2026-08-15 05:51:45] calibration oracle features chunk=17/48: processed_subjects=108/120
+[2026-08-15 05:51:48] calibration oracle features chunk=12/48: processed_subjects=108/120
+[2026-08-15 05:51:52] calibration oracle features chunk=19/48: processed_subjects=108/120
+[2026-08-15 05:51:57] calibration oracle features chunk=22/48: processed_subjects=108/120
+[2026-08-15 05:52:01] calibration oracle features chunk=40/48: processed_subjects=108/120
+[2026-08-15 05:52:03] calibration oracle features chunk=36/48: processed_subjects=108/120
+[2026-08-15 05:52:06] calibration oracle features chunk=15/48: processed_subjects=108/120
+[2026-08-15 05:52:06] calibration oracle features chunk=48/48: processed_subjects=108/119
+[2026-08-15 05:52:09] calibration oracle features chunk=11/48: processed_subjects=108/120
+[2026-08-15 05:52:13] calibration oracle features chunk=42/48: processed_subjects=108/120
+[2026-08-15 05:52:13] calibration oracle features chunk=41/48: processed_subjects=108/120
+[2026-08-15 05:52:16] calibration oracle features chunk=43/48: processed_subjects=108/120
+[2026-08-15 05:52:18] calibration oracle features chunk=20/48: processed_subjects=108/120
+[2026-08-15 05:52:22] calibration oracle features chunk=21/48: processed_subjects=108/120
+[2026-08-15 05:52:25] calibration oracle features chunk=16/48: processed_subjects=108/120
+[2026-08-15 05:52:27] calibration oracle features chunk=47/48: processed_subjects=108/119
+[2026-08-15 05:52:31] calibration oracle features chunk=45/48: processed_subjects=108/119
+[2026-08-15 05:52:34] calibration oracle features chunk=18/48: processed_subjects=108/120
+[2026-08-15 05:52:39] calibration oracle features chunk=13/48: processed_subjects=108/120
+[2026-08-15 05:52:42] calibration oracle features chunk=27/48: processed_subjects=108/120
+[2026-08-15 05:52:50] calibration oracle features chunk=23/48: processed_subjects=108/120
+[2026-08-15 05:52:51] calibration oracle features chunk=39/48: processed_subjects=108/120
+[2026-08-15 05:52:55] calibration oracle features chunk=32/48: processed_subjects=108/120
+[2026-08-15 05:52:59] calibration oracle features chunk=25/48: processed_subjects=108/120
+[2026-08-15 05:53:03] calibration oracle features chunk=44/48: processed_subjects=108/120
+[2026-08-15 05:53:03] calibration oracle features chunk=29/48: processed_subjects=108/120
+[2026-08-15 05:53:05] calibration oracle features chunk=24/48: processed_subjects=108/120
+[2026-08-15 05:53:05] calibration oracle features chunk=46/48: processed_subjects=108/119
+[2026-08-15 05:53:17] calibration oracle features chunk=30/48: processed_subjects=108/120
+[2026-08-15 05:53:40] calibration oracle features chunk=38/48: processed_subjects=108/120
+[2026-08-15 05:53:55] calibration oracle features chunk=34/48: processed_subjects=108/120
+[2026-08-15 05:59:21] calibration oracle features chunk=3/48: processed_subjects=120/120
+[2026-08-15 05:59:21] calibration oracle features: completed_chunks=1/48 completed_subjects=120/5756
+[2026-08-15 06:00:11] calibration oracle features chunk=4/48: processed_subjects=120/120
+[2026-08-15 06:00:11] calibration oracle features: completed_chunks=2/48 completed_subjects=240/5756
+[2026-08-15 06:00:15] calibration oracle features chunk=8/48: processed_subjects=120/120
+[2026-08-15 06:00:15] calibration oracle features: completed_chunks=3/48 completed_subjects=360/5756
+[2026-08-15 06:00:29] calibration oracle features chunk=9/48: processed_subjects=120/120
+[2026-08-15 06:00:29] calibration oracle features: completed_chunks=4/48 completed_subjects=480/5756
+[2026-08-15 06:00:51] calibration oracle features chunk=5/48: processed_subjects=120/120
+[2026-08-15 06:00:51] calibration oracle features: completed_chunks=5/48 completed_subjects=600/5756
+[2026-08-15 06:01:07] calibration oracle features chunk=2/48: processed_subjects=120/120
+[2026-08-15 06:01:07] calibration oracle features: completed_chunks=6/48 completed_subjects=720/5756
+[2026-08-15 06:01:21] calibration oracle features chunk=7/48: processed_subjects=120/120
+[2026-08-15 06:01:21] calibration oracle features: completed_chunks=7/48 completed_subjects=840/5756
+[2026-08-15 06:01:37] calibration oracle features chunk=1/48: processed_subjects=120/120
+[2026-08-15 06:01:37] calibration oracle features: completed_chunks=8/48 completed_subjects=960/5756
+[2026-08-15 06:01:41] calibration oracle features chunk=6/48: processed_subjects=120/120
+[2026-08-15 06:01:41] calibration oracle features: completed_chunks=9/48 completed_subjects=1080/5756
+[2026-08-15 06:01:51] calibration oracle features chunk=10/48: processed_subjects=120/120
+[2026-08-15 06:01:51] calibration oracle features: completed_chunks=10/48 completed_subjects=1200/5756
+[2026-08-15 06:02:00] calibration oracle features chunk=14/48: processed_subjects=120/120
+[2026-08-15 06:02:00] calibration oracle features: completed_chunks=11/48 completed_subjects=1320/5756
+[2026-08-15 06:02:11] calibration oracle features chunk=48/48: processed_subjects=119/119
+[2026-08-15 06:02:11] calibration oracle features: completed_chunks=12/48 completed_subjects=1439/5756
+[2026-08-15 06:02:24] calibration oracle features chunk=35/48: processed_subjects=120/120
+[2026-08-15 06:02:24] calibration oracle features: completed_chunks=13/48 completed_subjects=1559/5756
+[2026-08-15 06:02:27] calibration oracle features chunk=37/48: processed_subjects=120/120
+[2026-08-15 06:02:27] calibration oracle features: completed_chunks=14/48 completed_subjects=1679/5756
+[2026-08-15 06:02:27] calibration oracle features chunk=17/48: processed_subjects=120/120
+[2026-08-15 06:02:27] calibration oracle features: completed_chunks=15/48 completed_subjects=1799/5756
+[2026-08-15 06:02:29] calibration oracle features chunk=33/48: processed_subjects=120/120
+[2026-08-15 06:02:29] calibration oracle features: completed_chunks=16/48 completed_subjects=1919/5756
+[2026-08-15 06:02:31] calibration oracle features chunk=12/48: processed_subjects=120/120
+[2026-08-15 06:02:31] calibration oracle features: completed_chunks=17/48 completed_subjects=2039/5756
+[2026-08-15 06:02:32] calibration oracle features chunk=28/48: processed_subjects=120/120
+[2026-08-15 06:02:32] calibration oracle features: completed_chunks=18/48 completed_subjects=2159/5756
+[2026-08-15 06:02:37] calibration oracle features chunk=26/48: processed_subjects=120/120
+[2026-08-15 06:02:37] calibration oracle features: completed_chunks=19/48 completed_subjects=2279/5756
+[2026-08-15 06:02:38] calibration oracle features chunk=19/48: processed_subjects=120/120
+[2026-08-15 06:02:38] calibration oracle features: completed_chunks=20/48 completed_subjects=2399/5756
+[2026-08-15 06:02:39] calibration oracle features chunk=31/48: processed_subjects=120/120
+[2026-08-15 06:02:40] calibration oracle features: completed_chunks=21/48 completed_subjects=2519/5756
+[2026-08-15 06:02:42] calibration oracle features chunk=45/48: processed_subjects=119/119
+[2026-08-15 06:02:42] calibration oracle features: completed_chunks=22/48 completed_subjects=2638/5756
+[2026-08-15 06:02:45] calibration oracle features chunk=47/48: processed_subjects=119/119
+[2026-08-15 06:02:45] calibration oracle features: completed_chunks=23/48 completed_subjects=2757/5756
+[2026-08-15 06:02:54] calibration oracle features chunk=20/48: processed_subjects=120/120
+[2026-08-15 06:02:54] calibration oracle features: completed_chunks=24/48 completed_subjects=2877/5756
+[2026-08-15 06:02:55] calibration oracle features chunk=22/48: processed_subjects=120/120
+[2026-08-15 06:02:55] calibration oracle features: completed_chunks=25/48 completed_subjects=2997/5756
+[2026-08-15 06:02:56] calibration oracle features chunk=15/48: processed_subjects=120/120
+[2026-08-15 06:02:56] calibration oracle features: completed_chunks=26/48 completed_subjects=3117/5756
+[2026-08-15 06:03:02] calibration oracle features chunk=16/48: processed_subjects=120/120
+[2026-08-15 06:03:02] calibration oracle features: completed_chunks=27/48 completed_subjects=3237/5756
+[2026-08-15 06:03:04] calibration oracle features chunk=36/48: processed_subjects=120/120
+[2026-08-15 06:03:04] calibration oracle features: completed_chunks=28/48 completed_subjects=3357/5756
+[2026-08-15 06:03:04] calibration oracle features chunk=11/48: processed_subjects=120/120
+[2026-08-15 06:03:04] calibration oracle features: completed_chunks=29/48 completed_subjects=3477/5756
+[2026-08-15 06:03:07] calibration oracle features chunk=40/48: processed_subjects=120/120
+[2026-08-15 06:03:07] calibration oracle features: completed_chunks=30/48 completed_subjects=3597/5756
+[2026-08-15 06:03:08] calibration oracle features chunk=18/48: processed_subjects=120/120
+[2026-08-15 06:03:08] calibration oracle features: completed_chunks=31/48 completed_subjects=3717/5756
+[2026-08-15 06:03:08] calibration oracle features chunk=42/48: processed_subjects=120/120
+[2026-08-15 06:03:08] calibration oracle features: completed_chunks=32/48 completed_subjects=3837/5756
+[2026-08-15 06:03:13] calibration oracle features chunk=41/48: processed_subjects=120/120
+[2026-08-15 06:03:13] calibration oracle features: completed_chunks=33/48 completed_subjects=3957/5756
+[2026-08-15 06:03:14] calibration oracle features chunk=21/48: processed_subjects=120/120
+[2026-08-15 06:03:14] calibration oracle features: completed_chunks=34/48 completed_subjects=4077/5756
+[2026-08-15 06:03:19] calibration oracle features chunk=13/48: processed_subjects=120/120
+[2026-08-15 06:03:19] calibration oracle features: completed_chunks=35/48 completed_subjects=4197/5756
+[2026-08-15 06:03:22] calibration oracle features chunk=46/48: processed_subjects=119/119
+[2026-08-15 06:03:22] calibration oracle features: completed_chunks=36/48 completed_subjects=4316/5756
+[2026-08-15 06:03:27] calibration oracle features chunk=43/48: processed_subjects=120/120
+[2026-08-15 06:03:27] calibration oracle features: completed_chunks=37/48 completed_subjects=4436/5756
+[2026-08-15 06:03:45] calibration oracle features chunk=27/48: processed_subjects=120/120
+[2026-08-15 06:03:45] calibration oracle features: completed_chunks=38/48 completed_subjects=4556/5756
+[2026-08-15 06:03:48] calibration oracle features chunk=23/48: processed_subjects=120/120
+[2026-08-15 06:03:48] calibration oracle features: completed_chunks=39/48 completed_subjects=4676/5756
+[2026-08-15 06:03:48] calibration oracle features chunk=39/48: processed_subjects=120/120
+[2026-08-15 06:03:48] calibration oracle features: completed_chunks=40/48 completed_subjects=4796/5756
+[2026-08-15 06:03:51] calibration oracle features chunk=25/48: processed_subjects=120/120
+[2026-08-15 06:03:51] calibration oracle features: completed_chunks=41/48 completed_subjects=4916/5756
+[2026-08-15 06:03:57] calibration oracle features chunk=32/48: processed_subjects=120/120
+[2026-08-15 06:03:57] calibration oracle features: completed_chunks=42/48 completed_subjects=5036/5756
+[2026-08-15 06:04:01] calibration oracle features chunk=24/48: processed_subjects=120/120
+[2026-08-15 06:04:01] calibration oracle features: completed_chunks=43/48 completed_subjects=5156/5756
+[2026-08-15 06:04:02] calibration oracle features chunk=29/48: processed_subjects=120/120
+[2026-08-15 06:04:03] calibration oracle features: completed_chunks=44/48 completed_subjects=5276/5756
+[2026-08-15 06:04:06] calibration oracle features chunk=30/48: processed_subjects=120/120
+[2026-08-15 06:04:06] calibration oracle features: completed_chunks=45/48 completed_subjects=5396/5756
+[2026-08-15 06:04:12] calibration oracle features chunk=44/48: processed_subjects=120/120
+[2026-08-15 06:04:12] calibration oracle features: completed_chunks=46/48 completed_subjects=5516/5756
+[2026-08-15 06:04:20] calibration oracle features chunk=38/48: processed_subjects=120/120
+[2026-08-15 06:04:20] calibration oracle features: completed_chunks=47/48 completed_subjects=5636/5756
+[2026-08-15 06:04:32] calibration oracle features chunk=34/48: processed_subjects=120/120
+[2026-08-15 06:04:32] calibration oracle features: completed_chunks=48/48 completed_subjects=5756/5756
+[2026-08-15 06:04:32] Finished calibration oracle features with shape (5756, 73)
+[2026-08-15 06:04:32] Fitting calibration model across penalties [0.1, 1.0, 10.0]
+[2026-08-15 06:04:32] Finished calibration model fit with selected penalty 0.1
+[2026-08-15 06:04:32] Preparing heldout distance cache under /nfs/home/adas23/projects/AlphaEvolve/prio_func_disc_runs/oracle_priority_20260810_032011/cycle_0004/distance_cache_oncoarray
+[2026-08-15 06:04:32] Building heldout oracle features using training + calibration data; this is often the slowest step
+[2026-08-15 06:04:32] heldout oracle features: launching_chunks=48 total_subjects=3200 variants=73 min_chunk_subjects=66 max_chunk_subjects=67
+[2026-08-15 06:04:46] heldout oracle features chunk=12/48: started pid=851336 subjects=67 variants=73
+[2026-08-15 06:04:46] heldout oracle features chunk=15/48: started pid=851339 subjects=67 variants=73
+[2026-08-15 06:04:46] heldout oracle features chunk=5/48: started pid=851329 subjects=67 variants=73
+[2026-08-15 06:04:47] heldout oracle features chunk=3/48: started pid=851327 subjects=67 variants=73
+[2026-08-15 06:04:47] heldout oracle features chunk=13/48: started pid=851337 subjects=67 variants=73
+[2026-08-15 06:04:47] heldout oracle features chunk=1/48: started pid=851323 subjects=67 variants=73
+[2026-08-15 06:04:47] heldout oracle features chunk=6/48: started pid=851330 subjects=67 variants=73
+[2026-08-15 06:04:47] heldout oracle features chunk=4/48: started pid=851328 subjects=67 variants=73
+[2026-08-15 06:04:47] heldout oracle features chunk=20/48: started pid=851344 subjects=67 variants=73
+[2026-08-15 06:04:47] heldout oracle features chunk=18/48: started pid=851342 subjects=67 variants=73
+[2026-08-15 06:04:47] heldout oracle features chunk=17/48: started pid=851341 subjects=67 variants=73
+[2026-08-15 06:04:47] heldout oracle features chunk=7/48: started pid=851331 subjects=67 variants=73
+[2026-08-15 06:04:47] heldout oracle features chunk=25/48: started pid=851349 subjects=67 variants=73
+[2026-08-15 06:04:47] heldout oracle features chunk=11/48: started pid=851335 subjects=67 variants=73
+[2026-08-15 06:04:47] heldout oracle features chunk=30/48: started pid=851354 subjects=67 variants=73
+[2026-08-15 06:04:48] heldout oracle features chunk=9/48: started pid=851333 subjects=67 variants=73
+[2026-08-15 06:04:48] heldout oracle features chunk=10/48: started pid=851334 subjects=67 variants=73
+[2026-08-15 06:04:48] heldout oracle features chunk=8/48: started pid=851332 subjects=67 variants=73
+[2026-08-15 06:04:48] heldout oracle features chunk=16/48: started pid=851340 subjects=67 variants=73
+[2026-08-15 06:04:48] heldout oracle features chunk=47/48: started pid=851371 subjects=66 variants=73
+[2026-08-15 06:04:48] heldout oracle features chunk=2/48: started pid=851326 subjects=67 variants=73
+[2026-08-15 06:04:48] heldout oracle features chunk=23/48: started pid=851347 subjects=67 variants=73
+[2026-08-15 06:04:48] heldout oracle features chunk=24/48: started pid=851348 subjects=67 variants=73
+[2026-08-15 06:04:48] heldout oracle features chunk=38/48: started pid=851362 subjects=66 variants=73
+[2026-08-15 06:04:48] heldout oracle features chunk=26/48: started pid=851350 subjects=67 variants=73
+[2026-08-15 06:04:48] heldout oracle features chunk=14/48: started pid=851338 subjects=67 variants=73
+[2026-08-15 06:04:48] heldout oracle features chunk=39/48: started pid=851363 subjects=66 variants=73
+[2026-08-15 06:04:48] heldout oracle features chunk=48/48: started pid=851372 subjects=66 variants=73
+[2026-08-15 06:04:48] heldout oracle features chunk=21/48: started pid=851345 subjects=67 variants=73
+[2026-08-15 06:04:48] heldout oracle features chunk=29/48: started pid=851353 subjects=67 variants=73
+[2026-08-15 06:04:48] heldout oracle features chunk=31/48: started pid=851355 subjects=67 variants=73
+[2026-08-15 06:04:48] heldout oracle features chunk=33/48: started pid=851357 subjects=66 variants=73
+[2026-08-15 06:04:48] heldout oracle features chunk=42/48: started pid=851366 subjects=66 variants=73
+[2026-08-15 06:04:48] heldout oracle features chunk=28/48: started pid=851352 subjects=67 variants=73
+[2026-08-15 06:04:48] heldout oracle features chunk=22/48: started pid=851346 subjects=67 variants=73
+[2026-08-15 06:04:48] heldout oracle features chunk=36/48: started pid=851360 subjects=66 variants=73
+[2026-08-15 06:04:48] heldout oracle features chunk=37/48: started pid=851361 subjects=66 variants=73
+[2026-08-15 06:04:48] heldout oracle features chunk=40/48: started pid=851364 subjects=66 variants=73
+[2026-08-15 06:04:49] heldout oracle features chunk=43/48: started pid=851367 subjects=66 variants=73
+[2026-08-15 06:04:49] heldout oracle features chunk=34/48: started pid=851358 subjects=66 variants=73
+[2026-08-15 06:04:49] heldout oracle features chunk=32/48: started pid=851356 subjects=67 variants=73
+[2026-08-15 06:04:49] heldout oracle features chunk=27/48: started pid=851351 subjects=67 variants=73
+[2026-08-15 06:04:49] heldout oracle features chunk=19/48: started pid=851343 subjects=67 variants=73
+[2026-08-15 06:04:49] heldout oracle features chunk=44/48: started pid=851368 subjects=66 variants=73
+[2026-08-15 06:04:49] heldout oracle features chunk=35/48: started pid=851359 subjects=66 variants=73
+[2026-08-15 06:04:49] heldout oracle features chunk=46/48: started pid=851370 subjects=66 variants=73
+[2026-08-15 06:04:49] heldout oracle features chunk=41/48: started pid=851365 subjects=66 variants=73
+[2026-08-15 06:04:49] heldout oracle features chunk=45/48: started pid=851369 subjects=66 variants=73
+[2026-08-15 06:12:47] heldout oracle features chunk=1/48: processed_subjects=7/67
+[2026-08-15 06:13:02] heldout oracle features chunk=30/48: processed_subjects=7/67
+[2026-08-15 06:13:05] heldout oracle features chunk=15/48: processed_subjects=7/67
+[2026-08-15 06:13:05] heldout oracle features chunk=48/48: processed_subjects=7/66
+[2026-08-15 06:13:06] heldout oracle features chunk=39/48: processed_subjects=7/66
+[2026-08-15 06:13:06] heldout oracle features chunk=6/48: processed_subjects=7/67
+[2026-08-15 06:13:06] heldout oracle features chunk=31/48: processed_subjects=7/67
+[2026-08-15 06:13:06] heldout oracle features chunk=3/48: processed_subjects=7/67
+[2026-08-15 06:13:06] heldout oracle features chunk=36/48: processed_subjects=7/66
+[2026-08-15 06:13:07] heldout oracle features chunk=23/48: processed_subjects=7/67
+[2026-08-15 06:13:07] heldout oracle features chunk=32/48: processed_subjects=7/67
+[2026-08-15 06:13:07] heldout oracle features chunk=9/48: processed_subjects=7/67
+[2026-08-15 06:13:08] heldout oracle features chunk=43/48: processed_subjects=7/66
+[2026-08-15 06:13:08] heldout oracle features chunk=26/48: processed_subjects=7/67
+[2026-08-15 06:13:08] heldout oracle features chunk=40/48: processed_subjects=7/66
+[2026-08-15 06:13:09] heldout oracle features chunk=47/48: processed_subjects=7/66
+[2026-08-15 06:13:09] heldout oracle features chunk=22/48: processed_subjects=7/67
+[2026-08-15 06:13:09] heldout oracle features chunk=42/48: processed_subjects=7/66
+[2026-08-15 06:13:09] heldout oracle features chunk=5/48: processed_subjects=7/67
+[2026-08-15 06:13:10] heldout oracle features chunk=25/48: processed_subjects=7/67
+[2026-08-15 06:13:10] heldout oracle features chunk=46/48: processed_subjects=7/66
+[2026-08-15 06:13:10] heldout oracle features chunk=28/48: processed_subjects=7/67
+[2026-08-15 06:13:10] heldout oracle features chunk=27/48: processed_subjects=7/67
+[2026-08-15 06:13:11] heldout oracle features chunk=4/48: processed_subjects=7/67
+[2026-08-15 06:13:11] heldout oracle features chunk=12/48: processed_subjects=7/67
+[2026-08-15 06:13:11] heldout oracle features chunk=16/48: processed_subjects=7/67
+[2026-08-15 06:13:12] heldout oracle features chunk=21/48: processed_subjects=7/67
+[2026-08-15 06:13:13] heldout oracle features chunk=41/48: processed_subjects=7/66
+[2026-08-15 06:13:13] heldout oracle features chunk=11/48: processed_subjects=7/67
+[2026-08-15 06:13:13] heldout oracle features chunk=13/48: processed_subjects=7/67
+[2026-08-15 06:13:14] heldout oracle features chunk=35/48: processed_subjects=7/66
+[2026-08-15 06:13:14] heldout oracle features chunk=37/48: processed_subjects=7/66
+[2026-08-15 06:13:14] heldout oracle features chunk=18/48: processed_subjects=7/67
+[2026-08-15 06:13:15] heldout oracle features chunk=7/48: processed_subjects=7/67
+[2026-08-15 06:13:15] heldout oracle features chunk=17/48: processed_subjects=7/67
+[2026-08-15 06:13:16] heldout oracle features chunk=29/48: processed_subjects=7/67
+[2026-08-15 06:13:18] heldout oracle features chunk=14/48: processed_subjects=7/67
+[2026-08-15 06:13:18] heldout oracle features chunk=24/48: processed_subjects=7/67
+[2026-08-15 06:13:19] heldout oracle features chunk=19/48: processed_subjects=7/67
+[2026-08-15 06:13:19] heldout oracle features chunk=45/48: processed_subjects=7/66
+[2026-08-15 06:13:20] heldout oracle features chunk=10/48: processed_subjects=7/67
+[2026-08-15 06:13:20] heldout oracle features chunk=20/48: processed_subjects=7/67
+[2026-08-15 06:13:21] heldout oracle features chunk=38/48: processed_subjects=7/66
+[2026-08-15 06:13:21] heldout oracle features chunk=44/48: processed_subjects=7/66
+[2026-08-15 06:13:22] heldout oracle features chunk=33/48: processed_subjects=7/66
+[2026-08-15 06:13:23] heldout oracle features chunk=34/48: processed_subjects=7/66
+[2026-08-15 06:13:26] heldout oracle features chunk=8/48: processed_subjects=7/67
+[2026-08-15 06:13:28] heldout oracle features chunk=2/48: processed_subjects=7/67
+[2026-08-15 06:20:52] heldout oracle features chunk=1/48: processed_subjects=14/67
+[2026-08-15 06:21:19] heldout oracle features chunk=31/48: processed_subjects=14/67
+[2026-08-15 06:21:21] heldout oracle features chunk=30/48: processed_subjects=14/67
+[2026-08-15 06:21:21] heldout oracle features chunk=6/48: processed_subjects=14/67
+[2026-08-15 06:21:21] heldout oracle features chunk=15/48: processed_subjects=14/67
+[2026-08-15 06:21:22] heldout oracle features chunk=39/48: processed_subjects=14/66
+[2026-08-15 06:21:23] heldout oracle features chunk=25/48: processed_subjects=14/67
+[2026-08-15 06:21:23] heldout oracle features chunk=3/48: processed_subjects=14/67
+[2026-08-15 06:21:24] heldout oracle features chunk=48/48: processed_subjects=14/66
+[2026-08-15 06:21:25] heldout oracle features chunk=42/48: processed_subjects=14/66
+[2026-08-15 06:21:25] heldout oracle features chunk=47/48: processed_subjects=14/66
+[2026-08-15 06:21:27] heldout oracle features chunk=23/48: processed_subjects=14/67
+[2026-08-15 06:21:28] heldout oracle features chunk=22/48: processed_subjects=14/67
+[2026-08-15 06:21:29] heldout oracle features chunk=46/48: processed_subjects=14/66
+[2026-08-15 06:21:29] heldout oracle features chunk=29/48: processed_subjects=14/67
+[2026-08-15 06:21:29] heldout oracle features chunk=41/48: processed_subjects=14/66
+[2026-08-15 06:21:30] heldout oracle features chunk=32/48: processed_subjects=14/67
+[2026-08-15 06:21:30] heldout oracle features chunk=5/48: processed_subjects=14/67
+[2026-08-15 06:21:30] heldout oracle features chunk=2/48: processed_subjects=14/67
+[2026-08-15 06:21:31] heldout oracle features chunk=9/48: processed_subjects=14/67
+[2026-08-15 06:21:31] heldout oracle features chunk=12/48: processed_subjects=14/67
+[2026-08-15 06:21:31] heldout oracle features chunk=21/48: processed_subjects=14/67
+[2026-08-15 06:21:31] heldout oracle features chunk=37/48: processed_subjects=14/66
+[2026-08-15 06:21:31] heldout oracle features chunk=36/48: processed_subjects=14/66
+[2026-08-15 06:21:32] heldout oracle features chunk=4/48: processed_subjects=14/67
+[2026-08-15 06:21:33] heldout oracle features chunk=40/48: processed_subjects=14/66
+[2026-08-15 06:21:34] heldout oracle features chunk=27/48: processed_subjects=14/67
+[2026-08-15 06:21:34] heldout oracle features chunk=16/48: processed_subjects=14/67
+[2026-08-15 06:21:35] heldout oracle features chunk=26/48: processed_subjects=14/67
+[2026-08-15 06:21:36] heldout oracle features chunk=11/48: processed_subjects=14/67
+[2026-08-15 06:21:36] heldout oracle features chunk=13/48: processed_subjects=14/67
+[2026-08-15 06:21:37] heldout oracle features chunk=18/48: processed_subjects=14/67
+[2026-08-15 06:21:37] heldout oracle features chunk=38/48: processed_subjects=14/66
+[2026-08-15 06:21:37] heldout oracle features chunk=43/48: processed_subjects=14/66
+[2026-08-15 06:21:39] heldout oracle features chunk=45/48: processed_subjects=14/66
+[2026-08-15 06:21:41] heldout oracle features chunk=10/48: processed_subjects=14/67
+[2026-08-15 06:21:41] heldout oracle features chunk=24/48: processed_subjects=14/67
+[2026-08-15 06:21:42] heldout oracle features chunk=7/48: processed_subjects=14/67
+[2026-08-15 06:21:42] heldout oracle features chunk=35/48: processed_subjects=14/66
+[2026-08-15 06:21:43] heldout oracle features chunk=28/48: processed_subjects=14/67
+[2026-08-15 06:21:44] heldout oracle features chunk=44/48: processed_subjects=14/66
+[2026-08-15 06:21:44] heldout oracle features chunk=17/48: processed_subjects=14/67
+[2026-08-15 06:21:46] heldout oracle features chunk=20/48: processed_subjects=14/67
+[2026-08-15 06:21:47] heldout oracle features chunk=33/48: processed_subjects=14/66
+[2026-08-15 06:21:50] heldout oracle features chunk=14/48: processed_subjects=14/67
+[2026-08-15 06:21:50] heldout oracle features chunk=34/48: processed_subjects=14/66
+[2026-08-15 06:21:54] heldout oracle features chunk=19/48: processed_subjects=14/67
+[2026-08-15 06:21:59] heldout oracle features chunk=8/48: processed_subjects=14/67
+[2026-08-15 06:28:58] heldout oracle features chunk=1/48: processed_subjects=21/67
+[2026-08-15 06:29:16] heldout oracle features chunk=3/48: processed_subjects=21/67
+[2026-08-15 06:29:25] heldout oracle features chunk=2/48: processed_subjects=21/67
+[2026-08-15 06:29:32] heldout oracle features chunk=30/48: processed_subjects=21/67
+[2026-08-15 06:29:34] heldout oracle features chunk=25/48: processed_subjects=21/67
+[2026-08-15 06:29:36] heldout oracle features chunk=6/48: processed_subjects=21/67
+[2026-08-15 06:29:36] heldout oracle features chunk=31/48: processed_subjects=21/67
+[2026-08-15 06:29:37] heldout oracle features chunk=39/48: processed_subjects=21/66
+[2026-08-15 06:29:39] heldout oracle features chunk=15/48: processed_subjects=21/67
+[2026-08-15 06:29:42] heldout oracle features chunk=42/48: processed_subjects=21/66
+[2026-08-15 06:29:43] heldout oracle features chunk=4/48: processed_subjects=21/67
+[2026-08-15 06:29:43] heldout oracle features chunk=22/48: processed_subjects=21/67
+[2026-08-15 06:29:45] heldout oracle features chunk=48/48: processed_subjects=21/66
+[2026-08-15 06:29:47] heldout oracle features chunk=47/48: processed_subjects=21/66
+[2026-08-15 06:29:47] heldout oracle features chunk=46/48: processed_subjects=21/66
+[2026-08-15 06:29:48] heldout oracle features chunk=12/48: processed_subjects=21/67
+[2026-08-15 06:29:48] heldout oracle features chunk=23/48: processed_subjects=21/67
+[2026-08-15 06:29:48] heldout oracle features chunk=21/48: processed_subjects=21/67
+[2026-08-15 06:29:48] heldout oracle features chunk=37/48: processed_subjects=21/66
+[2026-08-15 06:29:49] heldout oracle features chunk=29/48: processed_subjects=21/67
+[2026-08-15 06:29:49] heldout oracle features chunk=9/48: processed_subjects=21/67
+[2026-08-15 06:29:53] heldout oracle features chunk=18/48: processed_subjects=21/67
+[2026-08-15 06:29:53] heldout oracle features chunk=26/48: processed_subjects=21/67
+[2026-08-15 06:29:54] heldout oracle features chunk=32/48: processed_subjects=21/67
+[2026-08-15 06:29:54] heldout oracle features chunk=11/48: processed_subjects=21/67
+[2026-08-15 06:29:55] heldout oracle features chunk=45/48: processed_subjects=21/66
+[2026-08-15 06:29:55] heldout oracle features chunk=41/48: processed_subjects=21/66
+[2026-08-15 06:29:57] heldout oracle features chunk=24/48: processed_subjects=21/67
+[2026-08-15 06:29:58] heldout oracle features chunk=5/48: processed_subjects=21/67
+[2026-08-15 06:29:58] heldout oracle features chunk=13/48: processed_subjects=21/67
+[2026-08-15 06:30:00] heldout oracle features chunk=44/48: processed_subjects=21/66
+[2026-08-15 06:30:01] heldout oracle features chunk=7/48: processed_subjects=21/67
+[2026-08-15 06:30:01] heldout oracle features chunk=38/48: processed_subjects=21/66
+[2026-08-15 06:30:01] heldout oracle features chunk=43/48: processed_subjects=21/66
+[2026-08-15 06:30:01] heldout oracle features chunk=20/48: processed_subjects=21/67
+[2026-08-15 06:30:03] heldout oracle features chunk=36/48: processed_subjects=21/66
+[2026-08-15 06:30:03] heldout oracle features chunk=27/48: processed_subjects=21/67
+[2026-08-15 06:30:04] heldout oracle features chunk=16/48: processed_subjects=21/67
+[2026-08-15 06:30:04] heldout oracle features chunk=40/48: processed_subjects=21/66
+[2026-08-15 06:30:06] heldout oracle features chunk=10/48: processed_subjects=21/67
+[2026-08-15 06:30:07] heldout oracle features chunk=14/48: processed_subjects=21/67
+[2026-08-15 06:30:13] heldout oracle features chunk=34/48: processed_subjects=21/66
+[2026-08-15 06:30:13] heldout oracle features chunk=17/48: processed_subjects=21/67
+[2026-08-15 06:30:14] heldout oracle features chunk=33/48: processed_subjects=21/66
+[2026-08-15 06:30:16] heldout oracle features chunk=28/48: processed_subjects=21/67
+[2026-08-15 06:30:16] heldout oracle features chunk=35/48: processed_subjects=21/66
+[2026-08-15 06:30:24] heldout oracle features chunk=19/48: processed_subjects=21/67
+[2026-08-15 06:30:30] heldout oracle features chunk=8/48: processed_subjects=21/67
+[2026-08-15 06:36:58] heldout oracle features chunk=1/48: processed_subjects=28/67
+[2026-08-15 06:37:05] heldout oracle features chunk=3/48: processed_subjects=28/67
+[2026-08-15 06:37:32] heldout oracle features chunk=4/48: processed_subjects=28/67
+[2026-08-15 06:37:34] heldout oracle features chunk=2/48: processed_subjects=28/67
+[2026-08-15 06:37:50] heldout oracle features chunk=25/48: processed_subjects=28/67
+[2026-08-15 06:37:51] heldout oracle features chunk=31/48: processed_subjects=28/67
+[2026-08-15 06:37:55] heldout oracle features chunk=15/48: processed_subjects=28/67
+[2026-08-15 06:37:56] heldout oracle features chunk=30/48: processed_subjects=28/67
+[2026-08-15 06:37:57] heldout oracle features chunk=6/48: processed_subjects=28/67
+[2026-08-15 06:37:58] heldout oracle features chunk=39/48: processed_subjects=28/66
+[2026-08-15 06:37:59] heldout oracle features chunk=22/48: processed_subjects=28/67
+[2026-08-15 06:38:04] heldout oracle features chunk=47/48: processed_subjects=28/66
+[2026-08-15 06:38:05] heldout oracle features chunk=48/48: processed_subjects=28/66
+[2026-08-15 06:38:06] heldout oracle features chunk=42/48: processed_subjects=28/66
+[2026-08-15 06:38:06] heldout oracle features chunk=46/48: processed_subjects=28/66
+[2026-08-15 06:38:06] heldout oracle features chunk=29/48: processed_subjects=28/67
+[2026-08-15 06:38:08] heldout oracle features chunk=26/48: processed_subjects=28/67
+[2026-08-15 06:38:08] heldout oracle features chunk=5/48: processed_subjects=28/67
+[2026-08-15 06:38:08] heldout oracle features chunk=21/48: processed_subjects=28/67
+[2026-08-15 06:38:09] heldout oracle features chunk=37/48: processed_subjects=28/66
+[2026-08-15 06:38:10] heldout oracle features chunk=9/48: processed_subjects=28/67
+[2026-08-15 06:38:11] heldout oracle features chunk=11/48: processed_subjects=28/67
+[2026-08-15 06:38:12] heldout oracle features chunk=23/48: processed_subjects=28/67
+[2026-08-15 06:38:12] heldout oracle features chunk=24/48: processed_subjects=28/67
+[2026-08-15 06:38:13] heldout oracle features chunk=45/48: processed_subjects=28/66
+[2026-08-15 06:38:14] heldout oracle features chunk=12/48: processed_subjects=28/67
+[2026-08-15 06:38:14] heldout oracle features chunk=41/48: processed_subjects=28/66
+[2026-08-15 06:38:16] heldout oracle features chunk=43/48: processed_subjects=28/66
+[2026-08-15 06:38:17] heldout oracle features chunk=44/48: processed_subjects=28/66
+[2026-08-15 06:38:20] heldout oracle features chunk=20/48: processed_subjects=28/67
+[2026-08-15 06:38:20] heldout oracle features chunk=18/48: processed_subjects=28/67
+[2026-08-15 06:38:22] heldout oracle features chunk=32/48: processed_subjects=28/67
+[2026-08-15 06:38:24] heldout oracle features chunk=13/48: processed_subjects=28/67
+[2026-08-15 06:38:24] heldout oracle features chunk=10/48: processed_subjects=28/67
+[2026-08-15 06:38:29] heldout oracle features chunk=28/48: processed_subjects=28/67
+[2026-08-15 06:38:30] heldout oracle features chunk=38/48: processed_subjects=28/66
+[2026-08-15 06:38:30] heldout oracle features chunk=17/48: processed_subjects=28/67
+[2026-08-15 06:38:30] heldout oracle features chunk=40/48: processed_subjects=28/66
+[2026-08-15 06:38:31] heldout oracle features chunk=36/48: processed_subjects=28/66
+[2026-08-15 06:38:32] heldout oracle features chunk=33/48: processed_subjects=28/66
+[2026-08-15 06:38:35] heldout oracle features chunk=16/48: processed_subjects=28/67
+[2026-08-15 06:38:36] heldout oracle features chunk=14/48: processed_subjects=28/67
+[2026-08-15 06:38:36] heldout oracle features chunk=27/48: processed_subjects=28/67
+[2026-08-15 06:38:37] heldout oracle features chunk=7/48: processed_subjects=28/67
+[2026-08-15 06:38:39] heldout oracle features chunk=34/48: processed_subjects=28/66
+[2026-08-15 06:38:40] heldout oracle features chunk=35/48: processed_subjects=28/66
+[2026-08-15 06:38:41] heldout oracle features chunk=19/48: processed_subjects=28/67
+[2026-08-15 06:38:51] heldout oracle features chunk=8/48: processed_subjects=28/67
+[2026-08-15 06:44:51] heldout oracle features chunk=1/48: processed_subjects=35/67
+[2026-08-15 06:44:57] heldout oracle features chunk=3/48: processed_subjects=35/67
+[2026-08-15 06:45:21] heldout oracle features chunk=4/48: processed_subjects=35/67
+[2026-08-15 06:45:41] heldout oracle features chunk=2/48: processed_subjects=35/67
+[2026-08-15 06:45:55] heldout oracle features chunk=6/48: processed_subjects=35/67
+[2026-08-15 06:46:07] heldout oracle features chunk=31/48: processed_subjects=35/67
+[2026-08-15 06:46:09] heldout oracle features chunk=5/48: processed_subjects=35/67
+[2026-08-15 06:46:09] heldout oracle features chunk=25/48: processed_subjects=35/67
+[2026-08-15 06:46:14] heldout oracle features chunk=39/48: processed_subjects=35/66
+[2026-08-15 06:46:16] heldout oracle features chunk=22/48: processed_subjects=35/67
+[2026-08-15 06:46:17] heldout oracle features chunk=30/48: processed_subjects=35/67
+[2026-08-15 06:46:18] heldout oracle features chunk=15/48: processed_subjects=35/67
+[2026-08-15 06:46:21] heldout oracle features chunk=47/48: processed_subjects=35/66
+[2026-08-15 06:46:24] heldout oracle features chunk=29/48: processed_subjects=35/67
+[2026-08-15 06:46:24] heldout oracle features chunk=42/48: processed_subjects=35/66
+[2026-08-15 06:46:25] heldout oracle features chunk=48/48: processed_subjects=35/66
+[2026-08-15 06:46:27] heldout oracle features chunk=9/48: processed_subjects=35/67
+[2026-08-15 06:46:27] heldout oracle features chunk=45/48: processed_subjects=35/66
+[2026-08-15 06:46:28] heldout oracle features chunk=46/48: processed_subjects=35/66
+[2026-08-15 06:46:28] heldout oracle features chunk=11/48: processed_subjects=35/67
+[2026-08-15 06:46:31] heldout oracle features chunk=26/48: processed_subjects=35/67
+[2026-08-15 06:46:31] heldout oracle features chunk=12/48: processed_subjects=35/67
+[2026-08-15 06:46:33] heldout oracle features chunk=43/48: processed_subjects=35/66
+[2026-08-15 06:46:36] heldout oracle features chunk=23/48: processed_subjects=35/67
+[2026-08-15 06:46:38] heldout oracle features chunk=41/48: processed_subjects=35/66
+[2026-08-15 06:46:38] heldout oracle features chunk=21/48: processed_subjects=35/67
+[2026-08-15 06:46:40] heldout oracle features chunk=13/48: processed_subjects=35/67
+[2026-08-15 06:46:42] heldout oracle features chunk=37/48: processed_subjects=35/66
+[2026-08-15 06:46:43] heldout oracle features chunk=10/48: processed_subjects=35/67
+[2026-08-15 06:46:43] heldout oracle features chunk=32/48: processed_subjects=35/67
+[2026-08-15 06:46:43] heldout oracle features chunk=44/48: processed_subjects=35/66
+[2026-08-15 06:46:44] heldout oracle features chunk=24/48: processed_subjects=35/67
+[2026-08-15 06:46:45] heldout oracle features chunk=18/48: processed_subjects=35/67
+[2026-08-15 06:46:45] heldout oracle features chunk=36/48: processed_subjects=35/66
+[2026-08-15 06:46:46] heldout oracle features chunk=17/48: processed_subjects=35/67
+[2026-08-15 06:46:48] heldout oracle features chunk=38/48: processed_subjects=35/66
+[2026-08-15 06:46:49] heldout oracle features chunk=28/48: processed_subjects=35/67
+[2026-08-15 06:46:51] heldout oracle features chunk=20/48: processed_subjects=35/67
+[2026-08-15 06:46:56] heldout oracle features chunk=14/48: processed_subjects=35/67
+[2026-08-15 06:46:58] heldout oracle features chunk=34/48: processed_subjects=35/66
+[2026-08-15 06:47:00] heldout oracle features chunk=35/48: processed_subjects=35/66
+[2026-08-15 06:47:01] heldout oracle features chunk=40/48: processed_subjects=35/66
+[2026-08-15 06:47:02] heldout oracle features chunk=19/48: processed_subjects=35/67
+[2026-08-15 06:47:05] heldout oracle features chunk=16/48: processed_subjects=35/67
+[2026-08-15 06:47:05] heldout oracle features chunk=33/48: processed_subjects=35/66
+[2026-08-15 06:47:09] heldout oracle features chunk=27/48: processed_subjects=35/67
+[2026-08-15 06:47:11] heldout oracle features chunk=7/48: processed_subjects=35/67
+[2026-08-15 06:47:13] heldout oracle features chunk=8/48: processed_subjects=35/67
+[2026-08-15 06:52:41] heldout oracle features chunk=1/48: processed_subjects=42/67
+[2026-08-15 06:52:48] heldout oracle features chunk=3/48: processed_subjects=42/67
+[2026-08-15 06:53:13] heldout oracle features chunk=4/48: processed_subjects=42/67
+[2026-08-15 06:53:44] heldout oracle features chunk=6/48: processed_subjects=42/67
+[2026-08-15 06:53:45] heldout oracle features chunk=2/48: processed_subjects=42/67
+[2026-08-15 06:54:13] heldout oracle features chunk=5/48: processed_subjects=42/67
+[2026-08-15 06:54:27] heldout oracle features chunk=39/48: processed_subjects=42/66
+[2026-08-15 06:54:27] heldout oracle features chunk=31/48: processed_subjects=42/67
+[2026-08-15 06:54:29] heldout oracle features chunk=25/48: processed_subjects=42/67
+[2026-08-15 06:54:35] heldout oracle features chunk=22/48: processed_subjects=42/67
+[2026-08-15 06:54:36] heldout oracle features chunk=15/48: processed_subjects=42/67
+[2026-08-15 06:54:41] heldout oracle features chunk=29/48: processed_subjects=42/67
+[2026-08-15 06:54:41] heldout oracle features chunk=45/48: processed_subjects=42/66
+[2026-08-15 06:54:43] heldout oracle features chunk=42/48: processed_subjects=42/66
+[2026-08-15 06:54:44] heldout oracle features chunk=11/48: processed_subjects=42/67
+[2026-08-15 06:54:45] heldout oracle features chunk=47/48: processed_subjects=42/66
+[2026-08-15 06:54:48] heldout oracle features chunk=48/48: processed_subjects=42/66
+[2026-08-15 06:54:50] heldout oracle features chunk=30/48: processed_subjects=42/67
+[2026-08-15 06:54:52] heldout oracle features chunk=43/48: processed_subjects=42/66
+[2026-08-15 06:54:52] heldout oracle features chunk=9/48: processed_subjects=42/67
+[2026-08-15 06:54:53] heldout oracle features chunk=41/48: processed_subjects=42/66
+[2026-08-15 06:54:56] heldout oracle features chunk=12/48: processed_subjects=42/67
+[2026-08-15 06:54:58] heldout oracle features chunk=21/48: processed_subjects=42/67
+[2026-08-15 06:54:58] heldout oracle features chunk=23/48: processed_subjects=42/67
+[2026-08-15 06:54:59] heldout oracle features chunk=46/48: processed_subjects=42/66
+[2026-08-15 06:54:59] heldout oracle features chunk=24/48: processed_subjects=42/67
+[2026-08-15 06:54:59] heldout oracle features chunk=17/48: processed_subjects=42/67
+[2026-08-15 06:55:00] heldout oracle features chunk=13/48: processed_subjects=42/67
+[2026-08-15 06:55:02] heldout oracle features chunk=26/48: processed_subjects=42/67
+[2026-08-15 06:55:02] heldout oracle features chunk=44/48: processed_subjects=42/66
+[2026-08-15 06:55:03] heldout oracle features chunk=36/48: processed_subjects=42/66
+[2026-08-15 06:55:03] heldout oracle features chunk=28/48: processed_subjects=42/67
+[2026-08-15 06:55:04] heldout oracle features chunk=10/48: processed_subjects=42/67
+[2026-08-15 06:55:04] heldout oracle features chunk=37/48: processed_subjects=42/66
+[2026-08-15 06:55:09] heldout oracle features chunk=18/48: processed_subjects=42/67
+[2026-08-15 06:55:09] heldout oracle features chunk=38/48: processed_subjects=42/66
+[2026-08-15 06:55:13] heldout oracle features chunk=20/48: processed_subjects=42/67
+[2026-08-15 06:55:16] heldout oracle features chunk=7/48: processed_subjects=42/67
+[2026-08-15 06:55:17] heldout oracle features chunk=14/48: processed_subjects=42/67
+[2026-08-15 06:55:17] heldout oracle features chunk=32/48: processed_subjects=42/67
+[2026-08-15 06:55:22] heldout oracle features chunk=34/48: processed_subjects=42/66
+[2026-08-15 06:55:25] heldout oracle features chunk=40/48: processed_subjects=42/66
+[2026-08-15 06:55:28] heldout oracle features chunk=19/48: processed_subjects=42/67
+[2026-08-15 06:55:29] heldout oracle features chunk=35/48: processed_subjects=42/66
+[2026-08-15 06:55:29] heldout oracle features chunk=33/48: processed_subjects=42/66
+[2026-08-15 06:55:29] heldout oracle features chunk=8/48: processed_subjects=42/67
+[2026-08-15 06:55:32] heldout oracle features chunk=27/48: processed_subjects=42/67
+[2026-08-15 06:55:39] heldout oracle features chunk=16/48: processed_subjects=42/67
+[2026-08-15 07:00:29] heldout oracle features chunk=1/48: processed_subjects=49/67
+[2026-08-15 07:00:38] heldout oracle features chunk=3/48: processed_subjects=49/67
+[2026-08-15 07:01:02] heldout oracle features chunk=4/48: processed_subjects=49/67
+[2026-08-15 07:01:33] heldout oracle features chunk=6/48: processed_subjects=49/67
+[2026-08-15 07:01:46] heldout oracle features chunk=2/48: processed_subjects=49/67
+[2026-08-15 07:02:18] heldout oracle features chunk=5/48: processed_subjects=49/67
+[2026-08-15 07:02:42] heldout oracle features chunk=39/48: processed_subjects=49/66
+[2026-08-15 07:02:49] heldout oracle features chunk=31/48: processed_subjects=49/67
+[2026-08-15 07:02:52] heldout oracle features chunk=22/48: processed_subjects=49/67
+[2026-08-15 07:02:56] heldout oracle features chunk=15/48: processed_subjects=49/67
+[2026-08-15 07:02:57] heldout oracle features chunk=25/48: processed_subjects=49/67
+[2026-08-15 07:02:57] heldout oracle features chunk=42/48: processed_subjects=49/66
+[2026-08-15 07:03:00] heldout oracle features chunk=47/48: processed_subjects=49/66
+[2026-08-15 07:03:00] heldout oracle features chunk=11/48: processed_subjects=49/67
+[2026-08-15 07:03:01] heldout oracle features chunk=45/48: processed_subjects=49/66
+[2026-08-15 07:03:03] heldout oracle features chunk=29/48: processed_subjects=49/67
+[2026-08-15 07:03:08] heldout oracle features chunk=9/48: processed_subjects=49/67
+[2026-08-15 07:03:11] heldout oracle features chunk=23/48: processed_subjects=49/67
+[2026-08-15 07:03:11] heldout oracle features chunk=7/48: processed_subjects=49/67
+[2026-08-15 07:03:13] heldout oracle features chunk=41/48: processed_subjects=49/66
+[2026-08-15 07:03:15] heldout oracle features chunk=30/48: processed_subjects=49/67
+[2026-08-15 07:03:15] heldout oracle features chunk=17/48: processed_subjects=49/67
+[2026-08-15 07:03:15] heldout oracle features chunk=21/48: processed_subjects=49/67
+[2026-08-15 07:03:16] heldout oracle features chunk=36/48: processed_subjects=49/66
+[2026-08-15 07:03:16] heldout oracle features chunk=12/48: processed_subjects=49/67
+[2026-08-15 07:03:19] heldout oracle features chunk=26/48: processed_subjects=49/67
+[2026-08-15 07:03:19] heldout oracle features chunk=43/48: processed_subjects=49/66
+[2026-08-15 07:03:19] heldout oracle features chunk=48/48: processed_subjects=49/66
+[2026-08-15 07:03:20] heldout oracle features chunk=13/48: processed_subjects=49/67
+[2026-08-15 07:03:21] heldout oracle features chunk=24/48: processed_subjects=49/67
+[2026-08-15 07:03:23] heldout oracle features chunk=10/48: processed_subjects=49/67
+[2026-08-15 07:03:24] heldout oracle features chunk=8/48: processed_subjects=49/67
+[2026-08-15 07:03:26] heldout oracle features chunk=44/48: processed_subjects=49/66
+[2026-08-15 07:03:28] heldout oracle features chunk=46/48: processed_subjects=49/66
+[2026-08-15 07:03:29] heldout oracle features chunk=20/48: processed_subjects=49/67
+[2026-08-15 07:03:29] heldout oracle features chunk=28/48: processed_subjects=49/67
+[2026-08-15 07:03:33] heldout oracle features chunk=14/48: processed_subjects=49/67
+[2026-08-15 07:03:33] heldout oracle features chunk=18/48: processed_subjects=49/67
+[2026-08-15 07:03:33] heldout oracle features chunk=37/48: processed_subjects=49/66
+[2026-08-15 07:03:38] heldout oracle features chunk=32/48: processed_subjects=49/67
+[2026-08-15 07:03:42] heldout oracle features chunk=38/48: processed_subjects=49/66
+[2026-08-15 07:03:43] heldout oracle features chunk=34/48: processed_subjects=49/66
+[2026-08-15 07:03:51] heldout oracle features chunk=40/48: processed_subjects=49/66
+[2026-08-15 07:03:51] heldout oracle features chunk=33/48: processed_subjects=49/66
+[2026-08-15 07:03:57] heldout oracle features chunk=19/48: processed_subjects=49/67
+[2026-08-15 07:04:01] heldout oracle features chunk=27/48: processed_subjects=49/67
+[2026-08-15 07:04:02] heldout oracle features chunk=35/48: processed_subjects=49/66
+[2026-08-15 07:04:13] heldout oracle features chunk=16/48: processed_subjects=49/67
+[2026-08-15 07:08:17] heldout oracle features chunk=1/48: processed_subjects=56/67
+[2026-08-15 07:08:30] heldout oracle features chunk=3/48: processed_subjects=56/67
+[2026-08-15 07:08:53] heldout oracle features chunk=4/48: processed_subjects=56/67
+[2026-08-15 07:09:21] heldout oracle features chunk=6/48: processed_subjects=56/67
+[2026-08-15 07:09:40] heldout oracle features chunk=2/48: processed_subjects=56/67
+[2026-08-15 07:10:09] heldout oracle features chunk=5/48: processed_subjects=56/67
+[2026-08-15 07:10:59] heldout oracle features chunk=39/48: processed_subjects=56/66
+[2026-08-15 07:10:59] heldout oracle features chunk=7/48: processed_subjects=56/67
+[2026-08-15 07:11:10] heldout oracle features chunk=9/48: processed_subjects=56/67
+[2026-08-15 07:11:11] heldout oracle features chunk=22/48: processed_subjects=56/67
+[2026-08-15 07:11:11] heldout oracle features chunk=31/48: processed_subjects=56/67
+[2026-08-15 07:11:13] heldout oracle features chunk=42/48: processed_subjects=56/66
+[2026-08-15 07:11:13] heldout oracle features chunk=15/48: processed_subjects=56/67
+[2026-08-15 07:11:16] heldout oracle features chunk=11/48: processed_subjects=56/67
+[2026-08-15 07:11:17] heldout oracle features chunk=25/48: processed_subjects=56/67
+[2026-08-15 07:11:17] heldout oracle features chunk=47/48: processed_subjects=56/66
+[2026-08-15 07:11:18] heldout oracle features chunk=45/48: processed_subjects=56/66
+[2026-08-15 07:11:20] heldout oracle features chunk=8/48: processed_subjects=56/67
+[2026-08-15 07:11:29] heldout oracle features chunk=29/48: processed_subjects=56/67
+[2026-08-15 07:11:30] heldout oracle features chunk=10/48: processed_subjects=56/67
+[2026-08-15 07:11:30] heldout oracle features chunk=17/48: processed_subjects=56/67
+[2026-08-15 07:11:30] heldout oracle features chunk=41/48: processed_subjects=56/66
+[2026-08-15 07:11:31] heldout oracle features chunk=21/48: processed_subjects=56/67
+[2026-08-15 07:11:34] heldout oracle features chunk=26/48: processed_subjects=56/67
+[2026-08-15 07:11:35] heldout oracle features chunk=12/48: processed_subjects=56/67
+[2026-08-15 07:11:36] heldout oracle features chunk=23/48: processed_subjects=56/67
+[2026-08-15 07:11:39] heldout oracle features chunk=48/48: processed_subjects=56/66
+[2026-08-15 07:11:41] heldout oracle features chunk=30/48: processed_subjects=56/67
+[2026-08-15 07:11:41] heldout oracle features chunk=43/48: processed_subjects=56/66
+[2026-08-15 07:11:43] heldout oracle features chunk=36/48: processed_subjects=56/66
+[2026-08-15 07:11:47] heldout oracle features chunk=20/48: processed_subjects=56/67
+[2026-08-15 07:11:48] heldout oracle features chunk=37/48: processed_subjects=56/66
+[2026-08-15 07:11:49] heldout oracle features chunk=24/48: processed_subjects=56/67
+[2026-08-15 07:11:51] heldout oracle features chunk=14/48: processed_subjects=56/67
+[2026-08-15 07:11:55] heldout oracle features chunk=13/48: processed_subjects=56/67
+[2026-08-15 07:11:55] heldout oracle features chunk=32/48: processed_subjects=56/67
+[2026-08-15 07:11:55] heldout oracle features chunk=44/48: processed_subjects=56/66
+[2026-08-15 07:11:56] heldout oracle features chunk=46/48: processed_subjects=56/66
+[2026-08-15 07:11:58] heldout oracle features chunk=18/48: processed_subjects=56/67
+[2026-08-15 07:11:58] heldout oracle features chunk=28/48: processed_subjects=56/67
+[2026-08-15 07:12:02] heldout oracle features chunk=34/48: processed_subjects=56/66
+[2026-08-15 07:12:06] heldout oracle features chunk=40/48: processed_subjects=56/66
+[2026-08-15 07:12:11] heldout oracle features chunk=38/48: processed_subjects=56/66
+[2026-08-15 07:12:14] heldout oracle features chunk=33/48: processed_subjects=56/66
+[2026-08-15 07:12:33] heldout oracle features chunk=19/48: processed_subjects=56/67
+[2026-08-15 07:12:34] heldout oracle features chunk=27/48: processed_subjects=56/67
+[2026-08-15 07:12:37] heldout oracle features chunk=16/48: processed_subjects=56/67
+[2026-08-15 07:12:39] heldout oracle features chunk=35/48: processed_subjects=56/66
+[2026-08-15 07:16:07] heldout oracle features chunk=1/48: processed_subjects=63/67
+[2026-08-15 07:16:22] heldout oracle features chunk=3/48: processed_subjects=63/67
+[2026-08-15 07:16:53] heldout oracle features chunk=4/48: processed_subjects=63/67
+[2026-08-15 07:17:10] heldout oracle features chunk=6/48: processed_subjects=63/67
+[2026-08-15 07:17:44] heldout oracle features chunk=2/48: processed_subjects=63/67
+[2026-08-15 07:18:02] heldout oracle features chunk=5/48: processed_subjects=63/67
+[2026-08-15 07:18:54] heldout oracle features chunk=7/48: processed_subjects=63/67
+[2026-08-15 07:19:09] heldout oracle features chunk=8/48: processed_subjects=63/67
+[2026-08-15 07:19:11] heldout oracle features chunk=9/48: processed_subjects=63/67
+[2026-08-15 07:19:15] heldout oracle features chunk=39/48: processed_subjects=63/66
+[2026-08-15 07:19:18] heldout oracle features chunk=11/48: processed_subjects=63/67
+[2026-08-15 07:19:22] heldout oracle features chunk=10/48: processed_subjects=63/67
+[2026-08-15 07:19:26] heldout oracle features chunk=31/48: processed_subjects=63/67
+[2026-08-15 07:19:31] heldout oracle features chunk=42/48: processed_subjects=63/66
+[2026-08-15 07:19:31] heldout oracle features chunk=22/48: processed_subjects=63/67
+[2026-08-15 07:19:32] heldout oracle features chunk=47/48: processed_subjects=63/66
+[2026-08-15 07:19:34] heldout oracle features chunk=15/48: processed_subjects=63/67
+[2026-08-15 07:19:38] heldout oracle features chunk=45/48: processed_subjects=63/66
+[2026-08-15 07:19:39] heldout oracle features chunk=25/48: processed_subjects=63/67
+[2026-08-15 07:19:46] heldout oracle features chunk=41/48: processed_subjects=63/66
+[2026-08-15 07:19:47] heldout oracle features chunk=29/48: processed_subjects=63/67
+[2026-08-15 07:19:49] heldout oracle features chunk=26/48: processed_subjects=63/67
+[2026-08-15 07:19:51] heldout oracle features chunk=12/48: processed_subjects=63/67
+[2026-08-15 07:19:51] heldout oracle features chunk=17/48: processed_subjects=63/67
+[2026-08-15 07:19:54] heldout oracle features chunk=21/48: processed_subjects=63/67
+[2026-08-15 07:19:56] heldout oracle features chunk=43/48: processed_subjects=63/66
+[2026-08-15 07:19:57] heldout oracle features chunk=48/48: processed_subjects=63/66
+[2026-08-15 07:20:01] heldout oracle features chunk=30/48: processed_subjects=63/67
+[2026-08-15 07:20:03] heldout oracle features chunk=20/48: processed_subjects=63/67
+[2026-08-15 07:20:09] heldout oracle features chunk=23/48: processed_subjects=63/67
+[2026-08-15 07:20:12] heldout oracle features chunk=36/48: processed_subjects=63/66
+[2026-08-15 07:20:13] heldout oracle features chunk=14/48: processed_subjects=63/67
+[2026-08-15 07:20:15] heldout oracle features chunk=37/48: processed_subjects=63/66
+[2026-08-15 07:20:18] heldout oracle features chunk=24/48: processed_subjects=63/67
+[2026-08-15 07:20:18] heldout oracle features chunk=18/48: processed_subjects=63/67
+[2026-08-15 07:20:20] heldout oracle features chunk=13/48: processed_subjects=63/67
+[2026-08-15 07:20:21] heldout oracle features chunk=44/48: processed_subjects=63/66
+[2026-08-15 07:20:21] heldout oracle features chunk=46/48: processed_subjects=63/66
+[2026-08-15 07:20:23] heldout oracle features chunk=28/48: processed_subjects=63/67
+[2026-08-15 07:20:23] heldout oracle features chunk=32/48: processed_subjects=63/67
+[2026-08-15 07:20:27] heldout oracle features chunk=38/48: processed_subjects=63/66
+[2026-08-15 07:20:32] heldout oracle features chunk=40/48: processed_subjects=63/66
+[2026-08-15 07:20:35] heldout oracle features chunk=34/48: processed_subjects=63/66
+[2026-08-15 07:20:38] heldout oracle features chunk=1/48: processed_subjects=67/67
+[2026-08-15 07:20:38] heldout oracle features: completed_chunks=1/48 completed_subjects=67/3200
+[2026-08-15 07:20:43] heldout oracle features chunk=33/48: processed_subjects=63/66
+[2026-08-15 07:20:57] heldout oracle features chunk=19/48: processed_subjects=63/67
+[2026-08-15 07:20:57] heldout oracle features chunk=3/48: processed_subjects=67/67
+[2026-08-15 07:20:57] heldout oracle features: completed_chunks=2/48 completed_subjects=134/3200
+[2026-08-15 07:20:59] heldout oracle features chunk=27/48: processed_subjects=63/67
+[2026-08-15 07:21:00] heldout oracle features chunk=16/48: processed_subjects=63/67
+[2026-08-15 07:21:06] heldout oracle features chunk=35/48: processed_subjects=63/66
+[2026-08-15 07:21:25] heldout oracle features chunk=4/48: processed_subjects=67/67
+[2026-08-15 07:21:25] heldout oracle features: completed_chunks=3/48 completed_subjects=201/3200
+[2026-08-15 07:21:35] heldout oracle features chunk=6/48: processed_subjects=67/67
+[2026-08-15 07:21:35] heldout oracle features: completed_chunks=4/48 completed_subjects=268/3200
+[2026-08-15 07:22:15] heldout oracle features chunk=2/48: processed_subjects=67/67
+[2026-08-15 07:22:15] heldout oracle features: completed_chunks=5/48 completed_subjects=335/3200
+[2026-08-15 07:22:34] heldout oracle features chunk=5/48: processed_subjects=67/67
+[2026-08-15 07:22:34] heldout oracle features: completed_chunks=6/48 completed_subjects=402/3200
+[2026-08-15 07:22:46] heldout oracle features chunk=39/48: processed_subjects=66/66
+[2026-08-15 07:22:46] heldout oracle features: completed_chunks=7/48 completed_subjects=468/3200
+[2026-08-15 07:23:03] heldout oracle features chunk=42/48: processed_subjects=66/66
+[2026-08-15 07:23:03] heldout oracle features: completed_chunks=8/48 completed_subjects=534/3200
+[2026-08-15 07:23:04] heldout oracle features chunk=47/48: processed_subjects=66/66
+[2026-08-15 07:23:04] heldout oracle features: completed_chunks=9/48 completed_subjects=600/3200
+[2026-08-15 07:23:15] heldout oracle features chunk=45/48: processed_subjects=66/66
+[2026-08-15 07:23:15] heldout oracle features: completed_chunks=10/48 completed_subjects=666/3200
+[2026-08-15 07:23:18] heldout oracle features chunk=41/48: processed_subjects=66/66
+[2026-08-15 07:23:18] heldout oracle features: completed_chunks=11/48 completed_subjects=732/3200
+[2026-08-15 07:23:25] heldout oracle features chunk=43/48: processed_subjects=66/66
+[2026-08-15 07:23:26] heldout oracle features: completed_chunks=12/48 completed_subjects=798/3200
+[2026-08-15 07:23:27] heldout oracle features chunk=48/48: processed_subjects=66/66
+[2026-08-15 07:23:27] heldout oracle features: completed_chunks=13/48 completed_subjects=864/3200
+[2026-08-15 07:23:28] heldout oracle features chunk=7/48: processed_subjects=67/67
+[2026-08-15 07:23:28] heldout oracle features: completed_chunks=14/48 completed_subjects=931/3200
+[2026-08-15 07:23:33] heldout oracle features chunk=8/48: processed_subjects=67/67
+[2026-08-15 07:23:33] heldout oracle features: completed_chunks=15/48 completed_subjects=998/3200
+[2026-08-15 07:23:43] heldout oracle features chunk=9/48: processed_subjects=67/67
+[2026-08-15 07:23:43] heldout oracle features: completed_chunks=16/48 completed_subjects=1065/3200
+[2026-08-15 07:23:48] heldout oracle features chunk=36/48: processed_subjects=66/66
+[2026-08-15 07:23:48] heldout oracle features: completed_chunks=17/48 completed_subjects=1131/3200
+[2026-08-15 07:23:49] heldout oracle features chunk=44/48: processed_subjects=66/66
+[2026-08-15 07:23:49] heldout oracle features: completed_chunks=18/48 completed_subjects=1197/3200
+[2026-08-15 07:23:49] heldout oracle features chunk=10/48: processed_subjects=67/67
+[2026-08-15 07:23:49] heldout oracle features: completed_chunks=19/48 completed_subjects=1264/3200
+[2026-08-15 07:23:50] heldout oracle features chunk=37/48: processed_subjects=66/66
+[2026-08-15 07:23:50] heldout oracle features: completed_chunks=20/48 completed_subjects=1330/3200
+[2026-08-15 07:23:51] heldout oracle features chunk=11/48: processed_subjects=67/67
+[2026-08-15 07:23:51] heldout oracle features: completed_chunks=21/48 completed_subjects=1397/3200
+[2026-08-15 07:23:53] heldout oracle features chunk=46/48: processed_subjects=66/66
+[2026-08-15 07:23:53] heldout oracle features: completed_chunks=22/48 completed_subjects=1463/3200
+[2026-08-15 07:23:54] heldout oracle features chunk=38/48: processed_subjects=66/66
+[2026-08-15 07:23:54] heldout oracle features: completed_chunks=23/48 completed_subjects=1529/3200
+[2026-08-15 07:24:02] heldout oracle features chunk=31/48: processed_subjects=67/67
+[2026-08-15 07:24:02] heldout oracle features: completed_chunks=24/48 completed_subjects=1596/3200
+[2026-08-15 07:24:07] heldout oracle features chunk=34/48: processed_subjects=66/66
+[2026-08-15 07:24:07] heldout oracle features: completed_chunks=25/48 completed_subjects=1662/3200
+[2026-08-15 07:24:07] heldout oracle features chunk=40/48: processed_subjects=66/66
+[2026-08-15 07:24:07] heldout oracle features: completed_chunks=26/48 completed_subjects=1728/3200
+[2026-08-15 07:24:11] heldout oracle features chunk=15/48: processed_subjects=67/67
+[2026-08-15 07:24:11] heldout oracle features: completed_chunks=27/48 completed_subjects=1795/3200
+[2026-08-15 07:24:13] heldout oracle features chunk=33/48: processed_subjects=66/66
+[2026-08-15 07:24:13] heldout oracle features: completed_chunks=28/48 completed_subjects=1861/3200
+[2026-08-15 07:24:15] heldout oracle features chunk=25/48: processed_subjects=67/67
+[2026-08-15 07:24:15] heldout oracle features: completed_chunks=29/48 completed_subjects=1928/3200
+[2026-08-15 07:24:16] heldout oracle features chunk=22/48: processed_subjects=67/67
+[2026-08-15 07:24:16] heldout oracle features: completed_chunks=30/48 completed_subjects=1995/3200
+[2026-08-15 07:24:23] heldout oracle features chunk=26/48: processed_subjects=67/67
+[2026-08-15 07:24:23] heldout oracle features: completed_chunks=31/48 completed_subjects=2062/3200
+[2026-08-15 07:24:27] heldout oracle features chunk=29/48: processed_subjects=67/67
+[2026-08-15 07:24:27] heldout oracle features: completed_chunks=32/48 completed_subjects=2129/3200
+[2026-08-15 07:24:27] heldout oracle features chunk=17/48: processed_subjects=67/67
+[2026-08-15 07:24:27] heldout oracle features: completed_chunks=33/48 completed_subjects=2196/3200
+[2026-08-15 07:24:29] heldout oracle features chunk=35/48: processed_subjects=66/66
+[2026-08-15 07:24:29] heldout oracle features: completed_chunks=34/48 completed_subjects=2262/3200
+[2026-08-15 07:24:29] heldout oracle features chunk=12/48: processed_subjects=67/67
+[2026-08-15 07:24:29] heldout oracle features: completed_chunks=35/48 completed_subjects=2329/3200
+[2026-08-15 07:24:35] heldout oracle features chunk=20/48: processed_subjects=67/67
+[2026-08-15 07:24:35] heldout oracle features: completed_chunks=36/48 completed_subjects=2396/3200
+[2026-08-15 07:24:37] heldout oracle features chunk=21/48: processed_subjects=67/67
+[2026-08-15 07:24:37] heldout oracle features: completed_chunks=37/48 completed_subjects=2463/3200
+[2026-08-15 07:24:40] heldout oracle features chunk=30/48: processed_subjects=67/67
+[2026-08-15 07:24:40] heldout oracle features: completed_chunks=38/48 completed_subjects=2530/3200
+[2026-08-15 07:24:43] heldout oracle features chunk=23/48: processed_subjects=67/67
+[2026-08-15 07:24:43] heldout oracle features: completed_chunks=39/48 completed_subjects=2597/3200
+[2026-08-15 07:24:44] heldout oracle features chunk=14/48: processed_subjects=67/67
+[2026-08-15 07:24:44] heldout oracle features: completed_chunks=40/48 completed_subjects=2664/3200
+[2026-08-15 07:24:48] heldout oracle features chunk=13/48: processed_subjects=67/67
+[2026-08-15 07:24:48] heldout oracle features: completed_chunks=41/48 completed_subjects=2731/3200
+[2026-08-15 07:24:49] heldout oracle features chunk=18/48: processed_subjects=67/67
+[2026-08-15 07:24:49] heldout oracle features: completed_chunks=42/48 completed_subjects=2798/3200
+[2026-08-15 07:24:49] heldout oracle features chunk=24/48: processed_subjects=67/67
+[2026-08-15 07:24:49] heldout oracle features: completed_chunks=43/48 completed_subjects=2865/3200
+[2026-08-15 07:24:57] heldout oracle features chunk=28/48: processed_subjects=67/67
+[2026-08-15 07:24:57] heldout oracle features: completed_chunks=44/48 completed_subjects=2932/3200
+[2026-08-15 07:25:02] heldout oracle features chunk=32/48: processed_subjects=67/67
+[2026-08-15 07:25:03] heldout oracle features: completed_chunks=45/48 completed_subjects=2999/3200
+[2026-08-15 07:25:19] heldout oracle features chunk=27/48: processed_subjects=67/67
+[2026-08-15 07:25:19] heldout oracle features: completed_chunks=46/48 completed_subjects=3066/3200
+[2026-08-15 07:25:19] heldout oracle features chunk=19/48: processed_subjects=67/67
+[2026-08-15 07:25:19] heldout oracle features: completed_chunks=47/48 completed_subjects=3133/3200
+[2026-08-15 07:25:27] heldout oracle features chunk=16/48: processed_subjects=67/67
+[2026-08-15 07:25:27] heldout oracle features: completed_chunks=48/48 completed_subjects=3200/3200
+[2026-08-15 07:25:27] Finished heldout oracle features with shape (3200, 73)
+[2026-08-15 07:25:27] Priority-function heldout ROC AUC=0.661274
+[2026-08-15 07:25:27] Priority-function heldout ROC AUC for ancestry=AFRICAN_ANCESTRY subjects=147 is 0.537234
+[2026-08-15 07:25:27] Priority-function heldout ROC AUC for ancestry=ASIAN subjects=63 is 0.807692
+[2026-08-15 07:25:27] Priority-function heldout ROC AUC for ancestry=EUROPEAN subjects=2990 is 0.662985
+[2026-08-15 07:25:27] Running baseline Mixture Learning
+[2026-08-15 07:25:27] Finished baseline Mixture Learning with heldout ROC AUC=0.673679
+[2026-08-15 07:25:27] Baseline Mixture Learning heldout ROC AUC for ancestry=AFRICAN_ANCESTRY subjects=147 is 0.524894
+[2026-08-15 07:25:27] Baseline Mixture Learning heldout ROC AUC for ancestry=ASIAN subjects=63 is 0.738248
+[2026-08-15 07:25:27] Baseline Mixture Learning heldout ROC AUC for ancestry=EUROPEAN subjects=2990 is 0.678565
+[2026-08-15 07:25:27] Running baseline Independent Learning Scheme
+[2026-08-15 07:25:28] Finished baseline Independent Learning Scheme with heldout ROC AUC=0.675607
+[2026-08-15 07:25:28] Baseline Independent Learning Scheme heldout ROC AUC for ancestry=AFRICAN_ANCESTRY subjects=147 is 0.538936
+[2026-08-15 07:25:28] Baseline Independent Learning Scheme heldout ROC AUC for ancestry=ASIAN subjects=63 is 0.725427
+[2026-08-15 07:25:28] Baseline Independent Learning Scheme heldout ROC AUC for ancestry=EUROPEAN subjects=2990 is 0.680438
+[2026-08-15 07:25:28] Running baseline TL-GDES
+[2026-08-15 07:25:38] Finished baseline TL-GDES with heldout ROC AUC=0.641582
+[2026-08-15 07:25:38] Baseline TL-GDES heldout ROC AUC for ancestry=AFRICAN_ANCESTRY subjects=147 is 0.529574
+[2026-08-15 07:25:38] Baseline TL-GDES heldout ROC AUC for ancestry=ASIAN subjects=63 is 0.746795
+[2026-08-15 07:25:38] Baseline TL-GDES heldout ROC AUC for ancestry=EUROPEAN subjects=2990 is 0.644266
+[2026-08-15 07:25:38] Running baseline TL-PR

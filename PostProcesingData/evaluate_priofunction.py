@@ -9,6 +9,7 @@ import os
 import re
 import time
 
+import numpy as np
 import pandas as pd
 
 from funsearch_pipeline.evaluation.procedure2 import _build_calibration_oracle_feature_matrix
@@ -22,6 +23,7 @@ from funsearch_pipeline.evaluation.procedure2 import _list_variant_names
 from funsearch_pipeline.evaluation.procedure2 import _load_priority_function
 from funsearch_pipeline.evaluation.procedure2 import _predict_linear_score
 from funsearch_pipeline.evaluation.procedure2 import _safe_roc_auc
+from funsearch_pipeline.evaluation.procedure2 import _sigmoid
 from funsearch_pipeline.evaluation.procedure2 import _validate_priority_signature
 from GenomicsHelpers.ancestry_distance_cache import ensure_distance_cache
 
@@ -39,6 +41,9 @@ DEFAULT_OUTPUT_ROW_TRACKING_PATH = _DEFAULT_DATA_DIR / "output_row_tracking.pkl"
 DEFAULT_FUNCTION_NAME = "priority"
 DEFAULT_CALIBRATION_PENALTIES = (0.1, 1.0, 10.0)
 DEFAULT_SUPPORTED_ANCESTRY_GROUPS = ("AA", "JA", "LA")
+DEFAULT_HELDOUT_MODEL_PREDICTIONS_FILE_NAME = "heldout_model_predictions.pkl"
+DEFAULT_HELDOUT_MODEL_PREDICTIONS_BY_MODEL_DIR_NAME = "heldout_model_predictions_by_model"
+PRIORITY_FUNCTION_MODEL_NAME = "Priority Function"
 
 
 """
@@ -93,6 +98,23 @@ class EvaluationReport:
     heldout_auc_roc: float
     heldout_ancestry_evaluations: tuple[HeldoutAncestryEvaluation, ...]
     baseline_evaluations: tuple[BaselineEvaluation, ...]
+
+
+_HELDOUT_MODEL_PREDICTION_COLUMNS = (
+    "heldout_subject_index",
+    "heldout_output_pickle_name",
+    "heldout_output_pickle_path",
+    "heldout_output_row_number",
+    "source_pickle_name",
+    "source_pickle_path",
+    "source_row_number",
+    "ancestry_group",
+    "label",
+    "model_name",
+    "model_slug",
+    "risk_score",
+    "risk_probability",
+)
 
 
 def _config_to_payload(config: EvaluationConfig) -> dict[str, Any]:
@@ -171,6 +193,38 @@ def _default_distance_cache_dir_for_priority_function(prio_function_path: Path) 
     return prio_function_path.parent / "distance_cache"
 
 
+def heldout_model_predictions_output_path_for_cache_root(cache_root: Path) -> Path:
+    return cache_root / DEFAULT_HELDOUT_MODEL_PREDICTIONS_FILE_NAME
+
+
+def heldout_model_predictions_by_model_dir_for_cache_root(cache_root: Path) -> Path:
+    return cache_root / DEFAULT_HELDOUT_MODEL_PREDICTIONS_BY_MODEL_DIR_NAME
+
+
+def heldout_model_predictions_output_path_for_model(cache_root: Path, model_name: str) -> Path:
+    return heldout_model_predictions_by_model_dir_for_cache_root(cache_root) / f"{_model_slug(model_name)}.pkl"
+
+
+def _heldout_model_prediction_paths_for_cache_root(cache_root: Path) -> dict[str, str]:
+    predictions_dir = heldout_model_predictions_by_model_dir_for_cache_root(cache_root)
+    if not predictions_dir.exists():
+        return {}
+
+    prediction_paths: dict[str, str] = {}
+    for prediction_path in sorted(predictions_dir.glob("*.pkl")):
+        try:
+            prediction_frame = pd.read_pickle(prediction_path)
+        except Exception:
+            continue
+        if prediction_frame.empty or "model_name" not in prediction_frame.columns:
+            continue
+        model_name = str(prediction_frame.iloc[0]["model_name"])
+        if not model_name:
+            continue
+        prediction_paths[model_name] = str(prediction_path)
+    return prediction_paths
+
+
 def write_evaluation_report_file(
     *,
     config_path: str | Path,
@@ -181,10 +235,20 @@ def write_evaluation_report_file(
         report.prio_function_path,
         config.report_file_name,
     )
+    cache_root = config.distance_cache_dir or _default_distance_cache_dir_for_priority_function(
+        config.prio_function_path
+    )
+    results_payload = _report_to_payload(report)
+    results_payload["heldout_model_predictions_path"] = str(
+        heldout_model_predictions_output_path_for_cache_root(cache_root)
+    )
+    results_payload["heldout_model_prediction_paths"] = _heldout_model_prediction_paths_for_cache_root(
+        cache_root
+    )
     payload = {
         "config_path": str(Path(config_path).expanduser().resolve()),
         "config": _config_to_payload(config),
-        "results": _report_to_payload(report),
+        "results": results_payload,
     }
     output_path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     return output_path
@@ -517,22 +581,29 @@ def _load_output_row_tracking(path: Path) -> pd.DataFrame:
     return tracking_frame
 
 
-def _build_dataset_ancestry_groups(
+def _build_dataset_tracking_rows(
     *,
     dataset_pickle_paths: tuple[Path, ...],
     dataset_lengths: tuple[int, ...],
     output_row_tracking_path: Path,
     supported_ancestry_groups: tuple[str, ...],
-) -> tuple[str, ...]:
+) -> pd.DataFrame:
+    if len(dataset_pickle_paths) != len(dataset_lengths):
+        raise ValueError(
+            "Dataset pickle paths and dataset lengths must have the same length: "
+            f"paths={len(dataset_pickle_paths)} lengths={len(dataset_lengths)}."
+        )
+
     tracking_frame = _load_output_row_tracking(output_row_tracking_path)
-    ancestry_groups: list[str] = []
+    tracking_rows: list[pd.DataFrame] = []
+    next_row_index = 0
 
     for dataset_path, expected_length in zip(dataset_pickle_paths, dataset_lengths):
         output_name = dataset_path.name
         output_tracking = tracking_frame.loc[
-            tracking_frame["output_pickle_name"] == output_name,
-            ["output_row_number", "source_pickle_name"],
-        ].sort_values("output_row_number")
+            tracking_frame["output_pickle_name"] == output_name
+        ].copy()
+        output_tracking = output_tracking.sort_values("output_row_number").reset_index(drop=True)
         if len(output_tracking) != expected_length:
             raise ValueError(
                 f"Tracking file {output_row_tracking_path} has {len(output_tracking)} rows for "
@@ -544,15 +615,67 @@ def _build_dataset_ancestry_groups(
             raise ValueError(
                 f"Tracking rows for {output_name} must cover output_row_number 0..{expected_length - 1} in order."
             )
-        ancestry_groups.extend(
+
+        if "source_pickle_path" not in output_tracking.columns:
+            output_tracking["source_pickle_path"] = None
+        if "source_row_number" not in output_tracking.columns:
+            output_tracking["source_row_number"] = pd.NA
+
+        ancestry_groups = [
             _extract_ancestry_group(
                 str(source_pickle_name),
                 supported_ancestry_groups=supported_ancestry_groups,
             )
             for source_pickle_name in output_tracking["source_pickle_name"].tolist()
+        ]
+        row_indexes = range(next_row_index, next_row_index + expected_length)
+        tracking_rows.append(
+            pd.DataFrame(
+                {
+                    "dataset_row_index": list(row_indexes),
+                    "dataset_pickle_name": output_tracking["output_pickle_name"].tolist(),
+                    "dataset_pickle_path": [str(dataset_path)] * expected_length,
+                    "dataset_row_number": output_tracking["output_row_number"].astype(int).tolist(),
+                    "source_pickle_name": output_tracking["source_pickle_name"].tolist(),
+                    "source_pickle_path": output_tracking["source_pickle_path"].tolist(),
+                    "source_row_number": output_tracking["source_row_number"].tolist(),
+                    "ancestry_group": ancestry_groups,
+                }
+            )
+        )
+        next_row_index += expected_length
+
+    if not tracking_rows:
+        return pd.DataFrame(
+            columns=(
+                "dataset_row_index",
+                "dataset_pickle_name",
+                "dataset_pickle_path",
+                "dataset_row_number",
+                "source_pickle_name",
+                "source_pickle_path",
+                "source_row_number",
+                "ancestry_group",
+            )
         )
 
-    return tuple(ancestry_groups)
+    return pd.concat(tracking_rows, ignore_index=True)
+
+
+def _build_dataset_ancestry_groups(
+    *,
+    dataset_pickle_paths: tuple[Path, ...],
+    dataset_lengths: tuple[int, ...],
+    output_row_tracking_path: Path,
+    supported_ancestry_groups: tuple[str, ...],
+) -> tuple[str, ...]:
+    tracking_rows = _build_dataset_tracking_rows(
+        dataset_pickle_paths=dataset_pickle_paths,
+        dataset_lengths=dataset_lengths,
+        output_row_tracking_path=output_row_tracking_path,
+        supported_ancestry_groups=supported_ancestry_groups,
+    )
+    return tuple(tracking_rows["ancestry_group"].tolist())
 
 
 def _safe_group_roc_auc(labels: pd.Series, scores: pd.Series, *, ancestry_group: str) -> float:
@@ -602,12 +725,179 @@ def _evaluate_heldout_ancestry_groups(
     return tuple(evaluations)
 
 
+def _model_slug(model_name: str) -> str:
+    slug = re.sub(r"[^a-z0-9]+", "_", model_name.strip().lower()).strip("_")
+    if not slug:
+        raise ValueError("Model name must contain at least one alphanumeric character.")
+    return slug
+
+
+def _score_to_probability(risk_scores: Sequence[float]) -> np.ndarray:
+    return _sigmoid(np.asarray(risk_scores, dtype=float))
+
+
+def _build_heldout_model_prediction_rows(
+    *,
+    model_name: str,
+    heldout_tracking_rows: pd.DataFrame,
+    heldout_labels: Sequence[float],
+    risk_scores: Sequence[float],
+) -> pd.DataFrame:
+    label_array = np.asarray(heldout_labels, dtype=float)
+    score_array = np.asarray(risk_scores, dtype=float)
+    heldout_subject_count = len(heldout_tracking_rows)
+    if label_array.shape[0] != heldout_subject_count:
+        raise ValueError(
+            "Heldout labels did not match heldout subject tracking rows: "
+            f"labels={label_array.shape[0]} tracking_rows={heldout_subject_count}."
+        )
+    if score_array.shape[0] != heldout_subject_count:
+        raise ValueError(
+            f"Model {model_name} produced {score_array.shape[0]} heldout scores for "
+            f"{heldout_subject_count} heldout subjects."
+        )
+
+    prediction_rows = pd.DataFrame(
+        {
+            "heldout_subject_index": heldout_tracking_rows["dataset_row_index"].to_numpy(copy=False),
+            "heldout_output_pickle_name": heldout_tracking_rows["dataset_pickle_name"].to_numpy(
+                copy=False
+            ),
+            "heldout_output_pickle_path": heldout_tracking_rows["dataset_pickle_path"].to_numpy(
+                copy=False
+            ),
+            "heldout_output_row_number": heldout_tracking_rows["dataset_row_number"].to_numpy(
+                copy=False
+            ),
+            "source_pickle_name": heldout_tracking_rows["source_pickle_name"].to_numpy(copy=False),
+            "source_pickle_path": heldout_tracking_rows["source_pickle_path"].to_numpy(copy=False),
+            "source_row_number": heldout_tracking_rows["source_row_number"].to_numpy(copy=False),
+            "ancestry_group": heldout_tracking_rows["ancestry_group"].to_numpy(copy=False),
+            "label": label_array,
+            "model_name": model_name,
+            "model_slug": _model_slug(model_name),
+            "risk_score": score_array,
+            "risk_probability": _score_to_probability(score_array),
+        }
+    )
+    return prediction_rows.loc[:, list(_HELDOUT_MODEL_PREDICTION_COLUMNS)]
+
+
+def _build_heldout_model_predictions_frame(
+    *,
+    heldout_tracking_rows: pd.DataFrame,
+    heldout_labels: Sequence[float],
+    priority_function_scores: Sequence[float],
+    baseline_scores_by_name: Sequence[tuple[str, Sequence[float]]],
+) -> pd.DataFrame:
+    prediction_frames = [
+        _build_heldout_model_prediction_rows(
+            model_name=PRIORITY_FUNCTION_MODEL_NAME,
+            heldout_tracking_rows=heldout_tracking_rows,
+            heldout_labels=heldout_labels,
+            risk_scores=priority_function_scores,
+        )
+    ]
+    prediction_frames.extend(
+        _build_heldout_model_prediction_rows(
+            model_name=model_name,
+            heldout_tracking_rows=heldout_tracking_rows,
+            heldout_labels=heldout_labels,
+            risk_scores=risk_scores,
+        )
+        for model_name, risk_scores in baseline_scores_by_name
+    )
+    return (
+        pd.concat(prediction_frames, ignore_index=True)
+        .sort_values(["heldout_subject_index", "model_name"])
+        .reset_index(drop=True)
+    )
+
+
+def write_heldout_model_predictions_file(
+    *,
+    cache_root: Path,
+    predictions_frame: pd.DataFrame,
+) -> Path:
+    cache_root.mkdir(parents=True, exist_ok=True)
+    output_path = heldout_model_predictions_output_path_for_cache_root(cache_root)
+    predictions_frame.to_pickle(output_path)
+    return output_path
+
+
+def write_heldout_model_predictions_file_for_model(
+    *,
+    cache_root: Path,
+    model_name: str,
+    predictions_frame: pd.DataFrame,
+) -> Path:
+    predictions_dir = heldout_model_predictions_by_model_dir_for_cache_root(cache_root)
+    predictions_dir.mkdir(parents=True, exist_ok=True)
+    output_path = heldout_model_predictions_output_path_for_model(cache_root, model_name)
+    predictions_frame.to_pickle(output_path)
+    return output_path
+
+
+def _persist_incremental_evaluation_artifacts(
+    *,
+    config_path: str | Path | None,
+    config: EvaluationConfig,
+    cache_root: Path,
+    report: EvaluationReport,
+    heldout_tracking_rows: pd.DataFrame,
+    heldout_labels: Sequence[float],
+    priority_function_scores: Sequence[float],
+    baseline_scores_by_name: Sequence[tuple[str, Sequence[float]]],
+    completed_model_name: str,
+    completed_model_scores: Sequence[float],
+    progress_reporter: Callable[[str], None],
+) -> None:
+    completed_prediction_rows = _build_heldout_model_prediction_rows(
+        model_name=completed_model_name,
+        heldout_tracking_rows=heldout_tracking_rows,
+        heldout_labels=heldout_labels,
+        risk_scores=completed_model_scores,
+    )
+    completed_predictions_path = write_heldout_model_predictions_file_for_model(
+        cache_root=cache_root,
+        model_name=completed_model_name,
+        predictions_frame=completed_prediction_rows,
+    )
+
+    aggregate_predictions = _build_heldout_model_predictions_frame(
+        heldout_tracking_rows=heldout_tracking_rows,
+        heldout_labels=heldout_labels,
+        priority_function_scores=priority_function_scores,
+        baseline_scores_by_name=baseline_scores_by_name,
+    )
+    aggregate_predictions_path = write_heldout_model_predictions_file(
+        cache_root=cache_root,
+        predictions_frame=aggregate_predictions,
+    )
+
+    if config_path is not None:
+        report_path = write_evaluation_report_file(
+            config_path=config_path,
+            config=config,
+            report=report,
+        )
+        progress_reporter(
+            f"Persisted report after {completed_model_name} to {report_path}"
+        )
+
+    progress_reporter(
+        "Persisted heldout predictions after "
+        f"{completed_model_name} to {completed_predictions_path} and {aggregate_predictions_path}"
+    )
+
+
 def evaluate_priority_function(
     config: EvaluationConfig,
     *,
     baselines_to_run: tuple[BaselineSpec, ...] | None = None,
     progress_reporter: Callable[[str], None] | None = None,
     progress_log_path: Path | None = None,
+    config_path: str | Path | None = None,
 ) -> EvaluationReport:
     report = progress_reporter or (lambda message: None)
     calibration_partitions = _resolve_partition_count(config.calibration_partitions)
@@ -650,12 +940,13 @@ def evaluate_priority_function(
         output_row_tracking_path=config.output_row_tracking_path,
         supported_ancestry_groups=config.supported_ancestry_groups,
     )
-    heldout_ancestry_groups = _build_dataset_ancestry_groups(
+    heldout_tracking_rows = _build_dataset_tracking_rows(
         dataset_pickle_paths=config.heldout_pickle_paths,
         dataset_lengths=heldout_lengths,
         output_row_tracking_path=config.output_row_tracking_path,
         supported_ancestry_groups=config.supported_ancestry_groups,
     )
+    heldout_ancestry_groups = tuple(heldout_tracking_rows["ancestry_group"].tolist())
     report(
         "Loaded datasets with rows: "
         f"training={len(training_data)} from {list(training_lengths)} "
@@ -780,8 +1071,29 @@ def evaluate_priority_function(
             f"is {evaluation.auc_roc:.6f}"
         )
 
+    partial_report = EvaluationReport(
+        prio_function_path=config.prio_function_path,
+        heldout_auc_roc=heldout_auc_roc,
+        heldout_ancestry_evaluations=heldout_ancestry_evaluations,
+        baseline_evaluations=(),
+    )
+    _persist_incremental_evaluation_artifacts(
+        config_path=config_path,
+        config=config,
+        cache_root=cache_root,
+        report=partial_report,
+        heldout_tracking_rows=heldout_tracking_rows,
+        heldout_labels=heldout_labels,
+        priority_function_scores=heldout_risk_scores,
+        baseline_scores_by_name=(),
+        completed_model_name=PRIORITY_FUNCTION_MODEL_NAME,
+        completed_model_scores=heldout_risk_scores,
+        progress_reporter=report,
+    )
+
     selected_baselines = config.baselines if baselines_to_run is None else baselines_to_run
     baseline_evaluations: list[BaselineEvaluation] = []
+    baseline_scores_by_name: list[tuple[str, Sequence[float]]] = []
     for baseline in selected_baselines:
         baseline_name = normalize_baseline_name(baseline.name)
         report(f"Running baseline {baseline_name}")
@@ -800,6 +1112,7 @@ def evaluate_priority_function(
                 f"Baseline {baseline_name} returned {type(baseline_result).__name__}, "
                 "expected BaselineResult."
             )
+        baseline_scores_by_name.append((baseline_name, baseline_result.heldout_scores))
         baseline_ancestry_evaluations = _evaluate_heldout_ancestry_groups(
             heldout_labels=heldout_labels,
             heldout_risk_scores=baseline_result.heldout_scores,
@@ -820,6 +1133,25 @@ def evaluate_priority_function(
                 auc_roc=baseline_result.auc_roc,
                 heldout_ancestry_evaluations=baseline_ancestry_evaluations,
             )
+        )
+        partial_report = EvaluationReport(
+            prio_function_path=config.prio_function_path,
+            heldout_auc_roc=heldout_auc_roc,
+            heldout_ancestry_evaluations=heldout_ancestry_evaluations,
+            baseline_evaluations=tuple(baseline_evaluations),
+        )
+        _persist_incremental_evaluation_artifacts(
+            config_path=config_path,
+            config=config,
+            cache_root=cache_root,
+            report=partial_report,
+            heldout_tracking_rows=heldout_tracking_rows,
+            heldout_labels=heldout_labels,
+            priority_function_scores=heldout_risk_scores,
+            baseline_scores_by_name=tuple(baseline_scores_by_name),
+            completed_model_name=baseline_name,
+            completed_model_scores=baseline_result.heldout_scores,
+            progress_reporter=report,
         )
 
     return EvaluationReport(
@@ -842,6 +1174,7 @@ def evaluate_from_config_path(
         baselines_to_run=baselines_to_run,
         progress_reporter=progress_reporter,
         progress_log_path=progress_log_path,
+        config_path=config_path,
     )
 
 
@@ -982,6 +1315,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     cache_root = config.distance_cache_dir or _default_distance_cache_dir_for_priority_function(
         config.prio_function_path
     )
+    heldout_model_predictions_path = heldout_model_predictions_output_path_for_cache_root(
+        cache_root
+    )
     progress_log_path = cache_root / "evaluate_priofunction.progress.log"
     _initialize_progress_log(progress_log_path)
     progress_reporter = _build_progress_reporter(progress_log_path)
@@ -998,6 +1334,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             config,
             progress_reporter=progress_reporter,
             progress_log_path=progress_log_path,
+            config_path=args.config_path,
         )
     else:
         existing_report = load_existing_evaluation_report(report_path)
@@ -1011,14 +1348,26 @@ def main(argv: Sequence[str] | None = None) -> int:
             progress_reporter(
                 "Existing report found with missing baselines: "
                 + ", ".join(normalize_baseline_name(baseline.name) for baseline in missing_baselines)
+                + ". Recomputing all configured models so heldout subject-level predictions stay complete."
             )
             additional_report = evaluate_priority_function(
                 config,
-                baselines_to_run=missing_baselines,
+                progress_reporter=progress_reporter,
+                progress_log_path=progress_log_path,
+                config_path=args.config_path,
+            )
+            report = merge_evaluation_reports(existing_report, additional_report)
+        elif not heldout_model_predictions_path.exists():
+            progress_reporter(
+                "Existing report found but heldout model predictions file is missing at "
+                f"{heldout_model_predictions_path}; recomputing evaluation to create it."
+            )
+            evaluate_priority_function(
+                config,
                 progress_reporter=progress_reporter,
                 progress_log_path=progress_log_path,
             )
-            report = merge_evaluation_reports(existing_report, additional_report)
+            report = existing_report
         else:
             progress_reporter(
                 f"Existing report already contains all configured baselines; reusing {report_path}"
@@ -1031,6 +1380,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
     print(format_report(report))
     print(f"evaluation_report_path={report_path}")
+    print(f"heldout_model_predictions_path={heldout_model_predictions_path}")
     return 0
 
 
