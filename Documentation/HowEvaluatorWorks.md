@@ -14,9 +14,17 @@ For each candidate priority function, the evaluator produces one score per prepa
 - the no-additional-covariates condition
 - the additional-covariates condition
 
-Each pair contributes `num_folds` fold scores because the same priority function is evaluated repeatedly under fold-specific calibration/scoring splits for that condition. The evaluator stores the average of all fold scores under `mean`, then the program database appends a registration-time `combined` score as the last entry. That final `combined` value is what upstream FunSearch uses for island ranking, best-program tracking, and prompt-function ordering.
+Each pair contributes `num_folds` fold scores because the same priority function is evaluated repeatedly under fold-specific calibration/scoring splits for that condition. The evaluator stores those per-fold scores first, then stores the average of all fold scores under `mean` as the final entry. That final `mean` value is what upstream FunSearch uses for island ranking, best-program tracking, and default prompt-function ordering.
 
-The evaluator also records an auxiliary simplicity score for the candidate function body. `simplicity` is defined as the negative AST node count of the candidate function, so values closer to zero are simpler and more negative values are more complex. During registration into an island, the program database compares that simplicity against up to 100 existing functions from the destination island, computes a bounded `simplicity_bonus`, and appends `combined = mean + simplicity_bonus` as the final ranking score.
+So for one candidate, the stored score signature is effectively:
+
+- one scalar per fold, for example `no_covariates_fold_1`, `no_covariates_fold_2`, `with_covariates_fold_1`, `with_covariates_fold_2`
+- `simplicity`
+- `mean`
+
+The fold-score vector is therefore stored in the program database semantically, but as separate named scalar entries rather than as one vector-valued field.
+
+The evaluator also records an auxiliary simplicity score for the candidate function body. `simplicity` is defined as the negative AST node count of the candidate function, so values closer to zero are simpler and more negative values are more complex. That simplicity score is stored alongside the fold scores for diagnostics and prompt ordering, but it does not change the persisted ranking score. Fold scores are computed once, at evaluation time before first registration, and later island resets copy those stored scores instead of recomputing them.
 
 ## The three oracle parts
 
@@ -150,13 +158,36 @@ For each prepared dataset pair, it does this for every fold-specific `calibratio
 
 The evaluator returns one fold score per prepared fold, plus:
 
+- one stored scalar per fold, such as `pair_name_fold_1`, `pair_name_fold_2`, and so on.
 - `simplicity`, an auxiliary score based on AST size of the priority function body.
 - `mean`, the mean of all fold scores across all configured dataset pairs.
 
-When that evaluated candidate is registered into an island, the program database appends:
+When that evaluated candidate is registered into an island, the program database stores exactly those fold scores, the auxiliary `simplicity`, and the final `mean`. It does not append any registration-time bonus or alternate combined score.
 
-- `simplicity_bonus`, computed from the candidate's simplicity rank relative to up to 100 baseline functions already registered in that island.
-- `combined`, the final ranking score used by upstream FunSearch, defined as `mean + simplicity_bonus`.
+When a prompt contains two prior functions, the default ordering is still lower-mean first (`priority_v0`) and higher-mean second (`priority_v1`). There is one override: if the lower-mean function is simpler and has a higher score on at least one corresponding fold, it is treated as the more desirable mutation and is shown second as `priority_v1`.
+
+## How prior mutations are presented to the LLM
+
+When the sampler prepares an LLM prompt for an island, it shows one or two prior priority functions from that island and then asks for the next version.
+
+With two prior functions, the default presentation is:
+
+- the lower-mean function is shown first as `priority_v0`
+- the higher-mean function is shown second as `priority_v1`
+
+In that default case, the bridge text tells the LLM that `priority_v1` is a higher-scored improvement over `priority_v0` and suggests improving further in that direction or trying a novel direction.
+
+There is one special override. If both of the following hold:
+
+- the lower-mean function has a higher `simplicity` score, meaning it is simpler
+- the lower-mean function beats the higher-mean function on at least one corresponding stored fold score
+
+then the lower-mean function is treated as the more desirable mutation for prompting purposes. In that case:
+
+- the higher-mean function is shown first as `priority_v0`
+- the simpler lower-mean function is shown second as `priority_v1`
+
+The bridge text also changes in that override case. Instead of calling `priority_v1` a higher-scored improvement, it explicitly tells the LLM that `priority_v1` is the preferred mutation because it is simpler and wins at least one fold score even though it does not have the higher mean score.
 
 When the evaluator moves from calibration to scoring, it uses the combined `oracle_train.pkl + calibration_i.pkl` data to estimate marginal effect sizes for the scoring subjects. The scoring split itself is only used for the final personalized-risk scoring and AUC calculation.
 
@@ -237,22 +268,9 @@ This score is auxiliary only. It is stored in the program signature for diagnost
 
 ### Mean score
 
-The mean score is the average of all fold scores across all configured conditions. With two conditions and `num_folds = N`, the evaluator averages `2N` fold scores. It is stored under `mean` for diagnostics and as the base input to the final ranking score, but it is no longer the last stored value once the candidate is registered into an island.
+The mean score is the average of all fold scores across all configured conditions. With two conditions and `num_folds = N`, the evaluator averages `2N` fold scores. It is stored under `mean`, it remains the last stored value when the candidate is registered into an island, and it is the scalar upstream FunSearch uses for island ranking and resets.
 
-### Combined score
-
-The combined score is the final scalar upstream FunSearch ranks on. It is appended last in the score signature during island registration:
-
-`combined = mean + simplicity_bonus`
-
-The simplicity bonus is computed by comparing the candidate's `simplicity` score against up to 100 deterministically sampled baseline functions already registered in the destination island.
-
-- If the island is empty and this is the first registered function, `simplicity_bonus = 0.0`.
-- Otherwise the candidate is placed on a simplicity rank scale relative to the baseline sample.
-- The interpolation range is `[-Y, Y]`, where `Y = program_database.simplicity_bonus_max` from the config file.
-- A uniquely simplest candidate gets `+Y`, a uniquely most complex candidate gets `-Y`, and intermediate ranks interpolate linearly between those endpoints.
-
-Because `combined` is stored last, it is the value upstream FunSearch uses for island ranking, for choosing island founders during resets, and for biasing which prior functions are sampled into prompts.
+The earlier fold-level values are still stored individually in the program database and are used by the prompt-order override described above.
 
 ## Data flow summary
 
@@ -270,8 +288,9 @@ flowchart TD
     H --> I[Bootstrap ROC AUC and take median]
     I --> J[Fold score]
     J --> K[Mean across all folds]
-    K --> L[Compare simplicity to destination-island baselines]
-    L --> M[Append simplicity_bonus and combined]
+    J --> L[Store per-fold scores]
+    K --> M[Store mean as final ranking score]
+    K --> N[Use simplicity plus fold vector for prompt-order override only]
 ```
 
 In short: `prepare(...)` creates the data layout, and `evaluate_candidate(...)` uses that layout to score the priority function under each configured pair and fold.

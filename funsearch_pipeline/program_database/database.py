@@ -1,12 +1,10 @@
 from __future__ import annotations
 
-import ast
 from collections import OrderedDict
 from dataclasses import asdict
 from dataclasses import dataclass
 from pathlib import Path
 import copy
-import hashlib
 import json
 import math
 import numpy as np
@@ -34,38 +32,6 @@ def _normalize_function_body_indentation(body: str) -> str:
     )
 
 
-def _materialize_program_source(
-    template: code_manipulation.Program,
-    function_to_evolve: str,
-    function: code_manipulation.Function,
-) -> str:
-    """Build full runnable source for one stored upstream function body."""
-
-    program = copy.deepcopy(template)
-    target_function = program.get_function(function_to_evolve)
-    target_function.args = function.args
-    target_function.body = function.body
-    target_function.return_type = function.return_type
-    target_function.docstring = function.docstring
-    return str(program)
-
-
-def _score_function_simplicity(program_source: str, function_name: str) -> float:
-    """Return the evaluator-compatible simplicity score for one function."""
-
-    module = ast.parse(program_source)
-    for node in module.body:
-        if isinstance(node, ast.FunctionDef) and node.name == function_name:
-            return -float(sum(1 for _ in ast.walk(node)))
-    return -float(sum(1 for _ in ast.walk(module)))
-
-
-def _stable_program_digest(program_source: str) -> bytes:
-    """Return a deterministic digest used to subsample baseline programs."""
-
-    return hashlib.sha256(program_source.encode("utf-8")).digest()
-
-
 def _expected_prompt_version(prompt_code: str, function_to_evolve: str) -> int:
     """Return the version suffix of the final function header in `prompt_code`."""
 
@@ -78,91 +44,220 @@ def _expected_prompt_version(prompt_code: str, function_to_evolve: str) -> int:
     return int(matches[-1].group(1))
 
 
-def _sample_baseline_simplicities(
-    island: upstream_programs_database.Island,
-    *,
-    max_baselines: int,
-) -> list[float]:
-    """Return up to `max_baselines` deterministic simplicity baselines."""
+def _prepare_scores_for_registration(scores_per_test: dict[str, float]) -> dict[str, float]:
+    """Keep evaluator fold scores intact and ensure `mean` remains last."""
 
-    baselines: list[tuple[bytes, float]] = []
-    for cluster in island._clusters.values():
-        for function in cluster._programs:
-            program_source = _materialize_program_source(
-                island._template,
-                island._function_to_evolve,
-                function,
-            )
-            baselines.append(
-                (
-                    _stable_program_digest(program_source),
-                    _score_function_simplicity(program_source, island._function_to_evolve),
-                )
-            )
-    baselines.sort(key=lambda item: item[0])
-    return [simplicity for _, simplicity in baselines[:max_baselines]]
-
-
-def _compute_simplicity_bonus(
-    candidate_simplicity: float,
-    baseline_simplicities: list[float],
-    *,
-    bonus_max: float,
-) -> float:
-    """Map candidate simplicity rank within the island to a bounded bonus."""
-
-    if bonus_max <= 0.0 or not baseline_simplicities:
-        return 0.0
-
-    num_strictly_greater = sum(
-        baseline_simplicity > candidate_simplicity
-        for baseline_simplicity in baseline_simplicities
-    )
-    num_equal = sum(
-        baseline_simplicity == candidate_simplicity
-        for baseline_simplicity in baseline_simplicities
-    )
-    rank = float(num_strictly_greater) + (float(num_equal) / 2.0)
-    denominator = float(len(baseline_simplicities))
-    return float(bonus_max - (2.0 * bonus_max * (rank / denominator)))
-
-
-def _prepare_scores_for_registration(
-    island: upstream_programs_database.Island,
-    evolved_function: code_manipulation.Function,
-    scores_per_test: dict[str, float],
-    *,
-    simplicity_bonus_max: float,
-) -> dict[str, float]:
-    """Append registration-time scores that depend on the destination island."""
+    if "mean" not in scores_per_test:
+        raise ValueError("scores_per_test must include a 'mean' entry.")
 
     registered_scores: OrderedDict[str, float] = OrderedDict()
     for score_name, score_value in scores_per_test.items():
-        if score_name in {"simplicity_bonus", "combined"}:
+        if score_name in {"mean", "simplicity_bonus", "combined"}:
             continue
         registered_scores[score_name] = score_value
-
-    mean_score = upstream_programs_database._reduce_score(registered_scores)
-    candidate_program_source = _materialize_program_source(
-        island._template,
-        island._function_to_evolve,
-        evolved_function,
-    )
-    candidate_simplicity = float(
-        registered_scores.get(
-            "simplicity",
-            _score_function_simplicity(candidate_program_source, island._function_to_evolve),
-        )
-    )
-    baseline_simplicities = _sample_baseline_simplicities(island, max_baselines=100)
-    simplicity_bonus = _compute_simplicity_bonus(
-        candidate_simplicity,
-        baseline_simplicities,
-        bonus_max=simplicity_bonus_max,
-    )
-    registered_scores["simplicity_bonus"] = simplicity_bonus
-    registered_scores["combined"] = mean_score + simplicity_bonus
+    registered_scores["mean"] = scores_per_test["mean"]
     return dict(registered_scores)
+
+
+def _attach_scores_to_cluster(
+    island: upstream_programs_database.Island,
+    scores_per_test: dict[str, float],
+) -> None:
+    """Store the named score vector on the matching upstream cluster."""
+
+    signature = upstream_programs_database._get_signature(scores_per_test)
+    cluster = island._clusters.get(signature)
+    if cluster is None:
+        raise KeyError(f"Cluster for signature {signature!r} was not found during registration.")
+    cluster._scores_per_test = dict(scores_per_test)
+
+
+def _ordered_fold_score_names(scores_per_test: dict[str, float]) -> tuple[str, ...]:
+    """Return fold-score keys in the stored order used to compute `mean`."""
+
+    fold_score_names = tuple(
+        score_name for score_name in scores_per_test if "_fold_" in score_name
+    )
+    if fold_score_names:
+        return fold_score_names
+    return tuple(
+        score_name
+        for score_name in scores_per_test
+        if score_name not in {"simplicity", "mean", "simplicity_bonus", "combined"}
+    )
+
+
+def _should_swap_prompt_order(
+    lower_mean_scores: dict[str, float],
+    higher_mean_scores: dict[str, float],
+) -> bool:
+    """Prefer the lower-mean program when it is simpler and wins a fold."""
+
+    lower_mean = float(lower_mean_scores["mean"])
+    higher_mean = float(higher_mean_scores["mean"])
+    if not lower_mean < higher_mean - 1e-12:
+        return False
+
+    lower_simplicity = lower_mean_scores.get("simplicity")
+    higher_simplicity = higher_mean_scores.get("simplicity")
+    if lower_simplicity is None or higher_simplicity is None:
+        return False
+    if not float(lower_simplicity) > float(higher_simplicity):
+        return False
+
+    lower_fold_names = _ordered_fold_score_names(lower_mean_scores)
+    higher_fold_names = _ordered_fold_score_names(higher_mean_scores)
+    if lower_fold_names != higher_fold_names or not lower_fold_names:
+        return False
+
+    return any(
+        float(lower_mean_scores[fold_name]) > float(higher_mean_scores[fold_name])
+        for fold_name in lower_fold_names
+    )
+
+
+def _build_prompt_prior_summary(
+    version_name: str,
+    scores_per_test: dict[str, float] | None,
+) -> "PromptPriorSummary":
+    """Summarize one prior function for sampler-side logging."""
+
+    if scores_per_test is None:
+        return PromptPriorSummary(version_name=version_name)
+
+    return PromptPriorSummary(
+        version_name=version_name,
+        mean_score=(float(scores_per_test["mean"]) if "mean" in scores_per_test else None),
+        simplicity_score=(
+            float(scores_per_test["simplicity"])
+            if "simplicity" in scores_per_test
+            else None
+        ),
+        fold_scores=tuple(
+            (fold_name, float(scores_per_test[fold_name]))
+            for fold_name in _ordered_fold_score_names(scores_per_test)
+        ),
+    )
+
+
+def _build_prompt_order_explanation(
+    prior_summaries: tuple["PromptPriorSummary", ...],
+    *,
+    preferred_second_due_to_simple_fold_win: bool,
+) -> str | None:
+    """Explain why the visible `priority_v1` was shown second."""
+
+    if len(prior_summaries) == 0:
+        return None
+    if len(prior_summaries) == 1:
+        return "Only one prior function was available, so only priority_v0 was shown."
+
+    v0_summary = prior_summaries[0]
+    v1_summary = prior_summaries[1]
+    if preferred_second_due_to_simple_fold_win:
+        v0_fold_scores = dict(v0_summary.fold_scores)
+        winning_fold_details = ", ".join(
+            (
+                f"{fold_name} ({v1_score} > {v0_fold_scores[fold_name]})"
+                if fold_name in v0_fold_scores
+                else f"{fold_name} ({v1_score})"
+            )
+            for fold_name, v1_score in v1_summary.fold_scores
+            if fold_name not in v0_fold_scores or v1_score > v0_fold_scores[fold_name]
+        )
+        return (
+            "priority_v1 was shown second because it is the preferred mutation: "
+            f"mean={v1_summary.mean_score} < {v0_summary.mean_score}, "
+            f"simplicity={v1_summary.simplicity_score} > {v0_summary.simplicity_score}, "
+            f"wins_folds=[{winning_fold_details}]"
+        )
+
+    return (
+        "priority_v1 was shown second because it has the higher mean score "
+        f"({v1_summary.mean_score} >= {v0_summary.mean_score}) and the "
+        "simplicity-plus-fold override did not apply."
+    )
+
+
+def _build_island_prompt(
+    island: upstream_programs_database.Island,
+    *,
+    island_id: int,
+) -> "IslandPrompt":
+    """Build an island prompt with the prompt-order override applied."""
+
+    signatures = list(island._clusters.keys())
+    if not signatures:
+        raise ValueError("Cannot build a prompt from an empty island.")
+
+    cluster_scores = np.array([island._clusters[signature].score for signature in signatures])
+    period = island._cluster_sampling_temperature_period
+    temperature = island._cluster_sampling_temperature_init * (
+        1 - (island._num_programs % period) / period
+    )
+    probabilities = upstream_programs_database._softmax(cluster_scores, temperature)
+    functions_per_prompt = min(len(island._clusters), island._functions_per_prompt)
+    chosen_indices = np.random.choice(
+        len(signatures),
+        size=functions_per_prompt,
+        p=probabilities,
+    )
+
+    prompt_entries: list[tuple[code_manipulation.Function, float, dict[str, float] | None]] = []
+    for chosen_index in np.atleast_1d(chosen_indices):
+        signature = signatures[int(chosen_index)]
+        cluster = island._clusters[signature]
+        prompt_entries.append(
+            (
+                cluster.sample_program(),
+                float(cluster.score),
+                getattr(cluster, "_scores_per_test", None),
+            )
+        )
+
+    sorted_entries = [
+        prompt_entries[int(index)]
+        for index in np.argsort([entry[1] for entry in prompt_entries])
+    ]
+    preferred_second_due_to_simple_fold_win = False
+    if len(sorted_entries) == 2:
+        lower_mean_scores = sorted_entries[0][2]
+        higher_mean_scores = sorted_entries[1][2]
+        if (
+            lower_mean_scores is not None
+            and higher_mean_scores is not None
+            and _should_swap_prompt_order(lower_mean_scores, higher_mean_scores)
+        ):
+            sorted_entries = [sorted_entries[1], sorted_entries[0]]
+            preferred_second_due_to_simple_fold_win = True
+
+    prior_summaries = tuple(
+        _build_prompt_prior_summary(f"priority_v{index}", entry[2])
+        for index, entry in enumerate(sorted_entries)
+    )
+
+    code = island._generate_prompt([entry[0] for entry in sorted_entries])
+    return IslandPrompt(
+        island_id=island_id,
+        version_generated=_expected_prompt_version(code, island._function_to_evolve),
+        code=code,
+        preferred_second_due_to_simple_fold_win=preferred_second_due_to_simple_fold_win,
+        prior_summaries=prior_summaries,
+        shown_second_reason=_build_prompt_order_explanation(
+            prior_summaries,
+            preferred_second_due_to_simple_fold_win=preferred_second_due_to_simple_fold_win,
+        ),
+    )
+
+
+@dataclass(frozen=True)
+class PromptPriorSummary:
+    """Lightweight sampler-log summary for one prior function in a prompt."""
+
+    version_name: str
+    mean_score: float | None = None
+    simplicity_score: float | None = None
+    fold_scores: tuple[tuple[str, float], ...] = ()
 
 
 @dataclass(frozen=True)
@@ -183,6 +278,9 @@ class IslandPrompt:
     island_id: int
     version_generated: int
     code: str
+    preferred_second_due_to_simple_fold_win: bool = False
+    prior_summaries: tuple[PromptPriorSummary, ...] = ()
+    shown_second_reason: str | None = None
 
 
 @dataclass(frozen=True)
@@ -256,7 +354,6 @@ class IslandShard:
     best_score: float
     best_program: code_manipulation.Function | None
     best_scores_per_test: dict[str, float] | None
-    simplicity_bonus_max: float
 
     def get_prompt(self) -> IslandPrompt:
         """Return a prompt from the shard's current island state.
@@ -269,12 +366,7 @@ class IslandShard:
             available, plus the header for the next generated version.
         """
 
-        code, _ = self.island.get_prompt()
-        return IslandPrompt(
-            island_id=self.island_id,
-            version_generated=_expected_prompt_version(code, self.island._function_to_evolve),
-            code=code,
-        )
+        return _build_island_prompt(self.island, island_id=self.island_id)
 
     def materialize_candidate(
         self,
@@ -331,13 +423,9 @@ class IslandShard:
             otherwise `False`.
         """
 
-        registered_scores = _prepare_scores_for_registration(
-            self.island,
-            candidate_program.evolved_function,
-            scores_per_test,
-            simplicity_bonus_max=self.simplicity_bonus_max,
-        )
+        registered_scores = _prepare_scores_for_registration(scores_per_test)
         self.island.register_program(candidate_program.evolved_function, registered_scores)
+        _attach_scores_to_cluster(self.island, registered_scores)
         reduced_score = upstream_programs_database._reduce_score(registered_scores)
         if reduced_score > self.best_score:
             self.best_score = reduced_score
@@ -471,17 +559,13 @@ class CycleProgramsDatabase:
 
         seed_function = copy.deepcopy(self._template.get_function(self._function_to_evolve))
         for island_id in range(self.num_islands):
-            registered_scores = _prepare_scores_for_registration(
-                self._database._islands[island_id],
-                seed_function,
-                scores_per_test,
-                simplicity_bonus_max=self._settings.simplicity_bonus_max,
-            )
+            registered_scores = _prepare_scores_for_registration(scores_per_test)
             self._database._register_program_in_island(
                 copy.deepcopy(seed_function),
                 island_id,
                 registered_scores,
             )
+            _attach_scores_to_cluster(self._database._islands[island_id], registered_scores)
 
     def get_prompt_for_island(self, island_id: int) -> IslandPrompt:
         """Return a prompt from the main database island state.
@@ -494,12 +578,7 @@ class CycleProgramsDatabase:
             `IslandShard.get_prompt()` so prompts reflect local registrations.
         """
 
-        code, _ = self._database._islands[island_id].get_prompt()
-        return IslandPrompt(
-            island_id=island_id,
-            version_generated=_expected_prompt_version(code, self._function_to_evolve),
-            code=code,
-        )
+        return _build_island_prompt(self._database._islands[island_id], island_id=island_id)
 
     def materialize_candidate(
         self,
@@ -550,15 +629,14 @@ class CycleProgramsDatabase:
             Mutates the corresponding parent island.
         """
 
-        registered_scores = _prepare_scores_for_registration(
-            self._database._islands[candidate_program.island_id],
-            candidate_program.evolved_function,
-            scores_per_test,
-            simplicity_bonus_max=self._settings.simplicity_bonus_max,
-        )
+        registered_scores = _prepare_scores_for_registration(scores_per_test)
         self._database._register_program_in_island(
             candidate_program.evolved_function,
             candidate_program.island_id,
+            registered_scores,
+        )
+        _attach_scores_to_cluster(
+            self._database._islands[candidate_program.island_id],
             registered_scores,
         )
 
@@ -595,13 +673,9 @@ class CycleProgramsDatabase:
             founder_scores = self._database._best_scores_per_test_per_island[founder_island_id]
             if founder is None or founder_scores is None:
                 continue
-            reset_scores = _prepare_scores_for_registration(
-                self._database._islands[island_id],
-                founder,
-                dict(founder_scores),
-                simplicity_bonus_max=self._settings.simplicity_bonus_max,
-            )
+            reset_scores = _prepare_scores_for_registration(dict(founder_scores))
             self._database._register_program_in_island(founder, island_id, reset_scores)
+            _attach_scores_to_cluster(self._database._islands[island_id], reset_scores)
 
     def export_island_shards(self) -> list[IslandShard]:
         """Copy every island into an independent shard.
@@ -633,7 +707,6 @@ class CycleProgramsDatabase:
             best_score=self._database._best_score_per_island[island_id],
             best_program=copy.deepcopy(self._database._best_program_per_island[island_id]),
             best_scores_per_test=(dict(best_scores) if best_scores is not None else None),
-            simplicity_bonus_max=self._settings.simplicity_bonus_max,
         )
 
     def combine_island_shards(self, shards: list[IslandShard]) -> None:

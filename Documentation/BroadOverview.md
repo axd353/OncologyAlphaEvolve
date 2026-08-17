@@ -44,6 +44,30 @@ The only built-in evaluator-side transformations are:
 - deterministic fold construction from the combined testing set
 - conversion into strict contract objects before the priority function is called
 
+After scoring, the evaluator does not collapse everything down to only one stored number. It registers one scalar per fold in the program database, plus `simplicity`, plus the final `mean`. So with two configured conditions and two folds, a candidate is stored with entries such as:
+
+- `no_covariates_fold_1`
+- `no_covariates_fold_2`
+- `with_covariates_fold_1`
+- `with_covariates_fold_2`
+- `simplicity`
+- `mean`
+
+The `mean` entry is still the final scalar used for ranking islands and selecting founders during resets.
+
+## How prior mutations are shown to the LLM
+
+During sampling, each island prompt can show one or two previous priority functions before asking the model for the next version.
+
+When two prior functions are shown, the default presentation is:
+
+- lower-mean function first as `priority_v0`
+- higher-mean function second as `priority_v1`
+
+There is one override. If the lower-mean function is simpler and also beats the higher-mean function on at least one corresponding stored fold score, then that simpler lower-mean function is treated as the more desirable mutation for prompting. In that case it is shown second as `priority_v1`, and the higher-mean function is shown first as `priority_v0`.
+
+The accompanying bridge text to the LLM also changes in that override case. Instead of saying that `priority_v1` is a higher-scored improvement, it says that `priority_v1` is the preferred mutation because it is simpler and wins at least one fold score even though its mean score is lower.
+
 ## How raw MEC data is transformed into `Data/FunsearchEvaluatorData`
 
 The standalone builder lives at `Data/build_funsearch_evaluator_data.py`.

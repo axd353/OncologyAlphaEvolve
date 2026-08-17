@@ -24,14 +24,12 @@
       "functions_per_prompt": "Number of previous priority functions to include in each island prompt. With value 2, established islands show two prior functions; brand-new islands show one because only the seed exists.",
       "num_islands": "Number of independent islands. Each cycle creates one sampler worker per island shard, up to sampler.parallel_workers concurrent processes.",
       "cluster_sampling_temperature_init": "Initial softmax temperature for sampling score clusters inside an island. Lower values favor high-scoring clusters more strongly.",
-      "cluster_sampling_temperature_period": "Period, measured in programs registered in an island, over which the cluster sampling temperature linearly decays before restarting its schedule.",
-      "simplicity_bonus_max": "Maximum absolute bonus added to the base mean score when computing the final combined ranking score. If this value is Y, the registration-time simplicity bonus is interpolated in the range [-Y, Y] from the candidate's simplicity rank relative to up to 100 baseline functions already in the destination island."
+      "cluster_sampling_temperature_period": "Period, measured in programs registered in an island, over which the cluster sampling temperature linearly decays before restarting its schedule."
     },
     "functions_per_prompt": 2,
     "num_islands": 4,
     "cluster_sampling_temperature_init": 0.1,
-    "cluster_sampling_temperature_period": 30000,
-    "simplicity_bonus_max": 0.008
+    "cluster_sampling_temperature_period": 30000
   },
   "sampler": {
     "_description": "Controls the LLM backend, system prompt, model name, and per-island sampling cadence.",
@@ -47,7 +45,7 @@
     "backend": "openai",
     "system_prompt_path": "./funsearch_system_prompt.example.txt",
     "model": "gpt-5.5",
-    "candidates_per_island_per_cycle": 7,
+    "candidates_per_island_per_cycle": 5,
     "parallel_workers": 8,
     "temperature": 1.0
   },
@@ -70,7 +68,7 @@
     "oracle_train_fraction": 0.8,
     "preprocessed_dirname": "preprocessed",
     "num_folds": 2,
-    "calibration_penalties": [0.1, 1.0, 10.0],
+    "calibration_penalties": [0.3],
     "calibration_partitions": 6,
     "scoring_partitions": 6,
     "bootstrap_iterations": 200,
