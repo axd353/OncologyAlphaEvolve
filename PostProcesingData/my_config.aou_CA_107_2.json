@@ -1,0 +1,28 @@
+{
+  "prio_function_path": "../../auxilalry_data/CA_107_2/best_prio.py",
+  "training_pickle_path": "../../auxilalry_data/CA_107_2/aou_train.pkl",
+  "calibrating_pickle_path": "../../auxilalry_data/CA_107_2/aou_calibration.pkl",
+  "heldout_pickle_path": "../../auxilalry_data/CA_107_2/aou_heldout.pkl",
+  "output_row_tracking_path": "../../auxilalry_data/CA_107_2/output_row_tracking.pkl",
+  "report_file_name": "best_prio.aou_CA_107_2.evaluation_report.json",
+  "supported_ancestry_groups": [
+    "EUR",
+    "AFR",
+    "AMR",
+    "EAS",
+    "SAS",
+    "MID"
+  ],
+  "should_overwrite": true,
+  "function_name": "priority",
+  "calibration_penalties": [
+    0.1,
+    1.0,
+    10.0
+  ],
+  "calibration_partitions": "auto",
+  "scoring_partitions": "auto",
+  "distance_cache_enabled": true,
+  "distance_cache_dir": "../../auxilalry_data/CA_107_2/distance_cache",
+  "baselines": []
+}
