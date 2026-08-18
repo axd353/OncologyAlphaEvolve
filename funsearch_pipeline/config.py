@@ -70,6 +70,7 @@ class ProgramDatabaseSettings:
     num_islands: int
     cluster_sampling_temperature_init: float
     cluster_sampling_temperature_period: int
+    simplicity_bonus_max: float = 0.008
 
 
 @dataclass(frozen=True)
@@ -193,6 +194,8 @@ def _validate_config(config: PipelineConfig) -> None:
         raise ValueError("program_database.functions_per_prompt must be at least 1.")
     if config.program_database.num_islands < 2:
         raise ValueError("program_database.num_islands must be at least 2.")
+    if config.program_database.simplicity_bonus_max < 0.0:
+        raise ValueError("program_database.simplicity_bonus_max must be non-negative.")
     if config.experiment.max_cycles < 1:
         raise ValueError("experiment.max_cycles must be at least 1.")
     if config.experiment.stop_after_no_improvement_cycles < 1:
@@ -280,6 +283,9 @@ def load_pipeline_config(config_path: str | Path) -> PipelineConfig:
             ),
             cluster_sampling_temperature_period=int(
                 program_database_section.get("cluster_sampling_temperature_period", 30_000)
+            ),
+            simplicity_bonus_max=float(
+                program_database_section.get("simplicity_bonus_max", 0.008)
             ),
         ),
         sampler=SamplerSettings(

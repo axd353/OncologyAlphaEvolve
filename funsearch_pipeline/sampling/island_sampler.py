@@ -131,46 +131,6 @@ def _log_prompt(log_path: Path, prompt: IslandPrompt, sample_index: int) -> None
     append_sampler_log(log_path, f"sample_index=0 full_prompt_end island={prompt.island_id}")
 
 
-def _log_prompt_prior_summaries(log_path: Path, prompt: IslandPrompt, sample_index: int) -> None:
-    """Log score summaries and ordering rationale before the LLM call."""
-
-    if not prompt.prior_summaries:
-        return
-
-    append_sampler_log(
-        log_path,
-        f"sample_index={sample_index} prompt_prior_summary_begin island={prompt.island_id}",
-    )
-    for prior_summary in prompt.prior_summaries:
-        fold_scores = ", ".join(
-            f"{fold_name}={fold_score}"
-            for fold_name, fold_score in prior_summary.fold_scores
-        )
-        append_sampler_log(
-            log_path,
-            (
-                f"sample_index={sample_index} prompt_prior_summary "
-                f"version={prior_summary.version_name} "
-                f"mean={prior_summary.mean_score} "
-                f"simplicity={prior_summary.simplicity_score} "
-                f"fold_scores=[{fold_scores}]"
-            ),
-        )
-
-    if prompt.shown_second_reason is not None:
-        append_sampler_log(
-            log_path,
-            (
-                f"sample_index={sample_index} prompt_order_reason "
-                f"{prompt.shown_second_reason}"
-            ),
-        )
-    append_sampler_log(
-        log_path,
-        f"sample_index={sample_index} prompt_prior_summary_end island={prompt.island_id}",
-    )
-
-
 def _build_single_completion_request(
     request: IslandSamplerRequest,
     prompt: IslandPrompt,
@@ -227,24 +187,14 @@ def _compose_sampler_input(prompt: IslandPrompt) -> str:
         )
     else:
         previous_version = prompt.version_generated - 1
-        if prompt.preferred_second_due_to_simple_fold_win:
-            bridge = (
-                "The code prompt below shows prior priority functions from the same island.\n"
-                f"priority_v{previous_version} is the preferred mutation over priority_v{previous_version - 1} because it is simpler and wins at least one fold score, even though it does not have the higher mean score.\n"
-                f"A plausible strategy is to identify what makes priority_v{previous_version} a more desirable mutation than priority_v{previous_version - 1} and improve further in that direction.\n"
-                "You may also try a completely novel direction of improvement.\n"
-                f"Your job is to return a complete definition of priority_v{prompt.version_generated} as a further improvement.\n"
-                f"Return only the definition of priority_v{prompt.version_generated} with the correct input and output signature.\n\n"
-            )
-        else:
-            bridge = (
-                "The code prompt below shows prior priority functions from the same island.\n"
-                f"priority_v{previous_version} is a higher-scored improvement over priority_v{previous_version - 1}.\n"
-                f"A plausible strategy is to identify what made priority_v{previous_version} better than priority_v{previous_version - 1} and improve further in that direction.\n"
-                "You may also try a completely novel direction of improvement.\n"
-                f"Your job is to return a complete definition of priority_v{prompt.version_generated} as a further improvement.\n"
-                f"Return only the definition of priority_v{prompt.version_generated} with the correct input and output signature.\n\n"
-            )
+        bridge = (
+            "The code prompt below shows prior priority functions from the same island.\n"
+            f"priority_v{previous_version} is a higher-scored improvement over priority_v{previous_version - 1}.\n"
+            f"A plausible strategy is to identify what made priority_v{previous_version} better than priority_v{previous_version - 1} and improve further in that direction.\n"
+            "You may also try a completely novel direction of improvement.\n"
+            f"Your job is to return a complete definition of priority_v{prompt.version_generated} as a further improvement.\n"
+            f"Return only the definition of priority_v{prompt.version_generated} with the correct input and output signature.\n\n"
+        )
     return bridge + prompt.code
 
 
@@ -330,7 +280,6 @@ def run_island_sampler(request: IslandSamplerRequest) -> IslandSamplerResult:
                 f"version_generated={prompt.version_generated}"
             ),
         )
-        _log_prompt_prior_summaries(request.log_path, prompt, sample_index)
 
         registered = False
         for attempt_index in range(1, max_attempts_per_prompt + 1):
