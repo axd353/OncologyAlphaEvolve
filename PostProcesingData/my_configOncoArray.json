@@ -1,5 +1,5 @@
 {
-  "prio_function_path": "/nfs/home/adas23/projects/AlphaEvolve/prio_func_disc_runs/oracle_priority_20260810_032011/cycle_0004/best_prio.py",
+  "prio_function_path": "/nfs/home/adas23/projects/AlphaEvolve/prio_func_disc_runs/oracle_priority_20260816_015322/cycle_0012/best_prio.py",
   "training_pickle_path": "../Data/FunsearchEvaluatorDataOncoArray/no_covariates_train.pkl",
   "calibrating_pickle_path": "../Data/FunsearchEvaluatorDataOncoArray/no_covariates_test.pkl",
   "heldout_pickle_path": "../Data/FunsearchEvaluatorDataOncoArray/no_covariates_heldout.pkl",
@@ -8,10 +8,10 @@
   "supported_ancestry_groups": ["AFRICAN_ANCESTRY", "ASIAN", "EUROPEAN"],
   "should_overwrite": false,
   "function_name": "priority",
-  "calibration_penalties": [0.1, 1.0, 10.0],
+  "calibration_penalties": [0.3],
   "calibration_partitions": "auto",
   "scoring_partitions": "auto",
-  "distance_cache_dir": "/nfs/home/adas23/projects/AlphaEvolve/prio_func_disc_runs/oracle_priority_20260810_032011/cycle_0004/distance_cache_oncoarray",
+  "distance_cache_dir": "/nfs/home/adas23/projects/AlphaEvolve/prio_func_disc_runs/oracle_priority_20260816_015322/cycle_0012/distance_cache_oncoarray",
   "baselines": [
     {
       "name": "Mixture Learning",
