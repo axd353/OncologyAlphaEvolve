@@ -1,0 +1,18 @@
+{
+  "run_dir": "../prio_func_disc_runs/oracle_priority_20260816_015322",
+  "report_file_name": "best_prio.all_cycles.JA.evaluation_report.json",
+  "target_ancestry_group": "JA",
+  "training_pickle_path": "../Data/FunsearchEvaluatorData/no_covariates_train.pkl",
+  "calibrating_pickle_path": "../Data/FunsearchEvaluatorData/no_covariates_test.pkl",
+  "heldout_pickle_path": "../Data/FunsearchEvaluatorData/no_covariates_heldout.pkl",
+  "output_row_tracking_path": "../Data/FunsearchEvaluatorData/output_row_tracking.pkl",
+  "supported_ancestry_groups": ["AA", "JA", "LA"],
+  "should_overwrite": false,
+  "function_name": "priority",
+  "calibration_penalties": [0.3],
+  "calibration_partitions": "auto",
+  "scoring_partitions": "auto",
+  "distance_cache_enabled": true,
+  "distance_cache_dir": "../prio_func_disc_runs/oracle_priority_20260816_015322/distance_cache_all_cycles_JA",
+  "baselines": []
+}
