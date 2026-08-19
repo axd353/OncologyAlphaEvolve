@@ -4,11 +4,13 @@
     "precomputed_directory": "Directory that already contains heldout_model_predictions_by_model/ or heldout_model_predictions.pkl.",
     "target_ancestry_group": "Requested ancestry label, matched case-insensitively after removing punctuation.",
     "p_value_threshold": "Decision threshold for rejecting the equal-performance null, for example 0.05.",
-    "output_file_name": "Optional. Markdown output file name written under precomputed_directory. Must end with .md and must be a file name only."
+    "effect_size": "Optional. Minimum improvement margin for the alternative hypothesis. Defaults to 0.0.",
+    "output_file_name": "Optional. Markdown output file name. For single-directory configs, this may be just a file name written under precomputed_directory, or a full path."
   },
   "precomputed_directory": "/nfs/home/adas23/projects/AlphaEvolve/prio_func_disc_runs/oracle_priority_20260810_032011/cycle_0004/distance_cache_MEC_HO",
   "target_ancestry_group": "JA",
   "p_value_threshold": 0.05,
-  "output_file_name": "heldout_paired_ttest_asian.md"
+  "effect_size": 0.0,
+  "output_file_name": "heldout_paired_ttest_ja.md"
 }
 

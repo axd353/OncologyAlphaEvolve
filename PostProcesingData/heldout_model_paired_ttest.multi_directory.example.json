@@ -1,0 +1,21 @@
+{
+  "_description": "Compare Scheme Discovered by LLM against each alternate baseline using a one-sided paired t-test on heldout correct-label probability pooled across multiple heldout slices.",
+  "_fields": {
+    "precomputed_directories": "JSON array of directories. Each directory must already contain heldout_model_predictions_by_model/ or heldout_model_predictions.pkl.",
+    "target_ancestry_group": "JSON array of ancestry labels with the same length as precomputed_directories. Each entry selects the ancestry slice to use in the corresponding directory.",
+    "p_value_threshold": "Decision threshold for rejecting the equal-performance null, for example 0.05.",
+    "effect_size": "Optional. Minimum improvement margin for the alternative hypothesis. Defaults to 0.0.",
+    "output_file_name": "Required for multi-directory configs. Must be a full absolute path to the markdown file to create."
+  },
+  "precomputed_directories": [
+    "/nfs/home/adas23/projects/AlphaEvolve/prio_func_disc_runs/oracle_priority_20260810_032011/cycle_0004/distance_cache_MEC_HO",
+    "/nfs/home/adas23/projects/AlphaEvolve/prio_func_disc_runs/oracle_priority_20260810_032011/cycle_0004/distance_cache_oncoarray"
+  ],
+  "target_ancestry_group": [
+    "JA",
+    "ASIAN"
+  ],
+  "p_value_threshold": 0.05,
+  "effect_size": 0.0,
+  "output_file_name": "/nfs/home/adas23/projects/AlphaEvolve/PostProcesingData/heldout_model_paired_ttest.multi_directory.example.output.md"
+}
