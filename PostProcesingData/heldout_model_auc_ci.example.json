@@ -1,0 +1,17 @@
+{
+  "_description": "Compute bootstrap heldout ROC AUC confidence intervals for every saved model within one ancestry group.",
+  "_fields": {
+    "precomputed_directory": "Directory that already contains heldout_model_predictions_by_model/ or heldout_model_predictions.pkl.",
+    "target_ancestry_group": "Requested ancestry label, matched case-insensitively after removing punctuation.",
+    "ci_level": "Confidence level as 0.95 or 95.",
+    "bootstrap_iterations": "Optional. Number of bootstrap resamples. Defaults to 2000.",
+    "random_seed": "Optional. Base seed used to derive deterministic per-model bootstrap seeds.",
+    "output_file_name": "Optional. Output CSV file name written under precomputed_directory. A PNG plot with the same base name is written alongside it. Must be a file name only."
+  },
+  "precomputed_directory": "../prio_func_disc_runs/oracle_priority_20260810_032011/cycle_0004/distance_cache_oncoarray",
+  "target_ancestry_group": "ASIAN",
+  "ci_level": 0.80,
+  "bootstrap_iterations": 2000,
+  "random_seed": 0,
+  "output_file_name": "heldout_auc_ci_asian.csv"
+}
