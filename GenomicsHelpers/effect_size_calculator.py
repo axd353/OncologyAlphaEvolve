@@ -52,6 +52,7 @@ def effect_size_calculator(
     tolerance: float = 1e-8,
     logger: logging.Logger | None = None,
     distance_view: TargetDistanceView | None = None,
+    covariate_fields: Sequence[str] = DEFAULT_COVARIATE_FIELDS,
 ) -> float:
     """Estimate ``\hat b_j(a)`` from the closed ancestry ball around ``a``.
 
@@ -83,6 +84,7 @@ def effect_size_calculator(
         target_variant=target_variant,
         radius=radius,
         distance_view=distance_view,
+        covariate_fields=covariate_fields,
     )
     failure_reason = get_nonidentifiable_local_effect_reason(
         local_data,
@@ -115,6 +117,7 @@ def prepare_local_variant_data(
     target_variant: Any,
     radius: float,
     distance_view: TargetDistanceView | None = None,
+    covariate_fields: Sequence[str] = DEFAULT_COVARIATE_FIELDS,
 ) -> LocalVariantData:
     """Extract labels, genotype dosage, and covariates inside the closed ball.
 
@@ -134,6 +137,7 @@ def prepare_local_variant_data(
             target_variant=target_variant,
             radius=radius,
             distance_view=resolved_distance_view,
+            covariate_fields=covariate_fields,
         )
 
     center = np.asarray(ancestry_coordinate, dtype=float)
@@ -149,7 +153,7 @@ def prepare_local_variant_data(
         labels.append(read_label(record))
         genotype.append(read_variant_dosage(record, target_variant))
 
-        covariates.append(read_optional_covariates(record))
+        covariates.append(read_optional_covariates(record, covariate_fields=covariate_fields))
 
     covariate_matrix = None
     if any(row is not None for row in covariates):
@@ -172,6 +176,7 @@ def _prepare_local_variant_data_from_cached_distances(
     target_variant: Any,
     radius: float,
     distance_view: TargetDistanceView,
+    covariate_fields: Sequence[str] = DEFAULT_COVARIATE_FIELDS,
 ) -> LocalVariantData:
     within_indices = np.flatnonzero(np.asarray(distance_view.distances, dtype=float) <= float(radius))
     if isinstance(training_data, pd.DataFrame):
@@ -179,11 +184,13 @@ def _prepare_local_variant_data_from_cached_distances(
             training_data=training_data,
             row_indices=within_indices,
             target_variant=target_variant,
+            covariate_fields=covariate_fields,
         )
     return _prepare_local_variant_data_from_records(
         training_data=training_data,
         row_indices=within_indices,
         target_variant=target_variant,
+        covariate_fields=covariate_fields,
     )
 
 
@@ -192,6 +199,7 @@ def _prepare_local_variant_data_from_dataframe(
     training_data: pd.DataFrame,
     row_indices: np.ndarray,
     target_variant: Any,
+    covariate_fields: Sequence[str] = DEFAULT_COVARIATE_FIELDS,
 ) -> LocalVariantData:
     local_frame = training_data.iloc[row_indices]
     labels = local_frame[DEFAULT_LABEL_FIELD].to_numpy(dtype=float)
@@ -199,17 +207,17 @@ def _prepare_local_variant_data_from_dataframe(
     genotype_array = impute_missing_genotype_values(genotype_array)
 
     covariate_matrix = None
-    present_covariates = [field_name for field_name in DEFAULT_COVARIATE_FIELDS if field_name in local_frame.columns]
+    present_covariates = [field_name for field_name in covariate_fields if field_name in local_frame.columns]
     if present_covariates:
-        if len(present_covariates) != len(DEFAULT_COVARIATE_FIELDS):
+        if len(present_covariates) != len(covariate_fields):
             missing_fields = [
-                field_name for field_name in DEFAULT_COVARIATE_FIELDS if field_name not in local_frame.columns
+                field_name for field_name in covariate_fields if field_name not in local_frame.columns
             ]
             raise ValueError(
                 "Record has only a partial covariate layout. Missing fields: "
                 f"{missing_fields}."
             )
-        covariate_matrix = local_frame.loc[:, DEFAULT_COVARIATE_FIELDS].to_numpy(dtype=float)
+        covariate_matrix = local_frame.loc[:, covariate_fields].to_numpy(dtype=float)
 
     return LocalVariantData(
         labels=labels,
@@ -224,6 +232,7 @@ def _prepare_local_variant_data_from_records(
     training_data: Any,
     row_indices: np.ndarray,
     target_variant: Any,
+    covariate_fields: Sequence[str] = DEFAULT_COVARIATE_FIELDS,
 ) -> LocalVariantData:
     records = list(iter_training_records(training_data))
     labels: list[float] = []
@@ -233,7 +242,7 @@ def _prepare_local_variant_data_from_records(
         record = records[int(row_index)]
         labels.append(read_label(record))
         genotype.append(read_variant_dosage(record, target_variant))
-        covariates.append(read_optional_covariates(record))
+        covariates.append(read_optional_covariates(record, covariate_fields=covariate_fields))
 
     covariate_matrix = None
     if any(row is not None for row in covariates):

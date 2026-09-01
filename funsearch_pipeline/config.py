@@ -5,6 +5,8 @@ import json
 from pathlib import Path
 from typing import Any
 
+from GenomicsHelpers.oracle_data_adapter import DEFAULT_COVARIATE_FIELDS
+
 
 def _resolve_path(base_dir: Path, raw_value: str) -> Path:
     """Resolve one path value relative to the config file directory.
@@ -46,6 +48,7 @@ def _read_required_section(raw_config: dict[str, Any], section_name: str) -> dic
 class DatasetPairConfig:
     name: str
     has_additional_covariates: bool
+    covariate_fields: tuple[str, ...] = DEFAULT_COVARIATE_FIELDS
     training_pickles: tuple[Path, ...] = ()
     testing_pickles: tuple[Path, ...] = ()
     oracle_train_pickle: Path | None = None
@@ -144,6 +147,13 @@ def _parse_dataset_pairs(base_dir: Path, evaluator_section: dict[str, Any]) -> t
         if not isinstance(raw_pair, dict):
             raise ValueError("Each evaluator.dataset_pairs entry must be a JSON object.")
 
+        raw_covariate_fields = raw_pair.get("covariate_fields", DEFAULT_COVARIATE_FIELDS)
+        if raw_covariate_fields is None:
+            raw_covariate_fields = DEFAULT_COVARIATE_FIELDS
+        if not isinstance(raw_covariate_fields, (list, tuple)):
+            raise ValueError("evaluator.dataset_pairs[].covariate_fields must be an array of strings.")
+        covariate_fields = tuple(str(value) for value in raw_covariate_fields)
+
         training_pickles = tuple(
             _resolve_path(base_dir, raw_path) for raw_path in raw_pair.get("training_pickles", [])
         )
@@ -169,6 +179,7 @@ def _parse_dataset_pairs(base_dir: Path, evaluator_section: dict[str, Any]) -> t
             DatasetPairConfig(
                 name=str(raw_pair["name"]),
                 has_additional_covariates=bool(raw_pair.get("has_additional_covariates", False)),
+                covariate_fields=covariate_fields,
                 training_pickles=training_pickles,
                 testing_pickles=testing_pickles,
                 oracle_train_pickle=oracle_train_pickle,
@@ -223,6 +234,10 @@ def _validate_config(config: PipelineConfig) -> None:
     if not config.evaluator.calibration_penalties:
         raise ValueError("evaluator.calibration_penalties must contain at least one value.")
     for dataset_pair in config.evaluator.dataset_pairs:
+        if dataset_pair.has_additional_covariates and not dataset_pair.covariate_fields:
+            raise ValueError(
+                "Each evaluator.dataset_pairs entry with has_additional_covariates=true must provide at least one covariate field."
+            )
         has_raw_pickles = bool(dataset_pair.training_pickles) and bool(dataset_pair.testing_pickles)
         has_prepared_pickles = all(
             path is not None

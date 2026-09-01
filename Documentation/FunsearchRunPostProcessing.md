@@ -111,10 +111,7 @@ python PostProcesingData/funsearch_funnel_conversion_plots.py \
 Or from inside `PostProcesingData/`:
 
 ```bash
-python funsearch_funnel_conversion_plots.py \
-	--rates all \
-	--save-formats png pdf \
-	prio_func_disc_runs/oracle_priority_20260716_050704
+(OcologyAlphaEvolve) [adas23@clr0816 PostProcesingData]$ python funsearch_funnel_conversion_plots.py --rates all --save-formats png pdf prio_func_disc_runs/oracle_priority_20260829_043323/
 ```
 
 Do not use `python PostProcesingData.funsearch_funnel_conversion_plots.py`; dotted names are only for module execution with `python -m`.

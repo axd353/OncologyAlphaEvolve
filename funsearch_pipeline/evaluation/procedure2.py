@@ -130,6 +130,7 @@ class PreparedDatasetPair:
     has_additional_covariates: bool
     oracle_train_pickle: str
     fold_artifacts: tuple[PreparedFoldArtifacts, ...]
+    covariate_fields: tuple[str, ...] = DEFAULT_COVARIATE_FIELDS
 
 
 @dataclass(frozen=True)
@@ -282,6 +283,7 @@ class Procedure2PriorityEvaluator:
             has_additional_covariates=dataset_pair.has_additional_covariates,
             oracle_train_pickle=str(oracle_train_pickle),
             fold_artifacts=fold_artifacts,
+            covariate_fields=dataset_pair.covariate_fields,
         )
 
         if all(
@@ -305,12 +307,14 @@ class Procedure2PriorityEvaluator:
             return prepared_pair
 
         combined_training, training_imputed_counts = _impute_missing_feature_columns(
-            _load_and_combine_pickles(dataset_pair.training_pickles)
+            _load_and_combine_pickles(dataset_pair.training_pickles),
+            covariate_fields=dataset_pair.covariate_fields,
         )
         combined_training_sample_count = _dataset_length(combined_training)
         oracle_train = combined_training
         combined_scoring, scoring_imputed_counts = _impute_missing_feature_columns(
-            _load_and_combine_pickles(dataset_pair.testing_pickles)
+            _load_and_combine_pickles(dataset_pair.testing_pickles),
+            covariate_fields=dataset_pair.covariate_fields,
         )
         scoring_sample_count = _dataset_length(combined_scoring)
         calibration_and_scoring_folds = _split_scoring_data_into_folds(
@@ -551,6 +555,7 @@ def _evaluate_prepared_pair(
             variant_names=variant_names,
             candidate_source=candidate_source,
             function_name=function_name,
+            covariate_fields=prepared_pair.covariate_fields,
             calibration_partitions=int(
                 getattr(settings, "calibration_partitions", _DEFAULT_CALIBRATION_PARTITIONS)
             ),
@@ -559,6 +564,7 @@ def _evaluate_prepared_pair(
         calibration_covariates = _extract_covariates(
             calibration,
             include_covariates=prepared_pair.has_additional_covariates,
+            covariate_fields=prepared_pair.covariate_fields,
         )
         calibration_model = _fit_best_calibration_model(
             oracle_features=calibration_oracle_features,
@@ -573,6 +579,7 @@ def _evaluate_prepared_pair(
             variant_names=variant_names,
             candidate_source=candidate_source,
             function_name=function_name,
+            covariate_fields=prepared_pair.covariate_fields,
             scoring_partitions=int(
                 getattr(settings, "scoring_partitions", _DEFAULT_SCORING_PARTITIONS)
             ),
@@ -581,6 +588,7 @@ def _evaluate_prepared_pair(
         scoring_covariates = _extract_covariates(
             scoring,
             include_covariates=prepared_pair.has_additional_covariates,
+            covariate_fields=prepared_pair.covariate_fields,
         )
         risk_scores = _predict_linear_score(
             calibration_model,
@@ -676,6 +684,7 @@ def _load_prepared_pairs_manifest(manifest_path: Path) -> tuple[int, tuple[Prepa
                     )
                 )
             ),
+            covariate_fields=tuple(raw_pair.get("covariate_fields", DEFAULT_COVARIATE_FIELDS)),
         )
         for raw_pair in manifest.get("dataset_pairs", [])
     )
@@ -700,7 +709,11 @@ def _load_and_combine_pickles(paths: Sequence[str | Path]) -> Any:
     return _combine_data_objects([_read_pickle(path) for path in paths])
 
 
-def _impute_missing_feature_columns(data: Any) -> tuple[Any, dict[str, int]]:
+def _impute_missing_feature_columns(
+    data: Any,
+    *,
+    covariate_fields: Sequence[str] = DEFAULT_COVARIATE_FIELDS,
+) -> tuple[Any, dict[str, int]]:
     """Impute missing dosage and covariate values before persisting artifacts.
 
     Dosage columns are mean-imputed (continuous expected allele dosages) and the
@@ -729,7 +742,7 @@ def _impute_missing_feature_columns(data: Any) -> tuple[Any, dict[str, int]]:
         imputed[column] = numeric_column
 
     covariate_columns = [
-        column for column in DEFAULT_COVARIATE_FIELDS if column in imputed.columns
+        column for column in covariate_fields if column in imputed.columns
     ]
     for column in covariate_columns:
         numeric_column = imputed[column].astype("float64")
@@ -945,23 +958,28 @@ def _extract_labels(data: Any) -> np.ndarray:
     return labels
 
 
-def _extract_covariates(data: Any, *, include_covariates: bool) -> np.ndarray:
+def _extract_covariates(
+    data: Any,
+    *,
+    include_covariates: bool,
+    covariate_fields: Sequence[str] = DEFAULT_COVARIATE_FIELDS,
+) -> np.ndarray:
     sample_count = _dataset_length(data)
     if not include_covariates:
         return np.zeros((sample_count, 0), dtype=float)
     if isinstance(data, pd.DataFrame):
-        missing = [field for field in DEFAULT_COVARIATE_FIELDS if field not in data.columns]
+        missing = [field for field in covariate_fields if field not in data.columns]
         if missing:
             raise ValueError(f"Missing expected covariate columns: {missing}.")
-        return data.loc[:, DEFAULT_COVARIATE_FIELDS].to_numpy(dtype=float)
+        return data.loc[:, covariate_fields].to_numpy(dtype=float)
 
     covariates = []
     for record in iter_training_records(data):
-        row = read_optional_covariates(record)
+        row = read_optional_covariates(record, covariate_fields=covariate_fields)
         if row is None:
             raise ValueError("Covariates were requested but are absent from a record.")
         covariates.append(row)
-    return np.vstack(covariates) if covariates else np.zeros((0, len(DEFAULT_COVARIATE_FIELDS)))
+    return np.vstack(covariates) if covariates else np.zeros((0, len(covariate_fields)))
 
 
 def _build_oracle_feature_matrix(
@@ -970,6 +988,7 @@ def _build_oracle_feature_matrix(
     subject_data: Any,
     variant_names: Sequence[str],
     priority_function: PriorityFunction,
+    covariate_fields: Sequence[str] = DEFAULT_COVARIATE_FIELDS,
     target_row_indices: Sequence[int] | None = None,
     opened_distance_cache: OpenedDistanceCache | None = None,
     progress_reporter: Callable[[str], None] | None = None,
@@ -989,6 +1008,7 @@ def _build_oracle_feature_matrix(
     priority_training_data = _build_priority_training_data_contract(
         training_data,
         variant_names,
+        covariate_fields=covariate_fields,
     )
     priority_target_variants = _build_priority_target_variants(variant_names)
     progress_interval = _progress_row_interval(len(records)) if progress_label is not None and records else None
@@ -1026,6 +1046,7 @@ def _build_oracle_feature_matrix(
                     raw_ancestry_coordinate,
                     variant_name,
                     radius,
+                    covariate_fields=covariate_fields,
                 )
                 dosage = read_variant_dosage(record, variant_name)
                 contribution = float(dosage) * float(effect_size)
@@ -1062,6 +1083,7 @@ def _build_oracle_feature_matrix(
                     variant_name,
                     radius,
                     distance_view=distance_view,
+                    covariate_fields=covariate_fields,
                 )
                 dosage = read_variant_dosage(record, variant_name)
                 contribution = float(dosage) * float(effect_size)
@@ -1086,6 +1108,7 @@ def _build_calibration_oracle_feature_matrix(
     variant_names: Sequence[str],
     candidate_source: str,
     function_name: str,
+    covariate_fields: Sequence[str] = DEFAULT_COVARIATE_FIELDS,
     calibration_partitions: int,
     distance_cache_manifest_path: str | None = None,
     progress_reporter: Callable[[str], None] | None = None,
@@ -1098,6 +1121,7 @@ def _build_calibration_oracle_feature_matrix(
         variant_names=variant_names,
         candidate_source=candidate_source,
         function_name=function_name,
+        covariate_fields=covariate_fields,
         partitions=calibration_partitions,
         distance_cache_manifest_path=distance_cache_manifest_path,
         progress_reporter=progress_reporter,
@@ -1121,6 +1145,8 @@ def _call_priority_function(
 def _build_priority_training_data_contract(
     training_data: Any,
     variant_names: Sequence[str],
+    *,
+    covariate_fields: Sequence[str] = DEFAULT_COVARIATE_FIELDS,
 ) -> PriorityTrainingData:
     dosage_fields = tuple(str(variant_name) for variant_name in variant_names)
     logical_variant_names = tuple(_logical_variant_name(variant_name) for variant_name in dosage_fields)
@@ -1129,13 +1155,13 @@ def _build_priority_training_data_contract(
 
     for record in iter_training_records(training_data):
         ancestry_coordinate = tuple(float(value) for value in read_ancestry_coordinate(record))
-        optional_covariates = read_optional_covariates(record)
+        optional_covariates = read_optional_covariates(record, covariate_fields=covariate_fields)
         covariates = None
         if optional_covariates is not None:
             covariates = {
                 covariate_name: float(covariate_value)
                 for covariate_name, covariate_value in zip(
-                    DEFAULT_COVARIATE_FIELDS,
+                    covariate_fields,
                     optional_covariates,
                 )
             }
@@ -1200,6 +1226,7 @@ def _build_partitioned_oracle_feature_matrix(
     variant_names: Sequence[str],
     candidate_source: str,
     function_name: str,
+    covariate_fields: Sequence[str] = DEFAULT_COVARIATE_FIELDS,
     partitions: int,
     distance_cache_manifest_path: str | None = None,
     progress_reporter: Callable[[str], None] | None = None,
@@ -1216,6 +1243,7 @@ def _build_partitioned_oracle_feature_matrix(
             subject_data=subject_data,
             variant_names=variant_names,
             priority_function=priority_function,
+            covariate_fields=tuple(covariate_fields),
             target_row_indices=tuple(range(_dataset_length(subject_data))),
             opened_distance_cache=opened_distance_cache,
             progress_reporter=progress_reporter,
@@ -1246,6 +1274,7 @@ def _build_partitioned_oracle_feature_matrix(
                 chunk_data,
                 tuple(int(index) for index in chunk_indices.tolist()),
                 tuple(variant_names),
+                tuple(covariate_fields),
                 distance_cache_manifest_path,
                 progress_log_path,
                 (
@@ -1283,6 +1312,7 @@ def _build_scoring_oracle_feature_matrix(
     variant_names: Sequence[str],
     candidate_source: str,
     function_name: str,
+    covariate_fields: Sequence[str] = DEFAULT_COVARIATE_FIELDS,
     scoring_partitions: int,
     distance_cache_manifest_path: str | None = None,
     progress_reporter: Callable[[str], None] | None = None,
@@ -1295,6 +1325,7 @@ def _build_scoring_oracle_feature_matrix(
         variant_names=variant_names,
         candidate_source=candidate_source,
         function_name=function_name,
+        covariate_fields=covariate_fields,
         partitions=scoring_partitions,
         distance_cache_manifest_path=distance_cache_manifest_path,
         progress_reporter=progress_reporter,
@@ -1310,6 +1341,7 @@ def _build_partitioned_oracle_feature_matrix_worker(
     subject_chunk: Any,
     target_row_indices: tuple[int, ...],
     variant_names: tuple[str, ...],
+    covariate_fields: tuple[str, ...],
     distance_cache_manifest_path: str | None = None,
     progress_log_path: str | Path | None = None,
     progress_label: str | None = None,
@@ -1322,6 +1354,7 @@ def _build_partitioned_oracle_feature_matrix_worker(
         subject_data=subject_chunk,
         variant_names=variant_names,
         priority_function=priority_function,
+        covariate_fields=covariate_fields,
         target_row_indices=target_row_indices,
         opened_distance_cache=opened_distance_cache,
         progress_log_path=progress_log_path,

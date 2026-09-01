@@ -158,7 +158,10 @@ def read_variant_dosage(record: Any, target_variant: Any) -> float:
     raise KeyError(f"Could not find dosage column for variant {target_variant!r}.")
 
 
-def read_optional_covariates(record: Any) -> np.ndarray | None:
+def read_optional_covariates(
+    record: Any,
+    covariate_fields: Sequence[str] = DEFAULT_COVARIATE_FIELDS,
+) -> np.ndarray | None:
     """Return optional non-genetic covariates for one subject record.
 
     Input:
@@ -170,14 +173,14 @@ def read_optional_covariates(record: Any) -> np.ndarray | None:
 
     available_field_names = set(list_record_field_names(record))
     present_covariate_fields = [
-        field_name for field_name in DEFAULT_COVARIATE_FIELDS if field_name in available_field_names
+        field_name for field_name in covariate_fields if field_name in available_field_names
     ]
     if not present_covariate_fields:
         return None
 
-    if len(present_covariate_fields) != len(DEFAULT_COVARIATE_FIELDS):
+    if len(present_covariate_fields) != len(covariate_fields):
         missing_fields = [
-            field_name for field_name in DEFAULT_COVARIATE_FIELDS if field_name not in available_field_names
+            field_name for field_name in covariate_fields if field_name not in available_field_names
         ]
         raise ValueError(
             "Record has only a partial covariate layout. Missing fields: "
@@ -185,7 +188,7 @@ def read_optional_covariates(record: Any) -> np.ndarray | None:
         )
 
     return np.asarray(
-        [read_record_field(record, field_name) for field_name in DEFAULT_COVARIATE_FIELDS],
+        [read_record_field(record, field_name) for field_name in covariate_fields],
         dtype=float,
     ).reshape(-1)
 
