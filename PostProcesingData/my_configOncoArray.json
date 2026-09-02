@@ -1,9 +1,9 @@
 {
   "prio_function_path": "/nfs/home/adas23/projects/AlphaEvolve/prio_func_disc_runs/oracle_priority_20260810_032011/cycle_0004/best_prio.py",
-  "training_pickle_path": "../Data/FunsearchEvaluatorDataOncoArray/no_covariates_train.pkl",
-  "calibrating_pickle_path": "../Data/FunsearchEvaluatorDataOncoArray/no_covariates_test.pkl",
-  "heldout_pickle_path": "../Data/FunsearchEvaluatorDataOncoArray/no_covariates_heldout.pkl",
-  "output_row_tracking_path": "../Data/FunsearchEvaluatorDataOncoArray/output_row_tracking.pkl",
+  "training_pickle_path": "/nfs/home/adas23/projects/AlphaEvolve/Data/FunsearchEvaluatorDataOncoArray/no_covariates_train.pkl",
+  "calibrating_pickle_path": "/nfs/home/adas23/projects/AlphaEvolve/Data/FunsearchEvaluatorDataOncoArray/no_covariates_test.pkl",
+  "heldout_pickle_path": "/nfs/home/adas23/projects/AlphaEvolve/Data/FunsearchEvaluatorDataOncoArray/no_covariates_heldout.pkl",
+  "output_row_tracking_path": "/nfs/home/adas23/projects/AlphaEvolve/Data/FunsearchEvaluatorDataOncoArray/output_row_tracking.pkl",
   "report_file_name": "best_prio.oncoarray.evaluation_report.json",
   "supported_ancestry_groups": ["AFRICAN_ANCESTRY", "ASIAN", "EUROPEAN"],
   "should_overwrite": false,

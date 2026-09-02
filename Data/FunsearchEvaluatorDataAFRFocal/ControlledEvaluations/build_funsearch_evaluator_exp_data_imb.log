@@ -1,0 +1,10 @@
+2026-09-01 18:25:13,822 INFO Starting controlled AFR evaluation build input_dir=/nfs/home/adas23/projects/AlphaEvolve/Data/FunsearchEvaluatorDataAFRFocal onco_dir=/nfs/home/adas23/projects/AlphaEvolve/Data/FunsearchEvaluatorDataOncoArray output_root=/nfs/home/adas23/projects/AlphaEvolve/Data/FunsearchEvaluatorDataAFRFocal/ControlledEvaluations heldout_size=400 calibration_extra_non_afr=100 train_afr_count=160 random_seed=7
+2026-09-01 18:25:14,267 INFO Shared heldout rows=400 sources=train_African_Ancestry.pkl:359, test_African_Ancestry.pkl:41
+2026-09-01 18:25:14,269 INFO Shared calibration rows=200 heldout_remainder=100 extra_non_afr=100 sources=test_African_Ancestry.pkl:10, train_African_Ancestry.pkl:90, test_Asian.pkl:3, test_European.pkl:97
+2026-09-01 18:25:14,324 INFO Wrote tracking file /nfs/home/adas23/projects/AlphaEvolve/Data/FunsearchEvaluatorDataAFRFocal/ControlledEvaluations/Very_high_imbalance/output_row_tracking.pkl rows=3960
+2026-09-01 18:25:14,326 INFO Wrote Very_high_imbalance train rows=3360 afr=160 non_afr=3200 sources=test_African_Ancestry.pkl:15, train_African_Ancestry.pkl:145, test_Asian.pkl:6, test_European.pkl:296, train_Asian.pkl:56, train_European.pkl:2842
+2026-09-01 18:25:14,379 INFO Wrote tracking file /nfs/home/adas23/projects/AlphaEvolve/Data/FunsearchEvaluatorDataAFRFocal/ControlledEvaluations/high_imbalance/output_row_tracking.pkl rows=3260
+2026-09-01 18:25:14,381 INFO Wrote high_imbalance train rows=2660 afr=160 non_afr=2500 sources=test_African_Ancestry.pkl:15, train_African_Ancestry.pkl:145, test_European.pkl:258, train_Asian.pkl:33, train_European.pkl:2209
+2026-09-01 18:25:14,428 INFO Wrote tracking file /nfs/home/adas23/projects/AlphaEvolve/Data/FunsearchEvaluatorDataAFRFocal/ControlledEvaluations/modest_imbalance/output_row_tracking.pkl rows=2760
+2026-09-01 18:25:14,429 INFO Wrote modest_imbalance train rows=2160 afr=160 non_afr=2000 sources=test_African_Ancestry.pkl:15, train_African_Ancestry.pkl:145, test_Asian.pkl:1, test_European.pkl:212, train_Asian.pkl:22, train_European.pkl:1765
+2026-09-01 18:25:14,431 INFO Finished controlled AFR evaluation build
