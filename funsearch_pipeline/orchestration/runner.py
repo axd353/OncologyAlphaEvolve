@@ -1,26 +1,33 @@
 from __future__ import annotations
 
+from concurrent.futures import FIRST_COMPLETED
 from concurrent.futures import ProcessPoolExecutor
-from concurrent.futures import as_completed
+from concurrent.futures import wait
 from dataclasses import asdict
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 import json
+import os
 import pickle
+import signal
 import shutil
+import time
 
 import numpy as np
 
 from funsearch_pipeline.config import PipelineConfig
 from funsearch_pipeline.config import load_pipeline_config
+from funsearch_pipeline.config import write_resolved_pipeline_config
 from funsearch_pipeline.evaluation import build_evaluator
 from funsearch_pipeline.logging_utils import configure_main_logger
 from funsearch_pipeline.program_database import CycleProgramsDatabase
 from funsearch_pipeline.program_database import IslandShard
 from funsearch_pipeline.sampling import IslandSamplerRequest
 from funsearch_pipeline.sampling import IslandSamplerResult
+from funsearch_pipeline.sampling import load_island_sampler_checkpoint
 from funsearch_pipeline.sampling import run_island_sampler
+from funsearch_pipeline.sampling.interfaces import append_sampler_log
 
 
 @dataclass(frozen=True)
@@ -220,6 +227,99 @@ def _build_resume_state(experiment_dir: Path, config: PipelineConfig) -> ResumeS
     )
 
 
+def _build_timed_out_sampler_result(
+    request: IslandSamplerRequest,
+    timeout_minutes: float,
+    logger,
+) -> IslandSamplerResult:
+    checkpoint_result: IslandSamplerResult | None = None
+    try:
+        checkpoint_result = load_island_sampler_checkpoint(request.output_dir)
+    except Exception as exc:
+        logger.warning(
+            "Failed to load sampler checkpoint for cycle %d island %d after timeout: %s",
+            request.cycle_index,
+            request.island_shard.island_id,
+            exc,
+        )
+
+    if checkpoint_result is not None and (
+        checkpoint_result.cycle_index != request.cycle_index
+        or checkpoint_result.island_id != request.island_shard.island_id
+    ):
+        logger.warning(
+            "Ignoring mismatched sampler checkpoint for cycle %d island %d.",
+            request.cycle_index,
+            request.island_shard.island_id,
+        )
+        checkpoint_result = None
+
+    result = checkpoint_result or IslandSamplerResult(
+        cycle_index=request.cycle_index,
+        island_id=request.island_shard.island_id,
+        island_shard=request.island_shard,
+        generated_candidates=0,
+        accepted_candidates=0,
+    )
+    append_sampler_log(
+        request.log_path,
+        (
+            f"cycle={request.cycle_index} island={request.island_shard.island_id} "
+            "sampler_aborted reason=last_island_timeout "
+            f"timeout_minutes={timeout_minutes} "
+            f"generated={result.generated_candidates} accepted={result.accepted_candidates} "
+            f"checkpoint_recovered={checkpoint_result is not None}"
+        ),
+    )
+    return result
+
+
+def _kill_sampler_executor_process_groups(executor: ProcessPoolExecutor, logger) -> None:
+    processes = list(getattr(executor, "_processes", {}).values())
+    for process in processes:
+        pid = getattr(process, "pid", None)
+        if pid is None:
+            continue
+        killed = False
+        if hasattr(os, "killpg"):
+            try:
+                os.killpg(pid, signal.SIGKILL)
+                killed = True
+            except ProcessLookupError:
+                killed = True
+            except OSError as exc:
+                logger.warning(
+                    "Failed to kill sampler worker process group %d cleanly: %s",
+                    pid,
+                    exc,
+                )
+        if killed:
+            continue
+        kill = getattr(process, "kill", None)
+        if callable(kill):
+            try:
+                kill()
+                continue
+            except ProcessLookupError:
+                continue
+            except OSError as exc:
+                logger.warning(
+                    "Failed to kill sampler worker process %d cleanly: %s",
+                    pid,
+                    exc,
+                )
+        try:
+            os.kill(pid, signal.SIGKILL)
+        except ProcessLookupError:
+            continue
+        except OSError as exc:
+            logger.warning(
+                "Failed to signal sampler worker process %d: %s",
+                pid,
+                exc,
+            )
+
+
 def _run_cycles(
     config: PipelineConfig,
     experiment_dir: Path,
@@ -259,6 +359,7 @@ def _run_cycles(
             sampler_requests,
             config.sampler.parallel_workers,
             logger,
+            last_island_abort_after_minutes=config.sampler.last_island_abort_after_minutes,
         )
         database.combine_island_shards([result.island_shard for result in sampler_results])
         generated_candidates = sum(result.generated_candidates for result in sampler_results)
@@ -363,6 +464,8 @@ def _run_sampling_phase(
     requests: list[IslandSamplerRequest],
     parallel_workers: int,
     logger,
+    *,
+    last_island_abort_after_minutes: float | None = None,
 ) -> list[IslandSamplerResult]:
     """Run one cycle's per-island sampler workers.
 
@@ -383,19 +486,67 @@ def _run_sampling_phase(
         return results
 
     results: list[IslandSamplerResult] = []
-    with ProcessPoolExecutor(max_workers=parallel_workers) as executor:
+    timeout_seconds = (
+        last_island_abort_after_minutes * 60.0
+        if last_island_abort_after_minutes is not None
+        else None
+    )
+    executor = ProcessPoolExecutor(max_workers=parallel_workers)
+    try:
         futures = {executor.submit(run_island_sampler, request): request for request in requests}
-        for future in as_completed(futures):
-            request = futures[future]
-            try:
-                results.append(future.result())
-            except Exception as exc:
-                logger.exception(
-                    "Sampling failed for island %d during cycle %d: %s",
-                    request.island_shard.island_id,
-                    request.cycle_index,
-                    exc,
-                )
+        pending = set(futures)
+        last_single_island_started_at: float | None = None
+
+        while pending:
+            wait_timeout = None
+            if timeout_seconds is not None and last_single_island_started_at is not None:
+                elapsed_seconds = time.monotonic() - last_single_island_started_at
+                if elapsed_seconds >= timeout_seconds:
+                    timed_out_future = next(iter(pending))
+                    timed_out_request = futures[timed_out_future]
+                    logger.warning(
+                        "Aborting cycle %d island %d after %.2f minutes as the last active island.",
+                        timed_out_request.cycle_index,
+                        timed_out_request.island_shard.island_id,
+                        elapsed_seconds / 60.0,
+                    )
+                    _kill_sampler_executor_process_groups(executor, logger)
+                    results.append(
+                        _build_timed_out_sampler_result(
+                            timed_out_request,
+                            last_island_abort_after_minutes,
+                            logger,
+                        )
+                    )
+                    pending.remove(timed_out_future)
+                    break
+                wait_timeout = timeout_seconds - elapsed_seconds
+
+            done, _ = wait(pending, timeout=wait_timeout, return_when=FIRST_COMPLETED)
+            if not done:
+                continue
+
+            for future in done:
+                request = futures[future]
+                try:
+                    results.append(future.result())
+                except Exception as exc:
+                    logger.exception(
+                        "Sampling failed for island %d during cycle %d: %s",
+                        request.island_shard.island_id,
+                        request.cycle_index,
+                        exc,
+                    )
+
+            pending.difference_update(done)
+            if timeout_seconds is None:
+                continue
+            if len(pending) == 1:
+                last_single_island_started_at = time.monotonic()
+            else:
+                last_single_island_started_at = None
+    finally:
+        executor.shutdown(wait=True, cancel_futures=True)
     return results
 
 
@@ -414,7 +565,7 @@ def run_experiment(config_path: str | Path) -> Path:
 
     config = load_pipeline_config(config_path)
     experiment_dir = _create_experiment_dir(config)
-    shutil.copy2(config.config_path, experiment_dir / "config.used.json")
+    write_resolved_pipeline_config(config.config_path, experiment_dir / "config.used.json")
     logger = configure_main_logger(experiment_dir / "main.log", config.logging.level)
 
     np.random.seed(config.experiment.random_seed)

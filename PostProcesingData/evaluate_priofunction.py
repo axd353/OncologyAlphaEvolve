@@ -27,6 +27,8 @@ from funsearch_pipeline.evaluation.procedure2 import _sigmoid
 from funsearch_pipeline.evaluation.procedure2 import _validate_priority_signature
 from GenomicsHelpers.ancestry_distance_cache import ensure_distance_cache
 
+from PostProcesingData.heldout_model_auc_ci import DEFAULT_BOOTSTRAP_ITERATIONS as DEFAULT_HELDOUT_AUC_CI_BOOTSTRAP_ITERATIONS
+from PostProcesingData.heldout_model_auc_ci import write_all_auc_ci_summaries
 from PostProcesingData.prio_func_eval_baselines import evaluate_baseline
 from PostProcesingData.prio_func_eval_baselines import BaselineResult
 from PostProcesingData.prio_func_eval_baselines import normalize_baseline_name
@@ -43,6 +45,8 @@ DEFAULT_CALIBRATION_PENALTIES = (0.1, 1.0, 10.0)
 DEFAULT_SUPPORTED_ANCESTRY_GROUPS = ("AA", "JA", "LA")
 DEFAULT_HELDOUT_MODEL_PREDICTIONS_FILE_NAME = "heldout_model_predictions.pkl"
 DEFAULT_HELDOUT_MODEL_PREDICTIONS_BY_MODEL_DIR_NAME = "heldout_model_predictions_by_model"
+DEFAULT_HELDOUT_AUC_CI_LEVEL = 0.90
+DEFAULT_HELDOUT_AUC_CI_OUTPUT_SUFFIX = ".md"
 PRIORITY_FUNCTION_MODEL_NAME = "Priority Function"
 
 
@@ -75,6 +79,9 @@ class EvaluationConfig:
     scoring_partitions: int | None
     distance_cache_enabled: bool
     distance_cache_dir: Path | None
+    heldout_auc_ci_level: float
+    heldout_auc_ci_bootstrap_iterations: int
+    heldout_auc_ci_output_suffix: str
     baselines: tuple[BaselineSpec, ...]
 
 
@@ -133,6 +140,9 @@ def _config_to_payload(config: EvaluationConfig) -> dict[str, Any]:
         "scoring_partitions": config.scoring_partitions,
         "distance_cache_enabled": config.distance_cache_enabled,
         "distance_cache_dir": str(config.distance_cache_dir) if config.distance_cache_dir is not None else None,
+        "heldout_auc_ci_level": config.heldout_auc_ci_level,
+        "heldout_auc_ci_bootstrap_iterations": config.heldout_auc_ci_bootstrap_iterations,
+        "heldout_auc_ci_output_format": config.heldout_auc_ci_output_suffix.lstrip("."),
         "baselines": [
             {
                 "name": baseline.name,
@@ -225,6 +235,18 @@ def _heldout_model_prediction_paths_for_cache_root(cache_root: Path) -> dict[str
     return prediction_paths
 
 
+def _heldout_auc_ci_summary_paths_for_cache_root(cache_root: Path) -> list[str]:
+    return [
+        str(path)
+        for path in sorted(cache_root.glob("heldout_auc_ci_*"))
+        if path.is_file() and path.suffix.lower() in {".md", ".csv"}
+    ]
+
+
+def _heldout_auc_ci_plot_paths_for_cache_root(cache_root: Path) -> list[str]:
+    return [str(path) for path in sorted(cache_root.glob("heldout_auc_ci_*.png")) if path.is_file()]
+
+
 def write_evaluation_report_file(
     *,
     config_path: str | Path,
@@ -243,6 +265,12 @@ def write_evaluation_report_file(
         heldout_model_predictions_output_path_for_cache_root(cache_root)
     )
     results_payload["heldout_model_prediction_paths"] = _heldout_model_prediction_paths_for_cache_root(
+        cache_root
+    )
+    results_payload["heldout_auc_ci_summary_paths"] = _heldout_auc_ci_summary_paths_for_cache_root(
+        cache_root
+    )
+    results_payload["heldout_auc_ci_plot_paths"] = _heldout_auc_ci_plot_paths_for_cache_root(
         cache_root
     )
     payload = {
@@ -440,6 +468,45 @@ def _parse_baselines(raw_baselines: Any) -> tuple[BaselineSpec, ...]:
     return tuple(baselines)
 
 
+def _parse_heldout_auc_ci_level(raw_value: Any) -> float:
+    if raw_value is None:
+        return DEFAULT_HELDOUT_AUC_CI_LEVEL
+    try:
+        parsed = float(raw_value)
+    except (TypeError, ValueError) as exc:
+        raise ValueError("heldout_auc_ci_level must be a number such as 0.90 or 90.") from exc
+    if parsed > 1.0:
+        parsed /= 100.0
+    if not 0.0 < parsed < 1.0:
+        raise ValueError("heldout_auc_ci_level must be between 0 and 1, or between 0 and 100.")
+    return parsed
+
+
+def _parse_heldout_auc_ci_bootstrap_iterations(raw_value: Any) -> int:
+    if raw_value is None:
+        return DEFAULT_HELDOUT_AUC_CI_BOOTSTRAP_ITERATIONS
+    try:
+        parsed = int(raw_value)
+    except (TypeError, ValueError) as exc:
+        raise ValueError("heldout_auc_ci_bootstrap_iterations must be a positive integer.") from exc
+    if parsed < 1:
+        raise ValueError("heldout_auc_ci_bootstrap_iterations must be at least 1.")
+    return parsed
+
+
+def _parse_heldout_auc_ci_output_suffix(raw_value: Any) -> str:
+    if raw_value is None:
+        return DEFAULT_HELDOUT_AUC_CI_OUTPUT_SUFFIX
+    if not isinstance(raw_value, str):
+        raise ValueError("heldout_auc_ci_output_format must be a string such as 'md' or 'csv'.")
+    normalized = raw_value.strip().lower().lstrip(".")
+    if normalized in {"md", "markdown"}:
+        return ".md"
+    if normalized == "csv":
+        return ".csv"
+    raise ValueError("heldout_auc_ci_output_format must be one of: md, markdown, csv.")
+
+
 def load_evaluation_config(config_path: str | Path) -> EvaluationConfig:
     config_path = Path(config_path).expanduser().resolve()
     raw_config = json.loads(config_path.read_text())
@@ -510,6 +577,13 @@ def load_evaluation_config(config_path: str | Path) -> EvaluationConfig:
             _resolve_path(base_dir, str(raw_config["distance_cache_dir"]))
             if raw_config.get("distance_cache_dir")
             else None
+        ),
+        heldout_auc_ci_level=_parse_heldout_auc_ci_level(raw_config.get("heldout_auc_ci_level")),
+        heldout_auc_ci_bootstrap_iterations=_parse_heldout_auc_ci_bootstrap_iterations(
+            raw_config.get("heldout_auc_ci_bootstrap_iterations")
+        ),
+        heldout_auc_ci_output_suffix=_parse_heldout_auc_ci_output_suffix(
+            raw_config.get("heldout_auc_ci_output_format")
         ),
         baselines=baselines,
     )
@@ -1309,6 +1383,39 @@ def _missing_baselines(
     )
 
 
+def _write_heldout_auc_ci_summaries(
+    *,
+    config: EvaluationConfig,
+    cache_root: Path,
+    report: EvaluationReport,
+    progress_reporter: Callable[[str], None],
+) -> tuple[Path, ...]:
+    ancestry_groups: list[str] = []
+    for evaluation in report.heldout_ancestry_evaluations:
+        if evaluation.ancestry_group not in ancestry_groups:
+            ancestry_groups.append(evaluation.ancestry_group)
+
+    if not ancestry_groups:
+        return ()
+
+    progress_reporter(
+        "Writing heldout ROC AUC confidence-interval summaries "
+        f"({100.0 * config.heldout_auc_ci_level:.1f}% bootstrap CI, "
+        f"{config.heldout_auc_ci_output_suffix} format) to {cache_root}"
+    )
+    written_paths = write_all_auc_ci_summaries(
+        precomputed_directory=cache_root,
+        ci_level=config.heldout_auc_ci_level,
+        bootstrap_iterations=config.heldout_auc_ci_bootstrap_iterations,
+        ancestry_groups=tuple(ancestry_groups),
+        output_suffix=config.heldout_auc_ci_output_suffix,
+        allow_overwrite=True,
+    )
+    for path in written_paths:
+        progress_reporter(f"Wrote heldout ROC AUC confidence-interval summary {path}")
+    return written_paths
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     args = parse_args(argv)
     config = load_evaluation_config(args.config_path)
@@ -1373,6 +1480,12 @@ def main(argv: Sequence[str] | None = None) -> int:
                 f"Existing report already contains all configured baselines; reusing {report_path}"
             )
             report = existing_report
+    heldout_auc_ci_summary_paths = _write_heldout_auc_ci_summaries(
+        config=config,
+        cache_root=cache_root,
+        report=report,
+        progress_reporter=progress_reporter,
+    )
     report_path = write_evaluation_report_file(
         config_path=args.config_path,
         config=config,
@@ -1381,6 +1494,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     print(format_report(report))
     print(f"evaluation_report_path={report_path}")
     print(f"heldout_model_predictions_path={heldout_model_predictions_path}")
+    for summary_path in heldout_auc_ci_summary_paths:
+        print(f"heldout_auc_ci_summary_path={summary_path}")
     return 0
 
 

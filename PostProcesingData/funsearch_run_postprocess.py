@@ -63,6 +63,7 @@ class PostProcessingOutputs:
     """Paths written by run-level post-processing."""
 
     logger_path: Path | None
+    logger_paths: tuple[Path, ...]
     best_priority_paths: tuple[Path, ...]
     completed_priority_function_counts_path: Path
     validated_priority_function_counts_path: Path
@@ -210,41 +211,43 @@ def count_island_best_improvements_in_sampler_log(log_path: str | Path) -> int:
     return extract_sampler_log_metrics(log_path).island_best_improvement_count
 
 
-def move_corresponding_logger_file(run_dir: str | Path) -> Path | None:
-    """Move the shell-captured `logger_*` file into the experiment directory.
+def move_corresponding_logger_files(run_dir: str | Path) -> tuple[Path, ...]:
+    """Move shell-captured `logger_*` files into the experiment directory.
 
     Input:
         run_dir: FunSearch experiment directory under `prio_func_disc_runs/`.
 
     Output:
-        Destination path under `run_dir`, or `None` when no matching shell log
-        is found. Existing `logger_*` files already inside `run_dir` are reused.
+        Sorted destination paths under `run_dir`. Existing `logger_*` files
+        already inside `run_dir` are reused, and any additional matching
+        sibling logger files are moved in.
     """
 
     normalized_run_dir = _normalize_run_dir(run_dir)
-    existing_logger_paths = sorted(normalized_run_dir.glob("logger_*"))
-    if existing_logger_paths:
-        return existing_logger_paths[0]
+    logger_paths_by_name: dict[str, Path] = {
+        logger_path.name: logger_path
+        for logger_path in sorted(normalized_run_dir.glob("logger_*"))
+        if logger_path.is_file()
+    }
 
     run_dir_text = str(normalized_run_dir)
-    matching_logger_paths: list[Path] = []
-    for logger_path in sorted(normalized_run_dir.parent.glob("logger_*")):
-        if not logger_path.is_file():
+    for source_path in sorted(normalized_run_dir.parent.glob("logger_*")):
+        if not source_path.is_file():
             continue
-        if run_dir_text in logger_path.read_text(encoding="utf-8", errors="ignore"):
-            matching_logger_paths.append(logger_path)
+        if run_dir_text not in source_path.read_text(encoding="utf-8", errors="ignore"):
+            continue
 
-    if not matching_logger_paths:
-        return None
-    if len(matching_logger_paths) != 1:
-        raise ValueError(
-            f"Found multiple logger files for {normalized_run_dir}: {matching_logger_paths}"
-        )
+        destination_path = normalized_run_dir / source_path.name
+        if destination_path.exists():
+            if destination_path.resolve() != source_path.resolve():
+                raise FileExistsError(
+                    f"Refusing to overwrite existing logger file: {destination_path}"
+                )
+        else:
+            shutil.move(str(source_path), str(destination_path))
+        logger_paths_by_name[destination_path.name] = destination_path
 
-    source_path = matching_logger_paths[0]
-    destination_path = normalized_run_dir / source_path.name
-    shutil.move(str(source_path), str(destination_path))
-    return destination_path
+    return tuple(sorted(logger_paths_by_name.values()))
 
 
 def _build_sampler_metrics_dataframe(run_dir: Path) -> pd.DataFrame:
@@ -381,7 +384,7 @@ def postprocess_funsearch_run(run_dir: str | Path) -> PostProcessingOutputs:
     """
 
     normalized_run_dir = _normalize_run_dir(run_dir)
-    logger_path = move_corresponding_logger_file(normalized_run_dir)
+    logger_paths = move_corresponding_logger_files(normalized_run_dir)
     best_priority_paths = write_cycle_best_priority_files(normalized_run_dir)
     metrics_frame = _build_sampler_metrics_dataframe(normalized_run_dir)
     configured_candidates_per_island_per_cycle = _configured_candidates_per_island_per_cycle(
@@ -417,7 +420,8 @@ def postprocess_funsearch_run(run_dir: str | Path) -> PostProcessingOutputs:
     island_best_improvement_counts.to_pickle(island_best_improvement_counts_path)
 
     return PostProcessingOutputs(
-        logger_path=logger_path,
+        logger_path=logger_paths[0] if logger_paths else None,
+        logger_paths=logger_paths,
         best_priority_paths=best_priority_paths,
         completed_priority_function_counts_path=completed_priority_function_counts_path,
         validated_priority_function_counts_path=validated_priority_function_counts_path,
@@ -451,6 +455,8 @@ def main(argv: list[str] | None = None) -> int:
 
     outputs = postprocess_funsearch_run(args.run_dir)
     print(f"logger_path={outputs.logger_path}")
+    for path in outputs.logger_paths[1:]:
+        print(f"logger_path={path}")
     for path in outputs.best_priority_paths:
         print(f"best_priority_path={path}")
     print(

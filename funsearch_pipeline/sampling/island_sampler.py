@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import multiprocessing
 import os
 from pathlib import Path
+import pickle
 
 from funsearch.implementation import code_manipulation
 from funsearch_pipeline.config import EvaluatorSettings
@@ -75,6 +77,45 @@ class IslandSamplerResult:
     island_shard: IslandShard
     generated_candidates: int
     accepted_candidates: int
+
+
+def _checkpoint_path(output_dir: Path) -> Path:
+    return output_dir / "island_progress.pkl"
+
+
+def _write_sampler_checkpoint(
+    request: IslandSamplerRequest,
+    generated_candidates: int,
+    accepted_candidates: int,
+) -> None:
+    checkpoint_path = _checkpoint_path(request.output_dir)
+    temporary_path = checkpoint_path.with_name(f"{checkpoint_path.name}.tmp")
+    with temporary_path.open("wb") as handle:
+        pickle.dump(
+            IslandSamplerResult(
+                cycle_index=request.cycle_index,
+                island_id=request.island_shard.island_id,
+                island_shard=request.island_shard,
+                generated_candidates=generated_candidates,
+                accepted_candidates=accepted_candidates,
+            ),
+            handle,
+        )
+    temporary_path.replace(checkpoint_path)
+
+
+def load_island_sampler_checkpoint(output_dir: Path) -> IslandSamplerResult | None:
+    checkpoint_path = _checkpoint_path(output_dir)
+    if not checkpoint_path.exists():
+        return None
+
+    with checkpoint_path.open("rb") as handle:
+        checkpoint = pickle.load(handle)
+    if not isinstance(checkpoint, IslandSamplerResult):
+        raise TypeError(
+            f"Sampler checkpoint {checkpoint_path} did not contain an IslandSamplerResult."
+        )
+    return checkpoint
 
 
 def _prompt_file(output_dir: Path, sample_index: int) -> Path:
@@ -216,6 +257,16 @@ def _format_sampler_cpu_binding() -> tuple[str, str]:
     return current_cpu, allowed_cpus
 
 
+def _ensure_sampler_worker_process_group() -> None:
+    if multiprocessing.parent_process() is None or not hasattr(os, "setsid"):
+        return
+    try:
+        os.setsid()
+    except OSError:
+        # If the worker already owns its own session/process group, leave it as-is.
+        return
+
+
 def run_island_sampler(request: IslandSamplerRequest) -> IslandSamplerResult:
     """Sample, evaluate, and register candidates on one island shard.
 
@@ -231,6 +282,7 @@ def run_island_sampler(request: IslandSamplerRequest) -> IslandSamplerResult:
     """
 
     request.output_dir.mkdir(parents=True, exist_ok=True)
+    _ensure_sampler_worker_process_group()
     append_sampler_log(
         request.log_path,
         (
@@ -296,6 +348,7 @@ def run_island_sampler(request: IslandSamplerRequest) -> IslandSamplerResult:
                         "rejected=empty_completion"
                     ),
                 )
+                _write_sampler_checkpoint(request, generated_candidates, accepted_candidates)
                 continue
 
             completion = completions[0]
@@ -320,6 +373,7 @@ def run_island_sampler(request: IslandSamplerRequest) -> IslandSamplerResult:
                         f"rejected=invalid_priority_function error={type(exc).__name__}: {exc}"
                     ),
                 )
+                _write_sampler_checkpoint(request, generated_candidates, accepted_candidates)
                 continue
 
             evaluated_candidate = evaluator.evaluate_candidate(candidate_program)
@@ -331,6 +385,7 @@ def run_island_sampler(request: IslandSamplerRequest) -> IslandSamplerResult:
                         "rejected=evaluation_failed"
                     ),
                 )
+                _write_sampler_checkpoint(request, generated_candidates, accepted_candidates)
                 continue
 
             improved = request.island_shard.register_candidate(
@@ -338,6 +393,7 @@ def run_island_sampler(request: IslandSamplerRequest) -> IslandSamplerResult:
                 dict(evaluated_candidate.scores_per_test()),
             )
             accepted_candidates += 1
+            _write_sampler_checkpoint(request, generated_candidates, accepted_candidates)
             if not logged_first_success:
                 append_sampler_log(
                     request.log_path,

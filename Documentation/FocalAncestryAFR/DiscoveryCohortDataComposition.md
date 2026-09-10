@@ -15,6 +15,16 @@ The pooled OncoArray source available per condition is:
 
 These totals are identical for the no_covariates and with_covariates conditions because the additional-covariates pickles are row-aligned versions of the same source subjects.
 
+## Raw OncoArray data composition
+
+The source raw OncoArray data in Data/RawDataOncoArray is split into cases and controls as follows:
+
+| Ancestry | Controls | Cases | Total |
+| --- | ---: | ---: | ---: |
+| African_Ancestry | 471 | 994 | 1465 |
+| Asian | 242 | 387 | 629 |
+| European | 11110 | 18782 | 29892 |
+
 ## Split design
 
 The AFR focal builder writes three outputs per condition in Data/FunsearchEvaluatorDataAFRFocal.
@@ -49,17 +59,13 @@ Source-shard composition:
 | test | 375 | 0 | 165 | 540 |
 | train | 400 | 200 | 2400 | 3000 |
 
-Source-shard composition:
 
-- heldout: test_African_Ancestry 51, train_African_Ancestry 449.
-- test: test_African_Ancestry 31, train_African_Ancestry 344, test_European 18, train_European 147.
-- train: test_African_Ancestry 43, train_African_Ancestry 357, test_Asian 23, train_Asian 177, test_European 258, train_European 2142.
 
-For experiemnts on East Asian ancestry we had
+For experiemnts on East Asian ancestry we had from MEC training
 
-Heldout: AA 57, JA 19, LA 57
-Test: AA 165, JA 76, LA 114
-Train: AA 1165, JA 51, LA 706
+ - Heldout: AA 57, JA 19, LA 57
+ - Test: AA 165, JA 76, LA 114
+ - Train: AA 1165, JA 51, LA 706
 
 ## Constraint note
 

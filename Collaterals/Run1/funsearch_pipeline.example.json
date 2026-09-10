@@ -41,6 +41,7 @@
       "model": "External model name passed to the sampler backend.",
       "candidates_per_island_per_cycle": "Number of LLM-generated priority functions per island per cycle. The sampler worker registers each accepted function into its island before requesting the next one, so later prompts reflect earlier local improvements.",
       "parallel_workers": "Maximum number of island sampler processes to run concurrently.",
+      "last_island_abort_after_minutes": "Optional watchdog for late-cycle stragglers. When only one island worker remains active for longer than this many minutes, the runner kills that worker subtree, keeps any registrations that island already completed earlier in the cycle, aborts only the in-flight attempt plus any remaining later attempts for that island, and proceeds with extinction and the next cycle. Set null or omit the field to keep the current wait-forever behavior.",
       "temperature": "Optional model sampling temperature. Omit this field to let the backend use its default.",
       "max_output_tokens": "Optional maximum output token budget for the model. Remove this field to use the backend default."
     },
@@ -49,6 +50,7 @@
     "model": "gpt-5.5",
     "candidates_per_island_per_cycle": 7,
     "parallel_workers": 8,
+    "last_island_abort_after_minutes": null,
     "temperature": 1.0
   },
   "evaluator": {

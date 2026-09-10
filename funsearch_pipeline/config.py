@@ -83,6 +83,7 @@ class SamplerSettings:
     model: str
     candidates_per_island_per_cycle: int
     parallel_workers: int
+    last_island_abort_after_minutes: float | None
     temperature: float | None
     max_output_tokens: int | None
 
@@ -122,6 +123,95 @@ class PipelineConfig:
     evaluator: EvaluatorSettings
     logging: LoggingSettings
     priority_tools: PriorityToolsSettings
+
+
+def build_resolved_config_payload(config_path: str | Path) -> dict[str, Any]:
+    """Build a JSON-serializable config payload with resolved absolute paths.
+
+    Input:
+        config_path: Path to the user-editable JSON configuration file.
+
+    Output:
+        Deep-copied JSON payload with all known path fields resolved so it can
+        be safely written as `config.used.json` and later resumed from a
+        different directory.
+    """
+
+    resolved_config_path = Path(config_path).expanduser().resolve()
+    base_dir = resolved_config_path.parent
+    raw_config = json.loads(resolved_config_path.read_text())
+    if not isinstance(raw_config, dict):
+        raise ValueError("Top-level config must be a JSON object.")
+
+    resolved_payload = json.loads(json.dumps(raw_config))
+    experiment_section = _read_required_section(resolved_payload, "experiment")
+    sampler_section = _read_required_section(resolved_payload, "sampler")
+    evaluator_section = _read_required_section(resolved_payload, "evaluator")
+
+    experiment_section["main_output_dir"] = str(
+        _resolve_path(base_dir, str(experiment_section["main_output_dir"]))
+    )
+    experiment_section["seed_priority_path"] = str(
+        _resolve_path(base_dir, str(experiment_section["seed_priority_path"]))
+    )
+    sampler_section["system_prompt_path"] = str(
+        _resolve_path(base_dir, str(sampler_section["system_prompt_path"]))
+    )
+
+    if evaluator_section.get("distance_cache_dir") is not None:
+        evaluator_section["distance_cache_dir"] = str(
+            _resolve_path(base_dir, str(evaluator_section["distance_cache_dir"]))
+        )
+
+    raw_pairs = evaluator_section.get("dataset_pairs", [])
+    if raw_pairs is None:
+        raw_pairs = []
+    if not isinstance(raw_pairs, list):
+        raise ValueError("evaluator.dataset_pairs must be an array of objects.")
+
+    for raw_pair in raw_pairs:
+        if not isinstance(raw_pair, dict):
+            raise ValueError("Each evaluator.dataset_pairs entry must be a JSON object.")
+        for field_name in ("training_pickles", "testing_pickles"):
+            raw_paths = raw_pair.get(field_name)
+            if raw_paths is None:
+                continue
+            if not isinstance(raw_paths, list):
+                raise ValueError(
+                    f"evaluator.dataset_pairs[].{field_name} must be an array of strings."
+                )
+            raw_pair[field_name] = [
+                str(_resolve_path(base_dir, str(raw_path))) for raw_path in raw_paths
+            ]
+
+        for field_name in (
+            "oracle_train_pickle",
+            "calibration_pickle",
+            "scoring_pickle",
+        ):
+            if raw_pair.get(field_name) is None:
+                continue
+            raw_pair[field_name] = str(_resolve_path(base_dir, str(raw_pair[field_name])))
+
+    return resolved_payload
+
+
+def write_resolved_pipeline_config(config_path: str | Path, destination_path: str | Path) -> None:
+    """Write a resume-safe config copy with absolute paths.
+
+    Input:
+        config_path: Original user-edited config file.
+        destination_path: Output file path, usually `config.used.json` inside a
+            run directory.
+
+    Output:
+        Writes JSON whose path-valued fields are already resolved, so later
+        `load_pipeline_config(...)` calls do not depend on the original config
+        file location.
+    """
+
+    resolved_payload = build_resolved_config_payload(config_path)
+    Path(destination_path).write_text(json.dumps(resolved_payload, indent=2) + "\n")
 
 
 def _parse_dataset_pairs(base_dir: Path, evaluator_section: dict[str, Any]) -> tuple[DatasetPairConfig, ...]:
@@ -217,6 +307,11 @@ def _validate_config(config: PipelineConfig) -> None:
         raise ValueError("sampler.candidates_per_island_per_cycle must be at least 1.")
     if config.sampler.parallel_workers < 1:
         raise ValueError("sampler.parallel_workers must be at least 1.")
+    if (
+        config.sampler.last_island_abort_after_minutes is not None
+        and config.sampler.last_island_abort_after_minutes <= 0.0
+    ):
+        raise ValueError("sampler.last_island_abort_after_minutes must be positive when set.")
     if not 0.0 < config.evaluator.oracle_train_fraction < 1.0:
         raise ValueError("evaluator.oracle_train_fraction must be strictly between 0 and 1.")
     if config.evaluator.backend == "procedure2" and not config.evaluator.dataset_pairs:
@@ -315,6 +410,11 @@ def load_pipeline_config(config_path: str | Path) -> PipelineConfig:
                     "parallel_workers",
                     program_database_section.get("num_islands", 8),
                 )
+            ),
+            last_island_abort_after_minutes=(
+                float(sampler_section["last_island_abort_after_minutes"])
+                if sampler_section.get("last_island_abort_after_minutes") is not None
+                else None
             ),
             temperature=(
                 float(sampler_section["temperature"])

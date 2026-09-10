@@ -21,7 +21,21 @@ import matplotlib.pyplot as plt
 DEFAULT_HELDOUT_MODEL_PREDICTIONS_FILE_NAME = "heldout_model_predictions.pkl"
 DEFAULT_HELDOUT_MODEL_PREDICTIONS_BY_MODEL_DIR_NAME = "heldout_model_predictions_by_model"
 DEFAULT_BOOTSTRAP_ITERATIONS = 2000
-DEFAULT_OUTPUT_FILE_NAME_TEMPLATE = "heldout_auc_ci_{ancestry_group}.csv"
+DEFAULT_CI_LEVEL = 0.95
+DEFAULT_OUTPUT_FILE_NAME_TEMPLATE = "heldout_auc_ci_{ancestry_group}.md"
+SUPPORTED_OUTPUT_SUFFIXES = (".md", ".csv")
+SUMMARY_OUTPUT_COLUMNS = (
+    "model_name",
+    "subject_count",
+    "auc_roc",
+    "ci_lower",
+    "ci_hi",
+)
+SUMMARY_FLOAT_COLUMNS = (
+    "auc_roc",
+    "ci_lower",
+    "ci_hi",
+)
 MODEL_DISPLAY_NAME_BY_SLUG = {
     "priority_function": "Scheme Discovered by LLM",
     "independent_learning_scheme": "Independent Learning Scheme",
@@ -113,8 +127,8 @@ def _normalize_output_file_name(raw_value: Any, *, ancestry_group: str) -> str:
     path = Path(file_name)
     if path.is_absolute() or path.name != file_name or file_name in {".", ".."}:
         raise ValueError("output_file_name must be a file name, not a path.")
-    if path.suffix.lower() != ".csv":
-        raise ValueError("output_file_name must end with .csv.")
+    if path.suffix.lower() not in SUPPORTED_OUTPUT_SUFFIXES:
+        raise ValueError("output_file_name must end with .md or .csv.")
     return file_name
 
 
@@ -291,15 +305,27 @@ def _load_prediction_frames(precomputed_directory: Path) -> list[tuple[Path, pd.
     return loaded_frames
 
 
+def _available_ancestry_groups(
+    loaded_frames: Sequence[tuple[Path, pd.DataFrame]],
+) -> tuple[str, ...]:
+    return tuple(
+        sorted(
+            {
+                str(group)
+                for _, frame in loaded_frames
+                for group in frame["ancestry_group"].dropna().astype(str).tolist()
+            }
+        )
+    )
+
+
+def list_available_ancestry_groups(precomputed_directory: Path) -> tuple[str, ...]:
+    return _available_ancestry_groups(_load_prediction_frames(precomputed_directory))
+
+
 def _build_auc_ci_summary(config: HeldoutAucCiConfig) -> pd.DataFrame:
     loaded_frames = _load_prediction_frames(config.precomputed_directory)
-    available_groups = sorted(
-        {
-            str(group)
-            for _, frame in loaded_frames
-            for group in frame["ancestry_group"].dropna().astype(str).tolist()
-        }
-    )
+    available_groups = list(_available_ancestry_groups(loaded_frames))
     ancestry_group = _resolve_target_ancestry_group(
         requested_group=config.target_ancestry_group,
         available_groups=available_groups,
@@ -364,8 +390,54 @@ def plot_path_for_output(output_path: Path) -> Path:
     return output_path.with_suffix(".png")
 
 
+def _format_significant_digits(value: float) -> str:
+    return format(float(value), ".3g")
+
+
+def _display_summary_frame(summary_frame: pd.DataFrame) -> pd.DataFrame:
+    return summary_frame.loc[:, list(SUMMARY_OUTPUT_COLUMNS)].copy()
+
+
+def _formatted_display_summary_frame(summary_frame: pd.DataFrame) -> pd.DataFrame:
+    display_frame = _display_summary_frame(summary_frame)
+    for column in SUMMARY_FLOAT_COLUMNS:
+        display_frame[column] = display_frame[column].map(_format_significant_digits)
+    return display_frame
+
+
+def _markdown_table_row(values: Sequence[str]) -> str:
+    return "| " + " | ".join(values) + " |"
+
+
+def _build_markdown_summary(summary_frame: pd.DataFrame) -> str:
+    formatted_frame = _formatted_display_summary_frame(summary_frame)
+    ancestry_group = str(summary_frame.iloc[0]["ancestry_group"])
+    ci_percent = _format_significant_digits(100.0 * float(summary_frame.iloc[0]["ci_level"]))
+    bootstrap_iterations = int(summary_frame.iloc[0]["bootstrap_iterations"])
+
+    lines = [
+        f"# Heldout ROC AUC Confidence Intervals for {ancestry_group}",
+        "",
+        f"- Confidence interval: {ci_percent}% bootstrap CI",
+        f"- Bootstrap iterations: {bootstrap_iterations}",
+        "",
+        _markdown_table_row(formatted_frame.columns.astype(str).tolist()),
+        _markdown_table_row(["---", "---:", "---:", "---:", "---:"]),
+    ]
+    for row in formatted_frame.itertuples(index=False, name=None):
+        lines.append(_markdown_table_row([str(value) for value in row]))
+    return "\n".join(lines) + "\n"
+
+
 def _write_summary_frame(summary_frame: pd.DataFrame, output_path: Path) -> None:
-    summary_frame.drop(columns=["plot_order"]).to_csv(output_path, index=False)
+    output_suffix = output_path.suffix.lower()
+    if output_suffix == ".csv":
+        _formatted_display_summary_frame(summary_frame).to_csv(output_path, index=False)
+        return
+    if output_suffix == ".md":
+        output_path.write_text(_build_markdown_summary(summary_frame), encoding="utf-8")
+        return
+    raise ValueError(f"Unsupported summary output suffix: {output_path.suffix}")
 
 
 def _wrap_plot_label(label: str) -> str:
@@ -385,10 +457,9 @@ def _wrap_plot_label(label: str) -> str:
     return best_label
 
 
-def _plot_summary_from_csv(csv_path: Path, plot_path: Path) -> None:
-    summary_frame = pd.read_csv(csv_path)
+def _plot_summary_frame(summary_frame: pd.DataFrame, plot_path: Path) -> None:
     if summary_frame.empty:
-        raise ValueError(f"Summary CSV {csv_path} is empty.")
+        raise ValueError("Summary frame is empty.")
 
     lower_errors = (summary_frame["auc_roc"] - summary_frame["ci_lower"]).to_numpy(dtype=float)
     upper_errors = (summary_frame["ci_hi"] - summary_frame["auc_roc"]).to_numpy(dtype=float)
@@ -425,23 +496,58 @@ def _plot_summary_from_csv(csv_path: Path, plot_path: Path) -> None:
     plt.close(fig)
 
 
-def write_auc_ci_summary(config: HeldoutAucCiConfig) -> Path:
+def write_auc_ci_summary(config: HeldoutAucCiConfig, *, allow_overwrite: bool = False) -> Path:
     summary_frame = _build_auc_ci_summary(config)
     output_path = output_path_for_config(config)
     plot_path = plot_path_for_output(output_path)
     if output_path.exists():
-        raise FileExistsError(
-            f"Refusing to overwrite existing output file: {output_path}. "
-            "Choose a different output_file_name in the config."
-        )
+        if not allow_overwrite:
+            raise FileExistsError(
+                f"Refusing to overwrite existing output file: {output_path}. "
+                "Choose a different output_file_name in the config."
+            )
+        output_path.unlink()
     if plot_path.exists():
-        raise FileExistsError(
-            f"Refusing to overwrite existing plot file: {plot_path}. "
-            "Choose a different output_file_name in the config."
-        )
+        if not allow_overwrite:
+            raise FileExistsError(
+                f"Refusing to overwrite existing plot file: {plot_path}. "
+                "Choose a different output_file_name in the config."
+            )
+        plot_path.unlink()
     _write_summary_frame(summary_frame, output_path)
-    _plot_summary_from_csv(output_path, plot_path)
+    _plot_summary_frame(summary_frame, plot_path)
     return output_path
+
+
+def write_all_auc_ci_summaries(
+    *,
+    precomputed_directory: Path,
+    ci_level: float = DEFAULT_CI_LEVEL,
+    bootstrap_iterations: int = DEFAULT_BOOTSTRAP_ITERATIONS,
+    random_seed: int = 0,
+    ancestry_groups: Sequence[str] | None = None,
+    output_suffix: str = ".md",
+    allow_overwrite: bool = False,
+) -> tuple[Path, ...]:
+    normalized_suffix = output_suffix.strip().lower()
+    if normalized_suffix not in SUPPORTED_OUTPUT_SUFFIXES:
+        raise ValueError(f"output_suffix must be one of {SUPPORTED_OUTPUT_SUFFIXES!r}.")
+
+    target_groups = tuple(ancestry_groups) if ancestry_groups is not None else list_available_ancestry_groups(
+        precomputed_directory
+    )
+    written_paths: list[Path] = []
+    for ancestry_group in target_groups:
+        config = HeldoutAucCiConfig(
+            precomputed_directory=precomputed_directory,
+            target_ancestry_group=ancestry_group,
+            ci_level=ci_level,
+            bootstrap_iterations=bootstrap_iterations,
+            random_seed=random_seed,
+            output_file_name=f"heldout_auc_ci_{_slugify_token(ancestry_group)}{normalized_suffix}",
+        )
+        written_paths.append(write_auc_ci_summary(config, allow_overwrite=allow_overwrite))
+    return tuple(written_paths)
 
 
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
@@ -476,8 +582,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             "Choose a different output_file_name in the config."
         )
     _write_summary_frame(summary_frame, output_path)
-    _plot_summary_from_csv(output_path, plot_path)
-    print(summary_frame.drop(columns=["plot_order"]).to_string(index=False))
+    _plot_summary_frame(summary_frame, plot_path)
+    print(_formatted_display_summary_frame(summary_frame).to_string(index=False))
     print(f"output_path={output_path}")
     print(f"plot_path={plot_path}")
     return 0

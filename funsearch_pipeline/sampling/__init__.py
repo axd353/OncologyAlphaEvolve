@@ -5,6 +5,7 @@ from funsearch_pipeline.sampling.interfaces import GeneratedCompletion
 from funsearch_pipeline.sampling.interfaces import SamplerRequest
 from funsearch_pipeline.sampling.island_sampler import IslandSamplerRequest
 from funsearch_pipeline.sampling.island_sampler import IslandSamplerResult
+from funsearch_pipeline.sampling.island_sampler import load_island_sampler_checkpoint
 from funsearch_pipeline.sampling.island_sampler import run_island_sampler
 
 __all__ = [
@@ -12,6 +13,7 @@ __all__ = [
     "IslandSamplerRequest",
     "IslandSamplerResult",
     "SamplerRequest",
+    "load_island_sampler_checkpoint",
     "run_island_sampler",
     "run_sampling_request",
 ]

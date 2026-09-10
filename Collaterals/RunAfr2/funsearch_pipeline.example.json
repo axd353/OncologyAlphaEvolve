@@ -10,9 +10,9 @@
       "stop_after_no_improvement_cycles": "Stop early after this many consecutive cycles without a new global best score.",
       "random_seed": "Random seed used for upstream island prompt sampling and tie-breaking."
     },
-    "name": "oracle_priority",
+    "name": "oracle_priorityAfr2",
     "main_output_dir": "/nfs/home/adas23/projects/AlphaEvolve/prio_func_disc_runs",
-    "seed_priority_path": "../Run1/funsearch_priority_seed_example.py",
+    "seed_priority_path": "/nfs/home/adas23/projects/AlphaEvolve/Collaterals/Run1/funsearch_priority_seed_example.py",
     "function_to_evolve": "priority",
     "max_cycles": 12,
     "stop_after_no_improvement_cycles": 3,
@@ -46,11 +46,11 @@
       "max_output_tokens": "Optional maximum output token budget for the model. Remove this field to use the backend default."
     },
     "backend": "openai",
-    "system_prompt_path": "../Run1/funsearch_system_prompt.example.txt",
+    "system_prompt_path": "/nfs/home/adas23/projects/AlphaEvolve/Collaterals/Run1/funsearch_system_prompt.example.txt",
     "model": "gpt-5.5",
     "candidates_per_island_per_cycle": 7,
     "parallel_workers": 8,
-    "last_island_abort_after_minutes": 90,
+    "last_island_abort_after_minutes": 180,
     "temperature": 1.0
   },
   "evaluator": {
@@ -91,10 +91,10 @@
         },
         "name": "no_covariates",
         "training_pickles": [
-          "/nfs/home/adas23/projects/AlphaEvolve/Data/FunsearchEvaluatorDataAFRFocal/no_covariates_train.pkl"
+          "/nfs/home/adas23/projects/AlphaEvolve/Data/FunsearchEvaluatorDataAFRFocal2/no_covariates_train.pkl"
         ],
         "testing_pickles": [
-          "/nfs/home/adas23/projects/AlphaEvolve/Data/FunsearchEvaluatorDataAFRFocal/no_covariates_test.pkl"
+          "/nfs/home/adas23/projects/AlphaEvolve/Data/FunsearchEvaluatorDataAFRFocal2/no_covariates_test.pkl"
         ],
         "has_additional_covariates": false
       },
@@ -112,10 +112,10 @@
         },
         "name": "with_covariates",
         "training_pickles": [
-          "/nfs/home/adas23/projects/AlphaEvolve/Data/FunsearchEvaluatorDataAFRFocal/with_covariates_train.pkl"
+          "/nfs/home/adas23/projects/AlphaEvolve/Data/FunsearchEvaluatorDataAFRFocal2/with_covariates_train.pkl"
         ],
         "testing_pickles": [
-          "/nfs/home/adas23/projects/AlphaEvolve/Data/FunsearchEvaluatorDataAFRFocal/with_covariates_test.pkl"
+          "/nfs/home/adas23/projects/AlphaEvolve/Data/FunsearchEvaluatorDataAFRFocal2/with_covariates_test.pkl"
         ],
         "covariate_fields": [
           "age",

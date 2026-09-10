@@ -192,6 +192,55 @@ def test_load_evaluation_config_reads_report_file_name_and_supported_ancestries(
     assert config.supported_ancestry_groups == ("EA", "JA")
 
 
+def test_load_evaluation_config_reads_heldout_auc_ci_settings(tmp_path: Path) -> None:
+    priority_path = _write_text(
+        tmp_path / "priority.py",
+        "def priority(training_data, ancestry_coordinate, target_variant):\n"
+        "    return 1.0\n",
+    )
+    config_path = _write_text(
+        tmp_path / "config.json",
+        json.dumps(
+            {
+                "prio_function_path": str(priority_path),
+                "heldout_auc_ci_level": 90,
+                "heldout_auc_ci_bootstrap_iterations": 123,
+                "heldout_auc_ci_output_format": "csv",
+            },
+            indent=2,
+        ),
+    )
+
+    config = load_evaluation_config(config_path)
+
+    assert config.heldout_auc_ci_level == 0.9
+    assert config.heldout_auc_ci_bootstrap_iterations == 123
+    assert config.heldout_auc_ci_output_suffix == ".csv"
+
+
+def test_load_evaluation_config_defaults_heldout_auc_ci_to_ninety_percent_markdown(tmp_path: Path) -> None:
+    priority_path = _write_text(
+        tmp_path / "priority.py",
+        "def priority(training_data, ancestry_coordinate, target_variant):\n"
+        "    return 1.0\n",
+    )
+    config_path = _write_text(
+        tmp_path / "config.json",
+        json.dumps(
+            {
+                "prio_function_path": str(priority_path),
+            },
+            indent=2,
+        ),
+    )
+
+    config = load_evaluation_config(config_path)
+
+    assert config.heldout_auc_ci_level == 0.9
+    assert config.heldout_auc_ci_bootstrap_iterations == 2000
+    assert config.heldout_auc_ci_output_suffix == ".md"
+
+
 def test_resolve_partition_count_uses_visible_cpus_when_auto(monkeypatch) -> None:
     monkeypatch.setattr(
         "PostProcesingData.evaluate_priofunction._visible_cpu_count",
@@ -993,6 +1042,8 @@ def test_write_evaluation_report_file_writes_clean_json_next_to_priority_functio
         priority_dir / "distance_cache" / "heldout_model_predictions.pkl"
     )
     assert payload["results"]["heldout_model_prediction_paths"] == {}
+    assert payload["results"]["heldout_auc_ci_summary_paths"] == []
+    assert payload["results"]["heldout_auc_ci_plot_paths"] == []
     assert payload["results"]["baseline_evaluations"] == []
     assert payload["results"]["summary_text"] == "prio_function_path=" + str(priority_path) + "\nheldout_auc_roc=0.500000"
 
@@ -1291,6 +1342,21 @@ def test_main_rebuilds_heldout_model_predictions_when_report_exists(tmp_path: Pa
     rebuilt_predictions = pd.read_pickle(predictions_path)
     assert set(rebuilt_predictions["model_name"].tolist()) == {"Priority Function"}
     assert rebuilt_predictions["heldout_subject_index"].nunique() == 24
+
+    aa_summary_path = tmp_path / "distance_cache" / "heldout_auc_ci_aa.md"
+    ja_summary_path = tmp_path / "distance_cache" / "heldout_auc_ci_ja.md"
+    assert aa_summary_path.exists()
+    assert ja_summary_path.exists()
+    assert (tmp_path / "distance_cache" / "heldout_auc_ci_aa.png").exists()
+    assert (tmp_path / "distance_cache" / "heldout_auc_ci_ja.png").exists()
+    assert "| model_name | subject_count | auc_roc | ci_lower | ci_hi |" in aa_summary_path.read_text()
+
+    payload = json.loads(report_path.read_text())
+    assert payload["results"]["heldout_auc_ci_summary_paths"] == [
+        str(aa_summary_path),
+        str(ja_summary_path),
+    ]
+
 
 
 def test_missing_baselines_only_returns_unreported_configured_baselines(tmp_path: Path) -> None:

@@ -58,6 +58,7 @@ That means the sampler worker is not just generating text. It also performs eval
 This is controlled by:
 
 - `sampler.parallel_workers`
+- `sampler.last_island_abort_after_minutes` for an optional cycle-level watchdog once only one island remains active
 
 The effective sampler-worker count is:
 
@@ -66,6 +67,8 @@ $$
 $$
 
 because the runner builds one request per island, but the `ProcessPoolExecutor` is capped at `parallel_workers`.
+
+If `sampler.last_island_abort_after_minutes` is set, the main runner also watches the tail of the cycle. After all but one island have finished, it starts a timer for that final active island. If the timer expires, the runner kills the remaining sampler worker process group, recovers the latest checkpointed shard state for that island, preserves the registrations that completed before the timeout, aborts the in-flight attempt plus any remaining later attempts for that island, and then proceeds with the cycle.
 
 Relevant config documentation already exists in:
 

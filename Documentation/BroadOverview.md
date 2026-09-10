@@ -203,7 +203,21 @@ The resume flow is intentionally conservative:
 - `sampler_logs/` and `sampler_outputs/` for that incomplete cycle are deleted before rerunning it, so stale partial sampler artifacts do not leak into the resumed cycle
 - the copied `config.used.json` inside the run directory is the config used for resume, so you do not need to pass `--config`
 
+So if your run finished cycles 1 through 5 and `cycle_0006` is incomplete, resume will delete the incomplete artifacts under `cycle_0006/` and rerun cycle 6 from the same `config.used.json` already stored inside that run directory.
+
 This means the safe restart boundary is the beginning of a cycle, not the middle of sampler execution.
+
+### 4b. Optional last-island watchdog
+
+Long `procedure2` evaluations can occasionally leave one island still running long after every other island finished the same cycle. You can now opt into a cycle-level watchdog with:
+
+```json
+"sampler": {
+	"last_island_abort_after_minutes": 30
+}
+```
+
+When this field is set to a positive number, the runner starts a timer once only one island worker remains active in the cycle. If that one remaining island is still running after the configured number of minutes, the runner kills that island worker process group, preserves any earlier registrations that island already completed in the same cycle, aborts only the current in-flight attempt plus any remaining later attempts for that island, and then continues to cycle-end bookkeeping plus the next cycle. If the field is omitted or set to `null`, the runner keeps the previous behavior and waits indefinitely.
 
 One limitation is worth keeping in mind: if a run dies after a cycle fully completed but before the next cycle started, the run directory may not contain a safe start-of-next-cycle snapshot yet. In that case the new resume command will refuse to guess.
 

@@ -17,6 +17,7 @@ from PostProcesingData.funsearch_run_postprocess import count_island_best_improv
 from PostProcesingData.funsearch_run_postprocess import count_total_sampler_attempts_in_sampler_log
 from PostProcesingData.funsearch_run_postprocess import count_validation_passes_in_sampler_log
 from PostProcesingData.funsearch_run_postprocess import extract_sampler_log_metrics
+from PostProcesingData.funsearch_run_postprocess import move_corresponding_logger_files
 from PostProcesingData.funsearch_run_postprocess import postprocess_funsearch_run
 from PostProcesingData.funsearch_run_postprocess import write_cycle_best_priority_files
 from funsearch_pipeline.config import ProgramDatabaseSettings
@@ -164,6 +165,7 @@ def test_postprocess_funsearch_run_moves_logger_and_writes_pickles(tmp_path: Pat
 
     moved_logger_path = run_dir / logger_path.name
     assert outputs.logger_path == moved_logger_path
+    assert outputs.logger_paths == (moved_logger_path,)
     assert outputs.best_priority_paths == (
         run_dir / "cycle_0001" / "best_prio.py",
         run_dir / "cycle_0002" / "best_prio.py",
@@ -224,6 +226,37 @@ def test_postprocess_funsearch_run_moves_logger_and_writes_pickles(tmp_path: Pat
         {"cycle_index": 1, "island_best_improvement_count": 1},
         {"cycle_index": 2, "island_best_improvement_count": 1},
     ]
+
+
+def test_move_corresponding_logger_files_moves_all_resumed_run_logs(tmp_path: Path) -> None:
+    run_dir = tmp_path / "prio_func_disc_runs" / "oracle_priority_20260903_055700"
+    run_dir.mkdir(parents=True)
+
+    first_logger = _write_text(
+        tmp_path / "prio_func_disc_runs" / "logger_20260903_015650.log",
+        f"Created experiment directory {run_dir}\n",
+    )
+    resumed_logger = _write_text(
+        tmp_path / "prio_func_disc_runs" / "logger_resume_20260904_121252.log",
+        f"Resuming experiment directory {run_dir}\n",
+    )
+    second_resumed_logger = _write_text(
+        tmp_path / "prio_func_disc_runs" / "logger_resume_20260908_111625.log",
+        f"Resuming experiment directory {run_dir}\n",
+    )
+
+    moved_logger_paths = move_corresponding_logger_files(run_dir)
+
+    assert moved_logger_paths == (
+        run_dir / first_logger.name,
+        run_dir / resumed_logger.name,
+        run_dir / second_resumed_logger.name,
+    )
+    for moved_path in moved_logger_paths:
+        assert moved_path.exists()
+    assert not first_logger.exists()
+    assert not resumed_logger.exists()
+    assert not second_resumed_logger.exists()
 
 
 def test_write_cycle_best_priority_files_materializes_best_program_per_cycle(

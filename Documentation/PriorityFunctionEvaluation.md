@@ -4,6 +4,8 @@ This document explains how to evaluate one produced priority function on heldout
 
 The implementation entry point is [PostProcesingData/evaluate_priofunction.py](/nfs/home/adas23/projects/AlphaEvolve/PostProcesingData/evaluate_priofunction.py).
 
+Each invocation of `PYTHONPATH=$PWD python -m PostProcesingData.evaluate_priofunction <config.json>` now also writes per-ancestry heldout ROC AUC confidence-interval summary tables into the configured `distance_cache_dir` or, if that config field is omitted, into the default cache directory next to the priority function.
+
 ## What the main method is
 
 The main method is the repository's Procedure 2 heldout evaluation flow applied to one concrete priority-function file.
@@ -105,6 +107,8 @@ If baselines are configured, the same heldout split is also evaluated with each 
 
 The final summary report also breaks down the priority-function heldout ROC AUC by ancestry group. Those ancestry groups are inferred from the heldout rows' source shard names through `output_row_tracking.pkl`, for example `train_AA.pkl`, `test_JA.pkl`, or `train_LA_add_covs.pkl`.
 
+At the end of the command, the saved heldout prediction pickles are also converted into one per-ancestry summary table. The default output format is Markdown rather than CSV because it is easier to inspect directly in the editor and with simple command-line tools such as `cat` or `less`, but CSV can be requested in the evaluator config.
+
 ## Available alternate baselines
 
 Baseline implementations are registered in [PostProcesingData/prio_func_eval_baselines/__init__.py](/nfs/home/adas23/projects/AlphaEvolve/PostProcesingData/prio_func_eval_baselines/__init__.py).
@@ -130,8 +134,7 @@ Example:
 
 ```bash
 source /nfs/home/adas23/python_environments/OcologyAlphaEvolve/bin/activate
-PYTHONPATH=$PWD python -m PostProcesingData.evaluate_priofunction \
-  PostProcesingData/my_config.json
+PYTHONPATH=$PWD python -m PostProcesingData.evaluate_priofunction PostProcesingData/my_configAFROnco.json
 ```
 
 An example config file already exists at [PostProcesingData/evaluate_priofunction.oracle_priority_20260717_141059.cycle_0006.best_prio.json](/nfs/home/adas23/projects/AlphaEvolve/PostProcesingData/evaluate_priofunction.oracle_priority_20260717_141059.cycle_0006.best_prio.json).
@@ -161,7 +164,12 @@ Common optional fields:
 - `scoring_partitions`: positive integer worker count or `"auto"`
 - `distance_cache_enabled`: defaults to `true`; set to `false` to disable persistent ancestry-distance caches
 - `distance_cache_dir`: optional path override for the cache root directory
+- `heldout_auc_ci_level`: optional confidence level for the end-of-run per-ancestry ROC AUC interval tables; defaults to `0.90` and also accepts percentage-style values such as `90`
+- `heldout_auc_ci_bootstrap_iterations`: optional bootstrap resample count for those interval tables; defaults to `2000`
+- `heldout_auc_ci_output_format`: optional output format for those interval tables; one of `md`, `markdown`, or `csv`; defaults to `md`
 - `baselines`: list of baseline entries to run in addition to the produced priority function
+
+The per-ancestry ROC AUC confidence-interval tables are written automatically under the cache root using those config settings. The standalone utility [PostProcesingData/heldout_model_auc_ci.py](/nfs/home/adas23/projects/AlphaEvolve/PostProcesingData/heldout_model_auc_ci.py) still works directly on the saved prediction artifacts when you want to regenerate them later without rerunning the evaluator.
 
 Each baseline entry may be either:
 
@@ -211,6 +219,9 @@ Example config:
   "calibration_partitions": "auto",
   "scoring_partitions": "auto",
   "distance_cache_enabled": true,
+  "heldout_auc_ci_level": 0.90,
+  "heldout_auc_ci_bootstrap_iterations": 2000,
+  "heldout_auc_ci_output_format": "md",
   "baselines": [
     {
       "name": "Mixture Learning",
@@ -250,6 +261,9 @@ There are two output layers:
 1. Progress logs with timestamps, for example dataset loading, feature-matrix construction, calibration fitting, and baseline execution.
 2. A final plain-text summary report.
 3. A clean JSON report file written in the same directory as the evaluated priority function.
+4. Heldout prediction pickles under the cache root, including one aggregate pickle and one pickle per model.
+5. One per-ancestry summary table under the cache root, named like `heldout_auc_ci_african_ancestry.md` or `heldout_auc_ci_african_ancestry.csv`, with rows = model names and columns = `subject_count`, `auc_roc`, `ci_lower`, and `ci_hi`.
+6. One PNG plot per heldout ancestry group alongside each summary table.
 
 The final summary report has this shape:
 
