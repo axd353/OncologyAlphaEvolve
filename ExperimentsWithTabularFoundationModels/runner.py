@@ -1935,7 +1935,7 @@ def _evaluate_prepared_experiment(
         metric_path = experiment_dir / "scheme_metrics.csv"
         metric_frame.to_csv(metric_path, index=False)
 
-        figure_dir = experiment_dir / "figures"
+        figure_dir = run_dir / "figures"
         figure_dir.mkdir(parents=True, exist_ok=True)
         title, subtitle, file_name = _build_plot_title_and_subtitle(
             experiment=experiment,

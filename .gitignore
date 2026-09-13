@@ -3,3 +3,4 @@ Data/RawData/*
 prio_func_disc_runs/*
 *.pyc
 ExperimentsWithTabularFoundationModels/output_results/*
+ExperimentsWithTabularFoundationModels2/output_results/*
