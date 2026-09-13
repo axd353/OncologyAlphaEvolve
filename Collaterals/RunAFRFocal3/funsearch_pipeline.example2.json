@@ -1,0 +1,117 @@
+{
+  "experiment": {
+    "_description": "Controls the run name, output directory, seed program, stopping rule, and reproducibility seed.",
+    "documentation": {
+      "name": "Short experiment label used in the timestamped output directory name.",
+      "main_output_dir": "Parent directory for all runs. The runner creates one timestamped experiment directory under this path and copies this config there as config.used.json.",
+      "seed_priority_path": "Path to the initial seed priority function source file. It must define the function named by function_to_evolve.",
+      "function_to_evolve": "Unversioned priority function name. FunSearch prompts will create versioned variants such as priority_v0, priority_v1, and so on.",
+      "max_cycles": "Maximum number of outer evolution cycles to run.",
+      "stop_after_no_improvement_cycles": "Stop early after this many consecutive cycles without a new global best score.",
+      "random_seed": "Random seed used for upstream island prompt sampling and tie-breaking."
+    },
+    "name": "oracle_priorityAfrFocal3",
+    "main_output_dir": "/nfs/home/adas23/projects/AlphaEvolve/prio_func_disc_runs",
+    "seed_priority_path": "/nfs/home/adas23/projects/AlphaEvolve/Collaterals/Run1/funsearch_priority_seed_example.py",
+    "function_to_evolve": "priority",
+    "max_cycles": 12,
+    "stop_after_no_improvement_cycles": 1,
+    "random_seed": 42
+  },
+  "program_database": {
+    "_description": "Controls how many islands exist, how prompts are assembled, and how cluster sampling behaves inside each island.",
+    "documentation": {
+      "functions_per_prompt": "Number of previous priority functions to include in each island prompt. With value 2, established islands show two prior functions; brand-new islands show one because only the seed exists.",
+      "num_islands": "Number of independent islands. Each cycle creates one sampler worker per island shard, up to sampler.parallel_workers concurrent processes.",
+      "cluster_sampling_temperature_init": "Initial softmax temperature for sampling score clusters inside an island. Lower values favor high-scoring clusters more strongly.",
+      "cluster_sampling_temperature_period": "Period, measured in programs registered in an island, over which the cluster sampling temperature linearly decays before restarting its schedule.",
+      "simplicity_bonus_max": "Maximum absolute bonus added to the base mean score when computing the final combined ranking score. If this value is Y, the registration-time simplicity bonus is interpolated in the range [-Y, Y] from the candidate's simplicity rank relative to up to 100 baseline functions already in the destination island."
+    },
+    "functions_per_prompt": 2,
+    "num_islands": 4,
+    "cluster_sampling_temperature_init": 0.1,
+    "cluster_sampling_temperature_period": 30000,
+    "simplicity_bonus_max": 0.008
+  },
+  "sampler": {
+    "_description": "Controls the LLM backend, system prompt, model name, and per-island sampling cadence.",
+    "documentation": {
+      "backend": "Sampler backend. Use openai for the OpenAI Responses API or deterministic for local smoke tests that do not call an external model.",
+      "system_prompt_path": "Text file used as the LLM system prompt or instructions. The island prompt code is passed separately as the user input to the model.",
+      "model": "External model name passed to the sampler backend.",
+      "candidates_per_island_per_cycle": "Number of LLM-generated priority functions per island per cycle. The sampler worker registers each accepted function into its island before requesting the next one, so later prompts reflect earlier local improvements.",
+      "parallel_workers": "Maximum number of island sampler processes to run concurrently.",
+      "last_island_abort_after_minutes": "Optional watchdog for late-cycle stragglers. When only one island worker remains active for longer than this many minutes, the runner kills that worker subtree, keeps any registrations that island already completed earlier in the cycle, aborts only the in-flight attempt plus any remaining later attempts for that island, and proceeds with extinction and the next cycle. Set null or omit the field to keep the current wait-forever behavior.",
+      "temperature": "Optional model sampling temperature. Omit this field to let the backend use its default.",
+      "max_output_tokens": "Optional maximum output token budget for the model. Remove this field to use the backend default."
+    },
+    "backend": "openai",
+    "system_prompt_path": "/nfs/home/adas23/projects/AlphaEvolve/Collaterals/Run1/funsearch_system_prompt.example.txt",
+    "model": "gpt-5.5",
+    "candidates_per_island_per_cycle": 7,
+    "parallel_workers": 8,
+    "last_island_abort_after_minutes": null,
+    "temperature": 1.0
+  },
+  "evaluator": {
+    "_description": "Controls the oracle-based scoring backend and how training/testing data pairs are preprocessed.",
+    "documentation": {
+      "backend": "Evaluator backend. procedure2 is the oracle plus ridge calibration path; deterministic is only for orchestration smoke tests.",
+      "metric": "Held-out scoring metric. roc_auc is recommended because it measures whether calibrated scores rank cases above controls without choosing a threshold.",
+      "oracle_train_fraction": "Legacy field from the old prepare path. The current fold-based procedure2 workflow writes oracle_train.pkl from all training_pickles and derives calibration_i/scoring_i artifacts from testing_pickles instead.",
+      "preprocessed_dirname": "Subdirectory inside the experiment directory where preprocessed oracle-train and fold-specific calibration/scoring pickles are stored.",
+      "num_folds": "Number of folds created from the combined testing_pickles for each dataset pair. For fold i, scoring_i.pkl is fold i and calibration_i.pkl is the concatenation of all other folds.",
+      "calibration_penalties": "Candidate ridge penalties to evaluate during calibration.",
+      "calibration_partitions": "Number of calibration-set partitions evaluated in parallel for each candidate priority function. Use 1 to keep calibration single-process.",
+      "scoring_partitions": "Number of scoring-set partitions evaluated in parallel for each candidate priority function. Use 1 to keep scoring single-process.",
+      "bootstrap_iterations": "Number of bootstrap resamples of the scoring set used to estimate the AUC distribution. The evaluator registers the median bootstrap AUC.",
+      "dataset_pairs": "Array of pair configurations. Each pair represents one training/testing condition, such as no additional covariates or additional covariates present."
+    },
+    "backend": "procedure2",
+    "metric": "roc_auc",
+    "oracle_train_fraction": 0.8,
+    "preprocessed_dirname": "preprocessed",
+    "num_folds": 2,
+    "calibration_penalties": [0.1],
+    "calibration_partitions": 10,
+    "scoring_partitions": 10,
+    "bootstrap_iterations": 200,
+    "dataset_pairs": [
+      {
+        "_description": "Training/testing pickle shards for the no-additional-covariates condition.",
+        "documentation": {
+          "name": "Pair name used in logs, preprocessed subdirectories, and database signatures.",
+          "training_pickles": "Training pickle shards that are concatenated into one oracle_train.pkl for this condition.",
+          "testing_pickles": "Testing pickle shards that are concatenated, randomly split into num_folds folds, and then materialized as scoring_i.pkl plus complementary calibration_i.pkl artifacts.",
+          "oracle_train_pickle": "Optional alternative to training_pickles: a prebuilt Oracle-Train pickle path.",
+          "calibration_pickle": "Optional base path for prepared calibration fold artifacts. The evaluator writes numbered files such as calibration_1.pkl, calibration_2.pkl, and so on.",
+          "scoring_pickle": "Optional base path for prepared scoring fold artifacts. The evaluator writes numbered files such as scoring_1.pkl, scoring_2.pkl, and so on.",
+          "covariate_fields": "Optional ordered list of covariate column names to use when has_additional_covariates is true. If omitted, the evaluator defaults to the MEC covariate field list.",
+          "has_additional_covariates": "False means no extra covariate columns are expected for this pair."
+        },
+        "name": "no_covariates",
+        "training_pickles": [
+          "/nfs/home/adas23/projects/AlphaEvolve/Data/FunsearchEvaluatorDataAFRFocal3/no_covariates_train.pkl"
+        ],
+        "testing_pickles": [
+          "/nfs/home/adas23/projects/AlphaEvolve/Data/FunsearchEvaluatorDataAFRFocal3/no_covariates_test.pkl"
+        ],
+        "has_additional_covariates": false
+      }
+    ]
+  },
+  "logging": {
+    "_description": "Controls the verbosity of main.log and console output.",
+    "documentation": {
+      "level": "Standard-library logging level for main.log and console output."
+    },
+    "level": "INFO"
+  },
+  "priority_tools": {
+    "_description": "Future extension point for helper modules that should be exposed to generated priority functions.",
+    "documentation": {
+      "module_names": "List of module names whose helper functions should be documented in the system prompt."
+    },
+    "module_names": []
+  }
+}
