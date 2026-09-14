@@ -1,0 +1,73 @@
+{
+  "_description": "AOU CA_107_2 EAS-only heldout TabPFN and TabICL experiments on prepared evaluator data. Update prio_function_path if best_prio.py lives outside auxilalry_data/20260810_032011 on the AOU workspace.",
+  "prio_function_path": "/home/jupyter/workspace/rw-migration-aou-rw-c4e08500/AutoResearch/DOWProstateCancerGrant/auxilalry_data/20260810_032011/best_prio.py",
+  "function_name": "priority",
+  "random_seed": 7,
+  "output_root_dir": "/home/jupyter/workspace/rw-migration-aou-rw-c4e08500/AutoResearch/DOWProstateCancerGrant/ICLRSubmissio/tabular_foundation_models",
+  "should_overwrite": false,
+  "experiments": [
+    {
+      "name": "aou_ca1072_eas_tabpfn",
+      "model_name": "tabpfn",
+      "training_pickle_path": "/home/jupyter/workspace/rw-migration-aou-rw-c4e08500/AutoResearch/DOWProstateCancerGrant/auxilalry_data/CA_107_2/aou_train.pkl",
+      "calibrating_pickle_path": "/home/jupyter/workspace/rw-migration-aou-rw-c4e08500/AutoResearch/DOWProstateCancerGrant/auxilalry_data/CA_107_2/aou_calibration.pkl",
+      "heldout_pickle_path": "/home/jupyter/workspace/rw-migration-aou-rw-c4e08500/AutoResearch/DOWProstateCancerGrant/auxilalry_data/CA_107_2/aou_heldout.pkl",
+      "output_row_tracking_path": "/home/jupyter/workspace/rw-migration-aou-rw-c4e08500/AutoResearch/DOWProstateCancerGrant/auxilalry_data/CA_107_2/output_row_tracking.pkl",
+      "supported_ancestry_groups": ["EUR", "AFR", "AMR", "EAS", "SAS", "MID"],
+      "heldout_target_ancestry_group": "EAS",
+      "label_column": "phenotype",
+      "dosage_prefix": "dosage__",
+      "ancestry_columns": [
+        "PC1", "PC2", "PC3", "PC4", "PC5", "PC6", "PC7", "PC8",
+        "PC9", "PC10", "PC11", "PC12", "PC13", "PC14", "PC15", "PC16"
+      ],
+      "additional_feature_columns": [],
+      "priority_radius_cache_path": null,
+      "max_context_rows": 1000000,
+      "priority_min_variant_support_fraction": 0.0,
+      "predict_proba_batch_size": null,
+      "plot_ci_level": null,
+      "model_init_kwargs": {
+        "device": "cuda",
+        "model_path": "auto"
+      },
+      "schemes": [
+        "mixture_learning",
+        "independent_learning_scheme",
+        "priority_function_curated_context"
+      ]
+    },
+    {
+      "name": "aou_ca1072_eas_tabicl",
+      "model_name": "tabicl",
+      "training_pickle_path": "/home/jupyter/workspace/rw-migration-aou-rw-c4e08500/AutoResearch/DOWProstateCancerGrant/auxilalry_data/CA_107_2/aou_train.pkl",
+      "calibrating_pickle_path": "/home/jupyter/workspace/rw-migration-aou-rw-c4e08500/AutoResearch/DOWProstateCancerGrant/auxilalry_data/CA_107_2/aou_calibration.pkl",
+      "heldout_pickle_path": "/home/jupyter/workspace/rw-migration-aou-rw-c4e08500/AutoResearch/DOWProstateCancerGrant/auxilalry_data/CA_107_2/aou_heldout.pkl",
+      "output_row_tracking_path": "/home/jupyter/workspace/rw-migration-aou-rw-c4e08500/AutoResearch/DOWProstateCancerGrant/auxilalry_data/CA_107_2/output_row_tracking.pkl",
+      "supported_ancestry_groups": ["EUR", "AFR", "AMR", "EAS", "SAS", "MID"],
+      "heldout_target_ancestry_group": "EAS",
+      "label_column": "phenotype",
+      "dosage_prefix": "dosage__",
+      "ancestry_columns": [
+        "PC1", "PC2", "PC3", "PC4", "PC5", "PC6", "PC7", "PC8",
+        "PC9", "PC10", "PC11", "PC12", "PC13", "PC14", "PC15", "PC16"
+      ],
+      "additional_feature_columns": [],
+      "priority_radius_cache_path": null,
+      "max_context_rows": 48000,
+      "priority_min_variant_support_fraction": 0.0,
+      "predict_proba_batch_size": null,
+      "plot_ci_level": null,
+      "model_init_kwargs": {
+        "device": "cuda",
+        "allow_auto_download": true,
+        "checkpoint_version": "tabicl-classifier-v2-20260212.ckpt"
+      },
+      "schemes": [
+        "mixture_learning",
+        "independent_learning_scheme",
+        "priority_function_curated_context"
+      ]
+    }
+  ]
+}

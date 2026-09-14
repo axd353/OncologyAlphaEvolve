@@ -95,6 +95,7 @@ class ExperimentConfig:
     additional_feature_columns: tuple[str, ...]
     priority_radius_cache_path: Path | None
     max_context_rows: int | None
+    priority_min_variant_support_fraction: float
     predict_proba_batch_size: int | None
     model_init_kwargs: dict[str, Any]
     schemes: tuple[str, ...]
@@ -275,6 +276,20 @@ def _parse_optional_probability(raw_value: Any, *, field_name: str) -> float | N
     return parsed
 
 
+def _parse_support_fraction_threshold(raw_value: Any, *, field_name: str) -> float:
+    if raw_value is None:
+        return 0.0
+    try:
+        parsed = float(raw_value)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"{field_name} must be a number between 0 and 1, or between 0 and 100.") from exc
+    if parsed > 1.0:
+        parsed /= 100.0
+    if not 0.0 <= parsed <= 1.0:
+        raise ValueError(f"{field_name} must lie between 0 and 1, or between 0 and 100.")
+    return parsed
+
+
 def _normalize_scheme_name(raw_value: Any) -> str:
     if isinstance(raw_value, str):
         key = raw_value.strip().lower()
@@ -402,6 +417,10 @@ def load_config(config_path: str | Path) -> RunnerConfig:
                 max_context_rows=_parse_optional_positive_int(
                     raw_experiment.get("max_context_rows"),
                     field_name="max_context_rows",
+                ),
+                priority_min_variant_support_fraction=_parse_support_fraction_threshold(
+                    raw_experiment.get("priority_min_variant_support_fraction"),
+                    field_name="priority_min_variant_support_fraction",
                 ),
                 predict_proba_batch_size=_parse_optional_positive_int(
                     raw_experiment.get("predict_proba_batch_size"),
@@ -1304,6 +1323,7 @@ def _build_priority_selection_for_target(
     distance_cache_manifest_path: Path,
     reference_tracking_rows: pd.DataFrame,
     context_cap: int,
+    min_support_fraction: float,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     opened_distance_cache = load_distance_cache(distance_cache_manifest_path)
     if opened_distance_cache is None:
@@ -1318,7 +1338,7 @@ def _build_priority_selection_for_target(
     counts_ge_distance = radii.size - np.searchsorted(sorted_radii, distances, side="left")
     support_fraction = counts_ge_distance.astype(np.float64) / float(radii.size)
 
-    positive_support_indices = np.flatnonzero(support_fraction > 0.0)
+    positive_support_indices = np.flatnonzero(support_fraction > min_support_fraction)
     candidate_indices = positive_support_indices
     if candidate_indices.size == 0:
         candidate_indices = np.array([int(np.argmin(distances))], dtype=int)
@@ -1376,7 +1396,7 @@ def _plot_experiment_metrics(
     metric_frame: pd.DataFrame,
     output_path: Path,
     title: str,
-    subtitle: str,
+    subtitle: str | None,
 ) -> None:
     plot_frame = metric_frame.sort_values("plot_order").reset_index(drop=True)
     figure_height = max(3.5, 1.2 * plot_frame.shape[0] + 1.5)
@@ -1439,7 +1459,8 @@ def _plot_experiment_metrics(
     ax.set_xlabel("ROC AUC", fontsize=13)
     ax.set_ylabel("Scheme", fontsize=13)
     ax.set_title(title, fontsize=15, loc="left", pad=12)
-    ax.text(0.0, 1.01, subtitle, transform=ax.transAxes, ha="left", va="bottom", fontsize=11)
+    if subtitle:
+        ax.text(0.0, 1.01, subtitle, transform=ax.transAxes, ha="left", va="bottom", fontsize=11)
     ax.set_xlim(0.0, 1.0)
     ax.grid(axis="x", alpha=0.3)
     ax.invert_yaxis()
@@ -1577,6 +1598,7 @@ def _run_priority_context_scheme(
                 distance_cache_manifest_path=radius_cache.distance_cache_manifest_path,
                 reference_tracking_rows=reference_tracking_rows,
                 context_cap=context_cap,
+                min_support_fraction=experiment.priority_min_variant_support_fraction,
             )
             context_sizes.append(int(selected_indices.shape[0]))
             context_frame = reference_frame.iloc[selected_indices].reset_index(drop=True)
@@ -1612,6 +1634,7 @@ def _run_priority_context_scheme(
             selected_tracking["selection_rank"] = np.arange(selected_tracking.shape[0], dtype=int)
             selected_tracking["ancestry_distance"] = distances[selected_indices]
             selected_tracking["priority_support_fraction"] = support_fraction[selected_indices]
+            selected_tracking["priority_min_variant_support_fraction"] = experiment.priority_min_variant_support_fraction
             audit_frames.append(selected_tracking)
 
         disease_probabilities = np.asarray(per_subject_probabilities, dtype=float)
@@ -1662,25 +1685,150 @@ def _build_plot_title_and_subtitle(
     model_display = model_name.upper() if model_name == "tabpfn" else "TabICL"
     experiment_name_lower = experiment.name.lower()
     if "onco" in experiment_name_lower:
-        title = f"Independent Validation in OncoArray with {model_display}"
-        subtitle = (
-            f"Horizontal bars compare ROC AUC across context-selection schemes on {subject_count} held-out "
-            f"{experiment.heldout_target_ancestry_group} subjects using the same off-the-shelf {model_display} model."
-        )
-        if ci_level is not None:
-            subtitle += f" Error bars show {int(round(ci_level * 100))}% bootstrap confidence intervals."
-        file_name = f"oncoarray_roc_auc_{_safe_slug(model_name)}.png"
-        return title, subtitle, file_name
+        dataset_label = "OncoArray"
+        file_prefix = "oncoarray"
+    elif experiment_name_lower.startswith("mec"):
+        dataset_label = "MEC"
+        file_prefix = "mec"
+    elif experiment_name_lower.startswith("aou"):
+        dataset_label = "AOU"
+        file_prefix = "aou"
+    else:
+        dataset_label = experiment.name.replace("_", " ").title()
+        file_prefix = _safe_slug(experiment.name)
 
-    title = f"Independent Validation in Held-out MEC Subjects with {model_display}"
-    subtitle = (
-        f"Horizontal bars compare ROC AUC across context-selection schemes on {subject_count} held-out "
-        f"{experiment.heldout_target_ancestry_group} subjects using the same off-the-shelf {model_display} model."
+    title = (
+        f"Held-out {experiment.heldout_target_ancestry_group} {dataset_label} "
+        f"with {model_display}"
     )
-    if ci_level is None:
-        subtitle += " Confidence intervals are omitted for this figure."
-    file_name = f"mec_roc_auc_{_safe_slug(model_name)}.png"
+    subtitle = None
+    if ci_level is not None:
+        subtitle = f"Error bars: {int(round(ci_level * 100))}% bootstrap CI. n={subject_count}"
+    file_name = f"{file_prefix}_roc_auc_{_safe_slug(model_name)}.png"
     return title, subtitle, file_name
+
+
+def _dataset_histogram_key(experiment_name: str) -> str:
+    normalized_name = _safe_slug(experiment_name)
+    for suffix in ("_tabpfn", "_tabicl"):
+        if normalized_name.endswith(suffix):
+            return normalized_name[: -len(suffix)]
+    return normalized_name
+
+
+def _build_context_histogram_descriptor(experiment_name: str) -> tuple[str, str]:
+    dataset_key = _dataset_histogram_key(experiment_name)
+    if dataset_key.startswith("oncoarray"):
+        title = "OncoArray"
+    elif dataset_key.startswith("mec"):
+        title = "MEC"
+    else:
+        title = dataset_key.replace("_", " ").title()
+    return title, f"{dataset_key}_incontext_exemplar_counts.png"
+
+
+def _context_count_profile(result: dict[str, Any]) -> tuple[str, int, int, tuple[int, ...]] | None:
+    metric_frame = result.get("metric_frame")
+    audit_frame = result.get("audit_frame")
+    if not isinstance(metric_frame, pd.DataFrame) or not isinstance(audit_frame, pd.DataFrame):
+        return None
+
+    priority_rows = audit_frame.loc[
+        audit_frame["scheme_name"] == "priority_function_curated_context",
+        ["heldout_subject_index"],
+    ]
+    if priority_rows.empty:
+        return None
+    priority_counts = tuple(
+        int(value)
+        for value in priority_rows.groupby("heldout_subject_index", dropna=False).size().sort_index().tolist()
+    )
+
+    def _metric_context_count(scheme_name: str) -> int:
+        scheme_rows = metric_frame.loc[metric_frame["scheme_name"] == scheme_name, "context_row_count"]
+        if scheme_rows.empty:
+            raise ValueError(f"Missing scheme metrics for {scheme_name!r} in experiment {result['experiment_name']!r}.")
+        return int(round(float(scheme_rows.iloc[0])))
+
+    return (
+        result["experiment_name"],
+        _metric_context_count("mixture_learning"),
+        _metric_context_count("independent_learning_scheme"),
+        priority_counts,
+    )
+
+
+def _plot_context_size_histogram(
+    *,
+    dataset_label: str,
+    output_path: Path,
+    priority_counts: Sequence[int],
+    mixture_count: int,
+    independent_count: int,
+) -> None:
+    if not priority_counts:
+        raise ValueError(f"Cannot plot context-size histogram for {dataset_label}: no priority counts were provided.")
+
+    priority_array = np.asarray(priority_counts, dtype=int)
+    min_count = int(min(priority_array.min(), mixture_count, independent_count))
+    max_count = int(max(priority_array.max(), mixture_count, independent_count))
+    bins = np.arange(min_count - 0.5, max_count + 1.5, 1.0)
+    if bins.size < 2:
+        bins = np.array([min_count - 0.5, min_count + 0.5], dtype=float)
+
+    fig, ax = plt.subplots(figsize=(9.0, 4.8))
+    ax.hist(priority_array, bins=bins, color="#1f4e79", edgecolor="#1b1b1b", alpha=0.88, label="Priority")
+    ax.axvline(mixture_count, color="#9c8f7a", linewidth=2.4, label="Mixture")
+    ax.axvline(independent_count, color="#6c757d", linewidth=2.4, label="Independent")
+    ax.set_title(dataset_label, fontsize=14, loc="left", pad=10)
+    ax.set_xlabel("Num In-Context Exemplars", fontsize=12)
+    ax.set_ylabel("Count", fontsize=12)
+    ax.grid(axis="y", alpha=0.25)
+    ax.legend(frameon=False, fontsize=10)
+    fig.tight_layout()
+    fig.savefig(output_path, dpi=200)
+    plt.close(fig)
+
+
+def _write_context_size_histograms(
+    *,
+    run_dir: Path,
+    experiment_results: Sequence[dict[str, Any]],
+) -> list[str]:
+    figure_dir = run_dir / "figures"
+    figure_dir.mkdir(parents=True, exist_ok=True)
+
+    grouped_results: dict[str, list[dict[str, Any]]] = {}
+    for result in experiment_results:
+        dataset_key = _dataset_histogram_key(str(result["experiment_name"]))
+        grouped_results.setdefault(dataset_key, []).append(result)
+
+    histogram_paths: list[str] = []
+    for dataset_results in grouped_results.values():
+        reference_profile = _context_count_profile(dataset_results[0])
+        if reference_profile is None:
+            continue
+        for candidate_result in dataset_results[1:]:
+            candidate_profile = _context_count_profile(candidate_result)
+            if candidate_profile is None:
+                continue
+            if candidate_profile[1:] != reference_profile[1:]:
+                raise ValueError(
+                    "Selection counts differed across models for dataset-level histogram generation: "
+                    f"{reference_profile[0]!r} vs {candidate_profile[0]!r}."
+                )
+
+        dataset_label, file_name = _build_context_histogram_descriptor(reference_profile[0])
+        output_path = figure_dir / file_name
+        _plot_context_size_histogram(
+            dataset_label=dataset_label,
+            output_path=output_path,
+            priority_counts=reference_profile[3],
+            mixture_count=reference_profile[1],
+            independent_count=reference_profile[2],
+        )
+        histogram_paths.append(str(output_path))
+    return histogram_paths
 
 
 def _prepare_experiment(
@@ -1924,6 +2072,7 @@ def _evaluate_prepared_experiment(
         metric_frame["model_context_cap_rows"] = int(prepared.model_cap.rows_cap)
         metric_frame["requested_max_context_rows"] = experiment.max_context_rows
         metric_frame["effective_max_context_rows"] = int(prepared.effective_cap)
+        metric_frame["priority_min_variant_support_fraction"] = experiment.priority_min_variant_support_fraction
         metric_frame["feature_count"] = int(len(prepared.feature_columns))
         metric_frame["reference_row_count"] = int(prepared.reference_frame.shape[0])
         metric_frame["heldout_subject_count"] = int(prepared.heldout_frame.shape[0])
@@ -1935,7 +2084,7 @@ def _evaluate_prepared_experiment(
         metric_path = experiment_dir / "scheme_metrics.csv"
         metric_frame.to_csv(metric_path, index=False)
 
-        figure_dir = run_dir / "figures"
+        figure_dir = experiment_dir.parent / "figures"
         figure_dir.mkdir(parents=True, exist_ok=True)
         title, subtitle, file_name = _build_plot_title_and_subtitle(
             experiment=experiment,
@@ -1982,6 +2131,7 @@ def _evaluate_prepared_experiment(
             "model_context_cap": asdict(prepared.model_cap),
             "requested_max_context_rows": experiment.max_context_rows,
             "effective_max_context_rows": prepared.effective_cap,
+            "priority_min_variant_support_fraction": experiment.priority_min_variant_support_fraction,
             "reference_row_count": int(prepared.reference_frame.shape[0]),
             "heldout_subject_count": int(prepared.heldout_frame.shape[0]),
             "training_imputation_counts": prepared.training_imputation_counts,
@@ -2027,6 +2177,7 @@ def _build_run_notes(config: RunnerConfig, run_dir: Path, experiment_results: Se
         "- OncoArray figures include bootstrap confidence-interval error bars when requested in the config.",
         "- MEC figures omit confidence intervals when the config sets plot_ci_level to null.",
         "- The priority-function bar uses the subset of reference rows selected by the stored per-subject per-variant radius cache; Mixture Learning uses the full eligible pooled reference cohort up to the model-spec cap; Independent Learning uses the same-ancestry pooled reference cohort up to the model-spec cap.",
+        "- The central figures directory also includes one dataset-level histogram of in-context exemplar counts. The histogram bars show the Priority Function Curated Context distribution across heldout subjects, and vertical lines mark the Mixture Learning and Independent Learning counts.",
         "",
         "## Experiments",
         "",
@@ -2114,6 +2265,12 @@ def run_from_config_path(config_path: str | Path) -> Path:
             aggregate_metric_frame.to_csv(run_dir / "scheme_metrics.csv", index=False)
             _log_event(event_logger, "aggregate_metrics.written", row_count=int(aggregate_metric_frame.shape[0]))
 
+            context_histogram_paths = _write_context_size_histograms(
+                run_dir=run_dir,
+                experiment_results=experiment_results,
+            )
+            _log_event(event_logger, "context_histograms.written", count=len(context_histogram_paths))
+
             summary_payload = {
                 "run_dir": str(run_dir),
                 "config_path": str(config.config_path),
@@ -2122,6 +2279,7 @@ def run_from_config_path(config_path: str | Path) -> Path:
                 "random_seed": config.random_seed,
                 "created_at": time.strftime("%Y-%m-%d %H:%M:%S"),
                 "run_events_log_path": str((run_dir / "run_events.log").resolve()),
+                "context_size_histogram_paths": context_histogram_paths,
                 "experiment_summaries": [result["summary_payload"] for result in experiment_results],
             }
             _write_json(run_dir / "summary.json", summary_payload)

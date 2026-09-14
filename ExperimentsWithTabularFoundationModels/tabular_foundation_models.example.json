@@ -1,5 +1,5 @@
 {
-  "_description": "Example config for the tabular foundation model runner. The runner applies a model-spec context cap automatically when max_context_rows is null.",
+  "_description": "Example config for the tabular foundation model runner. The runner applies a model-spec context cap automatically when max_context_rows is null, and priority_min_variant_support_fraction=0.0 preserves the original positive-support selection rule.",
   "prio_function_path": "../prio_func_disc_runs/oracle_priority_20260810_032011/cycle_0004/best_prio.py",
   "function_name": "priority",
   "random_seed": 7,
@@ -24,6 +24,7 @@
       "additional_feature_columns": [],
       "priority_radius_cache_path": null,
       "max_context_rows": 1000000,
+      "priority_min_variant_support_fraction": 0.0,
       "predict_proba_batch_size": null,
       "plot_ci_level": null,
       "model_init_kwargs": {
@@ -54,6 +55,7 @@
       "additional_feature_columns": [],
       "priority_radius_cache_path": null,
       "max_context_rows": 48000,
+      "priority_min_variant_support_fraction": 0.0,
       "predict_proba_batch_size": null,
       "plot_ci_level": null,
       "model_init_kwargs": {
@@ -80,6 +82,7 @@
       "additional_feature_columns": [],
       "priority_radius_cache_path": null,
       "max_context_rows": 1000000,
+      "priority_min_variant_support_fraction": 0.0,
       "predict_proba_batch_size": null,
       "plot_ci_level": 0.8,
       "model_init_kwargs": {
@@ -105,6 +108,7 @@
       "additional_feature_columns": [],
       "priority_radius_cache_path": null,
       "max_context_rows": 48000,
+      "priority_min_variant_support_fraction": 0.0,
       "predict_proba_batch_size": null,
       "plot_ci_level": 0.8,
       "model_init_kwargs": {

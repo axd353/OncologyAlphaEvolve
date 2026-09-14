@@ -1,0 +1,121 @@
+{
+  "_description": "Restart config that reuses the completed 20260912_203210 priority radius caches and exposes priority_min_variant_support_fraction for stricter priority-curated context selection.",
+  "prio_function_path": "/nfs/home/adas23/projects/AlphaEvolve/prio_func_disc_runs/oracle_priority_20260810_032011/cycle_0004/best_prio.py",
+  "function_name": "priority",
+  "random_seed": 7,
+  "output_root_dir": "/nfs/home/adas23/projects/AlphaEvolve/ExperimentsWithTabularFoundationModels/output_results",
+  "should_overwrite": false,
+  "experiments": [
+    {
+      "name": "mec_ja_tabpfn",
+      "model_name": "tabpfn",
+      "training_pickle_path": "/nfs/home/adas23/projects/AlphaEvolve/Data/FunsearchEvaluatorData/no_covariates_train.pkl",
+      "calibrating_pickle_path": "/nfs/home/adas23/projects/AlphaEvolve/Data/FunsearchEvaluatorData/no_covariates_test.pkl",
+      "heldout_pickle_path": "/nfs/home/adas23/projects/AlphaEvolve/Data/FunsearchEvaluatorData/no_covariates_heldout.pkl",
+      "output_row_tracking_path": "/nfs/home/adas23/projects/AlphaEvolve/Data/FunsearchEvaluatorData/output_row_tracking.pkl",
+      "supported_ancestry_groups": ["AA", "JA", "LA"],
+      "heldout_target_ancestry_group": "JA",
+      "label_column": "phenotype",
+      "dosage_prefix": "dosage__",
+      "ancestry_columns": [
+        "PC1", "PC2", "PC3", "PC4", "PC5", "PC6", "PC7", "PC8",
+        "PC9", "PC10", "PC11", "PC12", "PC13", "PC14", "PC15", "PC16"
+      ],
+      "additional_feature_columns": [],
+      "priority_radius_cache_path": "/nfs/home/adas23/projects/AlphaEvolve/ExperimentsWithTabularFoundationModels/output_results/20260912_203210_tabular_foundation_models/mec_ja_tabpfn/priority_radius_cache",
+      "max_context_rows": 1000000,
+      "priority_min_variant_support_fraction": 0.05,
+      "predict_proba_batch_size": null,
+      "plot_ci_level": null,
+      "model_init_kwargs": {
+        "device": "cuda",
+        "model_path": "auto"
+      },
+      "schemes": [
+        "mixture_learning",
+        "independent_learning_scheme",
+        "priority_function_curated_context"
+      ]
+    },
+    {
+      "name": "mec_ja_tabicl",
+      "model_name": "tabicl",
+      "training_pickle_path": "/nfs/home/adas23/projects/AlphaEvolve/Data/FunsearchEvaluatorData/no_covariates_train.pkl",
+      "calibrating_pickle_path": "/nfs/home/adas23/projects/AlphaEvolve/Data/FunsearchEvaluatorData/no_covariates_test.pkl",
+      "heldout_pickle_path": "/nfs/home/adas23/projects/AlphaEvolve/Data/FunsearchEvaluatorData/no_covariates_heldout.pkl",
+      "output_row_tracking_path": "/nfs/home/adas23/projects/AlphaEvolve/Data/FunsearchEvaluatorData/output_row_tracking.pkl",
+      "supported_ancestry_groups": ["AA", "JA", "LA"],
+      "heldout_target_ancestry_group": "JA",
+      "label_column": "phenotype",
+      "dosage_prefix": "dosage__",
+      "ancestry_columns": [
+        "PC1", "PC2", "PC3", "PC4", "PC5", "PC6", "PC7", "PC8",
+        "PC9", "PC10", "PC11", "PC12", "PC13", "PC14", "PC15", "PC16"
+      ],
+      "additional_feature_columns": [],
+      "priority_radius_cache_path": "/nfs/home/adas23/projects/AlphaEvolve/ExperimentsWithTabularFoundationModels/output_results/20260912_203210_tabular_foundation_models/mec_ja_tabicl/priority_radius_cache",
+      "max_context_rows": 48000,
+      "priority_min_variant_support_fraction": 0.05,
+      "predict_proba_batch_size": null,
+      "plot_ci_level": null,
+      "model_init_kwargs": {
+        "device": "cuda",
+        "allow_auto_download": true,
+        "checkpoint_version": "tabicl-classifier-v2-20260212.ckpt"
+      }
+    },
+    {
+      "name": "oncoarray_asian_tabpfn",
+      "model_name": "tabpfn",
+      "training_pickle_path": "/nfs/home/adas23/projects/AlphaEvolve/Data/FunsearchEvaluatorDataOncoArray/no_covariates_train.pkl",
+      "calibrating_pickle_path": "/nfs/home/adas23/projects/AlphaEvolve/Data/FunsearchEvaluatorDataOncoArray/no_covariates_test.pkl",
+      "heldout_pickle_path": "/nfs/home/adas23/projects/AlphaEvolve/Data/FunsearchEvaluatorDataOncoArray/no_covariates_heldout.pkl",
+      "output_row_tracking_path": "/nfs/home/adas23/projects/AlphaEvolve/Data/FunsearchEvaluatorDataOncoArray/output_row_tracking.pkl",
+      "supported_ancestry_groups": ["AFRICAN_ANCESTRY", "ASIAN", "EUROPEAN"],
+      "heldout_target_ancestry_group": "ASIAN",
+      "label_column": "phenotype",
+      "dosage_prefix": "dosage__",
+      "ancestry_columns": [
+        "PC1", "PC2", "PC3", "PC4", "PC5", "PC6", "PC7", "PC8",
+        "PC9", "PC10", "PC11", "PC12", "PC13", "PC14", "PC15", "PC16"
+      ],
+      "additional_feature_columns": [],
+      "priority_radius_cache_path": "/nfs/home/adas23/projects/AlphaEvolve/ExperimentsWithTabularFoundationModels/output_results/20260912_203210_tabular_foundation_models/oncoarray_asian_tabpfn/priority_radius_cache",
+      "max_context_rows": 1000000,
+      "priority_min_variant_support_fraction": 0.05,
+      "predict_proba_batch_size": null,
+      "plot_ci_level": 0.8,
+      "model_init_kwargs": {
+        "device": "cuda",
+        "model_path": "auto"
+      }
+    },
+    {
+      "name": "oncoarray_asian_tabicl",
+      "model_name": "tabicl",
+      "training_pickle_path": "/nfs/home/adas23/projects/AlphaEvolve/Data/FunsearchEvaluatorDataOncoArray/no_covariates_train.pkl",
+      "calibrating_pickle_path": "/nfs/home/adas23/projects/AlphaEvolve/Data/FunsearchEvaluatorDataOncoArray/no_covariates_test.pkl",
+      "heldout_pickle_path": "/nfs/home/adas23/projects/AlphaEvolve/Data/FunsearchEvaluatorDataOncoArray/no_covariates_heldout.pkl",
+      "output_row_tracking_path": "/nfs/home/adas23/projects/AlphaEvolve/Data/FunsearchEvaluatorDataOncoArray/output_row_tracking.pkl",
+      "supported_ancestry_groups": ["AFRICAN_ANCESTRY", "ASIAN", "EUROPEAN"],
+      "heldout_target_ancestry_group": "ASIAN",
+      "label_column": "phenotype",
+      "dosage_prefix": "dosage__",
+      "ancestry_columns": [
+        "PC1", "PC2", "PC3", "PC4", "PC5", "PC6", "PC7", "PC8",
+        "PC9", "PC10", "PC11", "PC12", "PC13", "PC14", "PC15", "PC16"
+      ],
+      "additional_feature_columns": [],
+      "priority_radius_cache_path": "/nfs/home/adas23/projects/AlphaEvolve/ExperimentsWithTabularFoundationModels/output_results/20260912_203210_tabular_foundation_models/oncoarray_asian_tabicl/priority_radius_cache",
+      "max_context_rows": 48000,
+      "priority_min_variant_support_fraction": 0.05,
+      "predict_proba_batch_size": null,
+      "plot_ci_level": 0.8,
+      "model_init_kwargs": {
+        "device": "cuda",
+        "allow_auto_download": true,
+        "checkpoint_version": "tabicl-classifier-v2-20260212.ckpt"
+      }
+    }
+  ]
+}

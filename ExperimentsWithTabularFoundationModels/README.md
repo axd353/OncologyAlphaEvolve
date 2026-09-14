@@ -167,7 +167,7 @@ For the current datasets, the reference-cohort sizes are below these row caps:
 - MEC train plus calibration: `2277` rows
 - OncoArray train plus calibration: `28786` rows
 
-So the auto cap does not truncate the pooled reference cohorts for these runs. The target scheme remains distinct because it keeps only reference rows with positive priority support and truncates further only if that selected subset exceeds the model-spec cap.
+So the auto cap does not truncate the pooled reference cohorts for these runs. The target scheme remains distinct because it keeps only reference rows whose priority support fraction is strictly above `priority_min_variant_support_fraction` and truncates further only if that selected subset exceeds the model-spec cap.
 
 ## Context Selection Schemes
 
@@ -203,11 +203,13 @@ $$
 where $V$ is the set of dosage variants.
 5. Rank candidate exemplar rows by descending $S(r \mid a_i)$.
 6. Break ties by smaller ancestry distance.
-7. Keep all candidate rows with strictly positive support score.
+7. Keep all candidate rows whose support score is strictly greater than `priority_min_variant_support_fraction`.
 8. If that selected subset exceeds the applied context cap, keep the top rows up to the cap.
-9. If no row has positive support score, fall back to the single closest ancestry neighbor.
+9. If no row clears that threshold, fall back to the single closest ancestry neighbor.
 
-This means rows that are not selected for any variant of the heldout target are excluded from the priority-curated context, even when `max_context_rows` is very large.
+Set `priority_min_variant_support_fraction` to `0.0` to recover the original behavior, where any row selected for more than `0%` of variants is eligible. You may also supply percentages such as `25`, which the runner interprets as `0.25`.
+
+This means rows that are not selected often enough across variants of the heldout target are excluded from the priority-curated context, even when `max_context_rows` is very large.
 
 Interpretation:
 
@@ -215,7 +217,7 @@ Interpretation:
 - this converts the variant-wise borrowing scheme into a single exemplar set that can be consumed by a tabular foundation model
 - when the model-spec cap does not bind, this scheme can still differ from Mixture Learning because it discards rows that are outside the discovered borrowing neighborhoods for all variants of the target patient
 
-Operationally, the priority scheme is not "rank every reference row and then keep them all because the cap is large". It first filters to rows with $S(r \mid a_i) > 0$, then ranks that filtered set, then applies the cap only if needed.
+Operationally, the priority scheme is not "rank every reference row and then keep them all because the cap is large". It first filters to rows with $S(r \mid a_i) > \texttt{priority\_min\_variant\_support\_fraction}$, then ranks that filtered set, then applies the cap only if needed.
 
 This adapter is the default planned implementation because it is deterministic, interpretable, and uses the locked priority function without modifying its contract.
 
@@ -268,7 +270,7 @@ Before any model fitting starts, the runner prepares the `priority_radius_cache`
 - `heldout_predictions.pkl`: one row per scored heldout subject per model, scheme, and dataset pair
 - `selected_context_audit.pkl`: audit rows for every selected exemplar. For target-specific priority contexts, rows are recorded per heldout subject. For shared baseline contexts, the heldout subject id is null and the audit row states that the same context applies to all filtered heldout subjects.
 - `priority_radius_cache/`: reusable per-heldout-subject, per-variant radius artifacts and metadata
-- `figures/`: PNG figures matching the style of grant Figure 2 and Figure 3A for each tabular model
+- `figures/`: central PNG figure directory containing ROC-AUC comparisons for each tabular model plus dataset-level context-size histograms
 - `README_run_notes.md`: human-readable summary of what was run and which model checkpoints were used
 
 ### `heldout_predictions.pkl` contents
@@ -371,6 +373,11 @@ Recommended file names:
 - `figures/mec_roc_auc_tabpfn.png`
 - `figures/mec_roc_auc_tabicl.png`
 
+The same central directory should also contain one dataset-level context-size histogram for each selection process that is model-agnostic in the current setup:
+
+- `figures/oncoarray_asian_incontext_exemplar_counts.png`
+- `figures/mec_ja_incontext_exemplar_counts.png`
+
 The intended style is:
 
 - horizontal bar chart
@@ -379,6 +386,7 @@ The intended style is:
 - the Priority Function Curated Context bar is highlighted separately from the two baselines
 - OncoArray figures use the configured bootstrap confidence interval, matching the Figure 2 style
 - MEC figures omit confidence intervals when the config sets `plot_ci_level` to `null`, matching the Figure 3A style
+- Each context-size histogram uses minimal text: dataset name as the title, `Num In-Context Exemplars` on the x-axis, `Count` on the y-axis, a blue histogram for Priority Function Curated Context across heldout subjects, and vertical reference lines for Mixture Learning and Independent Learning Scheme.
 
 `summary.json` should include at least:
 
@@ -407,6 +415,7 @@ The runner accepts one JSON config file describing one or more experiments.
 - `priority_radius_cache_path` is an optional path to an existing `priority_radius_cache` directory or its `manifest.json`. If it matches the current priority function and dataset inputs, the runner links reusable artifacts into the new run directory instead of recomputing them. If the source cache is only partial but contains a valid distance cache, the runner links the distance cache and recomputes the radius files locally.
 - within one invocation, the runner also auto-reuses a cache that it already prepared earlier in the same run when a later experiment has the same priority function and dataset triplet. This is why `mec_ja_tabpfn` and `mec_ja_tabicl` share one MEC cache, while the OncoArray experiments prepare or reuse a different cache.
 - `max_context_rows` is the requested cap and should normally be set explicitly from published model guidance. If `null`, the runner applies its model-spec cap automatically. If it is a positive integer, the runner still clamps it to the model-spec cap.
+- `priority_min_variant_support_fraction` is the strict row-inclusion cutoff used only by the priority-function-curated context scheme. A row is eligible only if its support score is greater than this value. Use `0.0` to keep the original behavior. Values may be entered as fractions such as `0.25` or percentages such as `25`.
 - `predict_proba_batch_size` is an inference-throughput knob, not a context-window limit.
 - `schemes` defaults to the three schemes defined in this document.
 
@@ -446,6 +455,7 @@ The runner accepts one JSON config file describing one or more experiments.
         "additional_feature_columns": "Optional extra predictors to append after dosage and ancestry features. Empty in the first no-covariate pass.",
         "priority_radius_cache_path": "Optional path to an existing priority_radius_cache directory or manifest.json. If it matches the current priority function and datasets, the runner links reusable artifacts into the new run directory.",
         "max_context_rows": "Maximum number of exemplar rows passed to the tabular foundation model. Prefer an explicit published cap in the config; use null only to let the runner derive the same cap automatically.",
+        "priority_min_variant_support_fraction": "Strict support-fraction cutoff for the priority_function_curated_context scheme. A row is eligible only if it is selected for more than this fraction of dosage variants. Use 0.0 for the original behavior; 0.25 and 25 both mean more than 25% of variants.",
         "predict_proba_batch_size": "Optional target-batch size for prediction throughput only. This is not the context-window size.",
         "model_init_kwargs": "Package-specific constructor kwargs forwarded to TabPFNClassifier or TabICLClassifier.",
         "schemes": "Selection schemes to run. If omitted, run mixture_learning, independent_learning_scheme, and priority_function_curated_context."
@@ -467,6 +477,7 @@ The runner accepts one JSON config file describing one or more experiments.
       "additional_feature_columns": [],
       "priority_radius_cache_path": null,
       "max_context_rows": 1000000,
+      "priority_min_variant_support_fraction": 0.0,
       "predict_proba_batch_size": null,
       "model_init_kwargs": {
         "device": "cuda",
@@ -506,6 +517,7 @@ The runner accepts one JSON config file describing one or more experiments.
       "additional_feature_columns": [],
       "priority_radius_cache_path": null,
       "max_context_rows": 48000,
+      "priority_min_variant_support_fraction": 0.0,
       "predict_proba_batch_size": null,
       "plot_ci_level": 80,
       "model_init_kwargs": {
@@ -571,6 +583,8 @@ The plots written by the run are:
 - `mec_roc_auc_tabicl.png`
 - `oncoarray_roc_auc_tabpfn.png`
 - `oncoarray_roc_auc_tabicl.png`
+- `mec_ja_incontext_exemplar_counts.png`
+- `oncoarray_asian_incontext_exemplar_counts.png`
 
 Each plot contains one horizontal bar per scheme:
 
@@ -580,14 +594,16 @@ Each plot contains one horizontal bar per scheme:
 
 The x-axis is ROC AUC on the requested heldout focal-ancestry subjects only. The bar labels show the exact AUC values. OncoArray plots include confidence-interval error bars because the example config requests an 80% bootstrap CI. MEC plots omit those error bars because the example config sets `plot_ci_level` to `null`, matching the Figure 3A presentation.
 
+Each context-size histogram is written once per dataset into the same `figures/` directory. The bars show how many in-context exemplars the priority-curated scheme selected across heldout subjects, while the two vertical lines mark the fixed Mixture Learning and Independent Learning context sizes for that dataset.
+
 ### Restarting With Cache Reuse
 
 If a previous run already produced a matching `priority_radius_cache/`, point a later experiment at that cache with `priority_radius_cache_path`.
 
-Example reuse path for the completed MEC cache from the interrupted run:
+Example reuse path for the completed MEC cache from a prior finished run:
 
 ```json
-"priority_radius_cache_path": "../ExperimentsWithTabularFoundationModels/output_results/20260912_025350_tabular_foundation_models/mec_ja_tabpfn/priority_radius_cache"
+"priority_radius_cache_path": "../ExperimentsWithTabularFoundationModels/output_results/20260912_203210_tabular_foundation_models/mec_ja_tabpfn/priority_radius_cache"
 ```
 
 The runner verifies the priority function, function name, train paths, calibration paths, heldout paths, ancestry columns, and heldout target ancestry group before linking it into the new run directory. If the cache is complete, it symlinks the full cache. If only the distance-cache subtree is available, it symlinks that subtree and recomputes the radius files in the new run directory.
