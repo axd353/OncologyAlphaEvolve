@@ -78,3 +78,55 @@ This folder also includes one raw-ancestry PCA boxplot PNG for each ancestry gro
 - `EUROPEAN.png`
 
 Each of those plots is built from the raw non-covariate OncoArray train and test shards for that ancestry group. The `_add_covs` raw files are not used for the plots so the same subjects are not counted twice.
+
+## Subject counts by ancestry and phenotype
+
+The counts below are taken from the pickle contents in this folder, with ancestry labels reconstructed from `output_row_tracking.pkl` source shard names.
+
+### `no_covariates_heldout.pkl`
+
+| Ancestry | Controls | Cases | Total |
+| --- | ---: | ---: | ---: |
+| AFRICAN_ANCESTRY | 200 | 200 | 400 |
+| ASIAN | 0 | 0 | 0 |
+| EUROPEAN | 0 | 0 | 0 |
+
+### `no_covariates_test.pkl`
+
+| Ancestry | Controls | Cases | Total |
+| --- | ---: | ---: | ---: |
+| AFRICAN_ANCESTRY | 200 | 200 | 400 |
+| ASIAN | 10 | 10 | 20 |
+| EUROPEAN | 30 | 30 | 60 |
+
+### `no_covariates_train.pkl`
+
+| Ancestry | Controls | Cases | Total |
+| --- | ---: | ---: | ---: |
+| AFRICAN_ANCESTRY | 55 | 55 | 110 |
+| ASIAN | 50 | 50 | 100 |
+| EUROPEAN | 1400 | 1400 | 2800 |
+
+### `with_covariates_heldout.pkl`
+
+| Ancestry | Controls | Cases | Total |
+| --- | ---: | ---: | ---: |
+| AFRICAN_ANCESTRY | 200 | 200 | 400 |
+| ASIAN | 0 | 0 | 0 |
+| EUROPEAN | 0 | 0 | 0 |
+
+### `with_covariates_test.pkl`
+
+| Ancestry | Controls | Cases | Total |
+| --- | ---: | ---: | ---: |
+| AFRICAN_ANCESTRY | 200 | 200 | 400 |
+| ASIAN | 10 | 10 | 20 |
+| EUROPEAN | 30 | 30 | 60 |
+
+### `with_covariates_train.pkl`
+
+| Ancestry | Controls | Cases | Total |
+| --- | ---: | ---: | ---: |
+| AFRICAN_ANCESTRY | 55 | 55 | 110 |
+| ASIAN | 50 | 50 | 100 |
+| EUROPEAN | 1400 | 1400 | 2800 |

@@ -76,3 +76,55 @@ That file records, for each condition:
 - `r`
 
 This folder also includes two histogram PNG files showing the Euclidean distance between each subject's standardized ancestry coordinate in AFRFocal2 and the same subject's standardized ancestry coordinate in AFRFocal3, one histogram per condition.
+
+## Subject counts by ancestry and phenotype
+
+The counts below are taken from the pickle contents in this folder, with ancestry labels reconstructed from `output_row_tracking.pkl` source shard names.
+
+### `no_covariates_heldout.pkl`
+
+| Ancestry | Controls | Cases | Total |
+| --- | ---: | ---: | ---: |
+| AFRICAN_ANCESTRY | 200 | 200 | 400 |
+| ASIAN | 0 | 0 | 0 |
+| EUROPEAN | 0 | 0 | 0 |
+
+### `no_covariates_test.pkl`
+
+| Ancestry | Controls | Cases | Total |
+| --- | ---: | ---: | ---: |
+| AFRICAN_ANCESTRY | 200 | 200 | 400 |
+| ASIAN | 10 | 10 | 20 |
+| EUROPEAN | 30 | 30 | 60 |
+
+### `no_covariates_train.pkl`
+
+| Ancestry | Controls | Cases | Total |
+| --- | ---: | ---: | ---: |
+| AFRICAN_ANCESTRY | 55 | 55 | 110 |
+| ASIAN | 50 | 50 | 100 |
+| EUROPEAN | 1400 | 1400 | 2800 |
+
+### `with_covariates_heldout.pkl`
+
+| Ancestry | Controls | Cases | Total |
+| --- | ---: | ---: | ---: |
+| AFRICAN_ANCESTRY | 200 | 200 | 400 |
+| ASIAN | 0 | 0 | 0 |
+| EUROPEAN | 0 | 0 | 0 |
+
+### `with_covariates_test.pkl`
+
+| Ancestry | Controls | Cases | Total |
+| --- | ---: | ---: | ---: |
+| AFRICAN_ANCESTRY | 200 | 200 | 400 |
+| ASIAN | 10 | 10 | 20 |
+| EUROPEAN | 30 | 30 | 60 |
+
+### `with_covariates_train.pkl`
+
+| Ancestry | Controls | Cases | Total |
+| --- | ---: | ---: | ---: |
+| AFRICAN_ANCESTRY | 55 | 55 | 110 |
+| ASIAN | 50 | 50 | 100 |
+| EUROPEAN | 1400 | 1400 | 2800 |
