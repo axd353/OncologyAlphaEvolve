@@ -1,0 +1,33 @@
+{
+  "config": {
+    "calibrating_pickle_path": [
+      "/nfs/home/adas23/projects/AlphaEvolve/Data/FunsearchEvaluatorDataAFRFocal3/no_covariates_test.pkl"
+    ],
+    "calibration_partitions": null,
+    "calibration_penalties": [
+      0.1
+    ],
+    "distance_cache_dir": "/nfs/home/adas23/projects/AlphaEvolve/prio_func_disc_runs/oracle_priorityAfrFocal3_SimpleSeed_20260916_052346/cycle_0003/calfull_distance_cache_OncoArray_HO",
+    "distance_cache_enabled": true,
+    "function_name": "priority",
+    "heldout_pickle_path": [
+      "/nfs/home/adas23/projects/AlphaEvolve/Data/FunsearchEvaluatorDataAFRFocal3/no_covariates_heldout.pkl"
+    ],
+    "heldout_target_ancestry_group": "AFRICAN_ANCESTRY",
+    "output_dir_tag": "afr_focal3_oncoarray_african",
+    "output_root_dir": "/nfs/home/adas23/projects/AlphaEvolve/TroubleShooting/DynamicsOfHeldOut/OutputDir",
+    "output_row_tracking_path": "/nfs/home/adas23/projects/AlphaEvolve/Data/FunsearchEvaluatorDataAFRFocal3/output_row_tracking.pkl",
+    "run_dir": "/nfs/home/adas23/projects/AlphaEvolve/prio_func_disc_runs/oracle_priorityAfrFocal3_SimpleSeed_20260916_052346",
+    "scoring_partitions": null,
+    "seed_prio_function_path": null,
+    "supported_ancestry_groups": [
+      "AFRICAN_ANCESTRY",
+      "ASIAN",
+      "EUROPEAN"
+    ],
+    "training_pickle_path": [
+      "/nfs/home/adas23/projects/AlphaEvolve/Data/FunsearchEvaluatorDataAFRFocal3/no_covariates_train.pkl"
+    ]
+  },
+  "config_path": "/nfs/home/adas23/projects/AlphaEvolve/TroubleShooting/DynamicsOfHeldOut/example_config.json"
+}
