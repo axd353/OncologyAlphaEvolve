@@ -26,7 +26,7 @@
   "supported_ancestry_groups": ["AFRICAN_ANCESTRY", "ASIAN", "EUROPEAN"],
   "heldout_target_ancestry_group": "AFRICAN_ANCESTRY",
   "function_name": "priority",
-  "calibration_penalties": [0.1],
+  "calibration_penalties": [1],
   "calibration_partitions": "auto",
   "scoring_partitions": "auto",
   "distance_cache_enabled": true,

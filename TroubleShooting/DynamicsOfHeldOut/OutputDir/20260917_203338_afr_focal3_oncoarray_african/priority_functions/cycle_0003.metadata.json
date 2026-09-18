@@ -1,0 +1,29 @@
+{
+  "cycle_index": 3,
+  "discovery_reduced_score": 0.5924817555394696,
+  "discovery_scores_per_test": {
+    "combined": 0.5924817555394696,
+    "mean": 0.6004817555394696,
+    "no_covariates_fold_1": 0.6358733663546481,
+    "no_covariates_fold_2": 0.5650901447242911,
+    "simplicity": -3279.0,
+    "simplicity_bonus": -0.008
+  },
+  "discovery_snapshot_path": "/lustre/isaac24/scratch/adas23/AlphaEvolve_prio_func_disc_runs/oracle_priorityAfrFocal3_SimpleSeed_20260916_052346/cycle_0003/program_db_end.pkl",
+  "discovery_source_island_id": 1,
+  "heldout_ancestry_evaluations": [
+    {
+      "ancestry_group": "AFRICAN_ANCESTRY",
+      "auc_roc": 0.584275,
+      "subject_count": 400
+    }
+  ],
+  "heldout_auc_roc": 0.584275,
+  "heldout_subject_count": 400,
+  "label": "cycle_0003",
+  "original_prio_function_path": "/lustre/isaac24/scratch/adas23/AlphaEvolve_prio_func_disc_runs/oracle_priorityAfrFocal3_SimpleSeed_20260916_052346/cycle_0003/best_prio.py",
+  "priority_source_hash": "b4236cc49317596b8f4f1e4afaf0aa481f28cb6b4a0789d0697ccdd56f9a0625",
+  "reused_from_label": "cycle_0002",
+  "selected_calibration_penalty": 1.0,
+  "source_kind": "cycle_best"
+}

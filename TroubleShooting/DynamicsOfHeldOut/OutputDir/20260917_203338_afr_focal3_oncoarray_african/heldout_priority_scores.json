@@ -1,0 +1,163 @@
+{
+  "config": {
+    "calibrating_pickle_path": [
+      "/nfs/home/adas23/projects/AlphaEvolve/Data/FunsearchEvaluatorDataAFRFocal3/no_covariates_test.pkl"
+    ],
+    "calibration_partitions": null,
+    "calibration_penalties": [
+      1.0
+    ],
+    "distance_cache_dir": "/nfs/home/adas23/projects/AlphaEvolve/prio_func_disc_runs/oracle_priorityAfrFocal3_SimpleSeed_20260916_052346/cycle_0003/calfull_distance_cache_OncoArray_HO",
+    "distance_cache_enabled": true,
+    "function_name": "priority",
+    "heldout_pickle_path": [
+      "/nfs/home/adas23/projects/AlphaEvolve/Data/FunsearchEvaluatorDataAFRFocal3/no_covariates_heldout.pkl"
+    ],
+    "heldout_target_ancestry_group": "AFRICAN_ANCESTRY",
+    "output_dir_tag": "afr_focal3_oncoarray_african",
+    "output_root_dir": "/nfs/home/adas23/projects/AlphaEvolve/TroubleShooting/DynamicsOfHeldOut/OutputDir",
+    "output_row_tracking_path": "/nfs/home/adas23/projects/AlphaEvolve/Data/FunsearchEvaluatorDataAFRFocal3/output_row_tracking.pkl",
+    "run_dir": "/nfs/home/adas23/projects/AlphaEvolve/prio_func_disc_runs/oracle_priorityAfrFocal3_SimpleSeed_20260916_052346",
+    "scoring_partitions": null,
+    "seed_prio_function_path": null,
+    "supported_ancestry_groups": [
+      "AFRICAN_ANCESTRY",
+      "ASIAN",
+      "EUROPEAN"
+    ],
+    "training_pickle_path": [
+      "/nfs/home/adas23/projects/AlphaEvolve/Data/FunsearchEvaluatorDataAFRFocal3/no_covariates_train.pkl"
+    ]
+  },
+  "config_path": "/nfs/home/adas23/projects/AlphaEvolve/TroubleShooting/DynamicsOfHeldOut/example_config.json",
+  "results": {
+    "evaluations": [
+      {
+        "cycle_index": null,
+        "discovery_reduced_score": 0.5623413435306454,
+        "discovery_scores_per_test": {
+          "combined": 0.5623413435306454,
+          "mean": 0.5623413435306454,
+          "no_covariates_fold_1": 0.5655101700903142,
+          "no_covariates_fold_2": 0.5591725169709765,
+          "simplicity": -9.0,
+          "simplicity_bonus": 0.0
+        },
+        "discovery_snapshot_path": "/nfs/home/adas23/projects/AlphaEvolve/prio_func_disc_runs/oracle_priorityAfrFocal3_SimpleSeed_20260916_052346/program_db/bootstrap.pkl",
+        "discovery_source_island_id": 0,
+        "heldout_ancestry_evaluations": [
+          {
+            "ancestry_group": "AFRICAN_ANCESTRY",
+            "auc_roc": 0.5690500000000001,
+            "subject_count": 400
+          }
+        ],
+        "heldout_auc_roc": 0.5690500000000001,
+        "heldout_subject_count": 400,
+        "label": "seed",
+        "prio_function_path": "/nfs/home/adas23/projects/AlphaEvolve/Collaterals/RunAFRFocal3/funsearch_priority_seed_constant4.py",
+        "priority_function_artifact_metadata_path": "/nfs/home/adas23/projects/AlphaEvolve/TroubleShooting/DynamicsOfHeldOut/OutputDir/20260917_203338_afr_focal3_oncoarray_african/priority_functions/seed.metadata.json",
+        "priority_function_artifact_path": "/nfs/home/adas23/projects/AlphaEvolve/TroubleShooting/DynamicsOfHeldOut/OutputDir/20260917_203338_afr_focal3_oncoarray_african/priority_functions/seed.py",
+        "priority_source_hash": "9ccd06ac08b86206dcff73f20dfa64f8d113cac41e6bacdcb81c9299e304e167",
+        "reused_from_label": null,
+        "selected_calibration_penalty": 1.0,
+        "source_kind": "seed"
+      },
+      {
+        "cycle_index": 1,
+        "discovery_reduced_score": 0.5738927824708068,
+        "discovery_scores_per_test": {
+          "combined": 0.5738927824708068,
+          "mean": 0.5738927824708068,
+          "no_covariates_fold_1": 0.5718163485047247,
+          "no_covariates_fold_2": 0.5759692164368888,
+          "simplicity": -1228.0,
+          "simplicity_bonus": 0.0
+        },
+        "discovery_snapshot_path": "/lustre/isaac24/scratch/adas23/AlphaEvolve_prio_func_disc_runs/oracle_priorityAfrFocal3_SimpleSeed_20260916_052346/cycle_0001/program_db_end.pkl",
+        "discovery_source_island_id": 3,
+        "heldout_ancestry_evaluations": [
+          {
+            "ancestry_group": "AFRICAN_ANCESTRY",
+            "auc_roc": 0.5494249999999999,
+            "subject_count": 400
+          }
+        ],
+        "heldout_auc_roc": 0.5494249999999999,
+        "heldout_subject_count": 400,
+        "label": "cycle_0001",
+        "prio_function_path": "/lustre/isaac24/scratch/adas23/AlphaEvolve_prio_func_disc_runs/oracle_priorityAfrFocal3_SimpleSeed_20260916_052346/cycle_0001/best_prio.py",
+        "priority_function_artifact_metadata_path": "/nfs/home/adas23/projects/AlphaEvolve/TroubleShooting/DynamicsOfHeldOut/OutputDir/20260917_203338_afr_focal3_oncoarray_african/priority_functions/cycle_0001.metadata.json",
+        "priority_function_artifact_path": "/nfs/home/adas23/projects/AlphaEvolve/TroubleShooting/DynamicsOfHeldOut/OutputDir/20260917_203338_afr_focal3_oncoarray_african/priority_functions/cycle_0001.py",
+        "priority_source_hash": "a9e8d2d77f9aed5d29f3ea025a433a9a431d12c8d776f536d3ad3ab0ed4df673",
+        "reused_from_label": null,
+        "selected_calibration_penalty": 1.0,
+        "source_kind": "cycle_best"
+      },
+      {
+        "cycle_index": 2,
+        "discovery_reduced_score": 0.5924817555394696,
+        "discovery_scores_per_test": {
+          "combined": 0.5924817555394696,
+          "mean": 0.6004817555394696,
+          "no_covariates_fold_1": 0.6358733663546481,
+          "no_covariates_fold_2": 0.5650901447242911,
+          "simplicity": -3279.0,
+          "simplicity_bonus": -0.008
+        },
+        "discovery_snapshot_path": "/lustre/isaac24/scratch/adas23/AlphaEvolve_prio_func_disc_runs/oracle_priorityAfrFocal3_SimpleSeed_20260916_052346/cycle_0002/program_db_end.pkl",
+        "discovery_source_island_id": 1,
+        "heldout_ancestry_evaluations": [
+          {
+            "ancestry_group": "AFRICAN_ANCESTRY",
+            "auc_roc": 0.584275,
+            "subject_count": 400
+          }
+        ],
+        "heldout_auc_roc": 0.584275,
+        "heldout_subject_count": 400,
+        "label": "cycle_0002",
+        "prio_function_path": "/lustre/isaac24/scratch/adas23/AlphaEvolve_prio_func_disc_runs/oracle_priorityAfrFocal3_SimpleSeed_20260916_052346/cycle_0002/best_prio.py",
+        "priority_function_artifact_metadata_path": "/nfs/home/adas23/projects/AlphaEvolve/TroubleShooting/DynamicsOfHeldOut/OutputDir/20260917_203338_afr_focal3_oncoarray_african/priority_functions/cycle_0002.metadata.json",
+        "priority_function_artifact_path": "/nfs/home/adas23/projects/AlphaEvolve/TroubleShooting/DynamicsOfHeldOut/OutputDir/20260917_203338_afr_focal3_oncoarray_african/priority_functions/cycle_0002.py",
+        "priority_source_hash": "b4236cc49317596b8f4f1e4afaf0aa481f28cb6b4a0789d0697ccdd56f9a0625",
+        "reused_from_label": null,
+        "selected_calibration_penalty": 1.0,
+        "source_kind": "cycle_best"
+      },
+      {
+        "cycle_index": 3,
+        "discovery_reduced_score": 0.5924817555394696,
+        "discovery_scores_per_test": {
+          "combined": 0.5924817555394696,
+          "mean": 0.6004817555394696,
+          "no_covariates_fold_1": 0.6358733663546481,
+          "no_covariates_fold_2": 0.5650901447242911,
+          "simplicity": -3279.0,
+          "simplicity_bonus": -0.008
+        },
+        "discovery_snapshot_path": "/lustre/isaac24/scratch/adas23/AlphaEvolve_prio_func_disc_runs/oracle_priorityAfrFocal3_SimpleSeed_20260916_052346/cycle_0003/program_db_end.pkl",
+        "discovery_source_island_id": 1,
+        "heldout_ancestry_evaluations": [
+          {
+            "ancestry_group": "AFRICAN_ANCESTRY",
+            "auc_roc": 0.584275,
+            "subject_count": 400
+          }
+        ],
+        "heldout_auc_roc": 0.584275,
+        "heldout_subject_count": 400,
+        "label": "cycle_0003",
+        "prio_function_path": "/lustre/isaac24/scratch/adas23/AlphaEvolve_prio_func_disc_runs/oracle_priorityAfrFocal3_SimpleSeed_20260916_052346/cycle_0003/best_prio.py",
+        "priority_function_artifact_metadata_path": "/nfs/home/adas23/projects/AlphaEvolve/TroubleShooting/DynamicsOfHeldOut/OutputDir/20260917_203338_afr_focal3_oncoarray_african/priority_functions/cycle_0003.metadata.json",
+        "priority_function_artifact_path": "/nfs/home/adas23/projects/AlphaEvolve/TroubleShooting/DynamicsOfHeldOut/OutputDir/20260917_203338_afr_focal3_oncoarray_african/priority_functions/cycle_0003.py",
+        "priority_source_hash": "b4236cc49317596b8f4f1e4afaf0aa481f28cb6b4a0789d0697ccdd56f9a0625",
+        "reused_from_label": "cycle_0002",
+        "selected_calibration_penalty": 1.0,
+        "source_kind": "cycle_best"
+      }
+    ],
+    "output_dir": "/nfs/home/adas23/projects/AlphaEvolve/TroubleShooting/DynamicsOfHeldOut/OutputDir/20260917_203338_afr_focal3_oncoarray_african",
+    "priority_functions_dir": "/nfs/home/adas23/projects/AlphaEvolve/TroubleShooting/DynamicsOfHeldOut/OutputDir/20260917_203338_afr_focal3_oncoarray_african/priority_functions"
+  }
+}
